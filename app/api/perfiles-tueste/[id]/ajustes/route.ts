@@ -1,0 +1,33 @@
+import { NextRequest } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { apiOk, apiError, apiValidationError } from "@/lib/api-helpers";
+
+const crearAjusteSchema = z.object({
+  orden_secuencia: z.number().int().min(0),
+  temperatura_ajuste: z.number().optional().nullable(),
+  llama: z.string().max(50).optional().nullable(),
+  tiempo: z.number().optional().nullable(),
+  aire: z.string().max(50).optional().nullable(),
+});
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = await createClient();
+  const { id } = await params;
+  const body = await request.json();
+
+  const parsed = crearAjusteSchema.safeParse(body);
+  if (!parsed.success) return apiValidationError(parsed.error.flatten());
+
+  const { data, error } = await supabase
+    .from("ajustes_tueste")
+    .insert({ id_perfil: Number(id), ...parsed.data })
+    .select()
+    .single();
+
+  if (error) return apiError(error.message, 500);
+  return apiOk(data, 201);
+}

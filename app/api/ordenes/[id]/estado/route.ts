@@ -1,0 +1,26 @@
+import { NextRequest } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { cambiarEstadoOrdenSchema } from "@/lib/schemas/ordenes";
+import { apiOk, apiError, apiValidationError } from "@/lib/api-helpers";
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = await createClient();
+  const { id } = await params;
+  const body = await request.json();
+
+  const parsed = cambiarEstadoOrdenSchema.safeParse(body);
+  if (!parsed.success) return apiValidationError(parsed.error.flatten());
+
+  const { data, error } = await supabase
+    .from("ordenes_trabajo")
+    .update({ estado_orden: parsed.data.estado_orden })
+    .eq("id_orden", Number(id))
+    .select()
+    .single();
+
+  if (error) return apiError(error.message, 500);
+  return apiOk(data);
+}
