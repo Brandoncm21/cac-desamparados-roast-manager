@@ -38,6 +38,7 @@ export default function NuevaOrdenPage() {
     defaultValues: {
       num_talonario_fisico: "",
       id_cliente: 0 as any,
+      descripcion_producto: "",
       proceso_cafe: "Otro",
       firma_aprobacion_cliente: false,
       servicios: [],
