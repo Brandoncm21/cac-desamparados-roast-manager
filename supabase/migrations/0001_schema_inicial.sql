@@ -244,7 +244,7 @@ BEGIN
   SELECT rol::TEXT INTO v_rol FROM empleados WHERE id_auth = auth.uid();
   RETURN v_rol;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+$$ LANGUAGE plpgsql STABLE SECURITY INVOKER;
 
 -- ============================================================
 -- POLÍTICAS RLS
