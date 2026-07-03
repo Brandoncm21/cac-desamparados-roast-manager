@@ -244,7 +244,7 @@ BEGIN
   SELECT rol::TEXT INTO v_rol FROM empleados WHERE id_auth = auth.uid();
   RETURN v_rol;
 END;
-$$ LANGUAGE plpgsql STABLE SECURITY INVOKER;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- ============================================================
 -- POLÍTICAS RLS
@@ -256,8 +256,12 @@ ALTER TABLE empleados ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "empleados_lectura_propia" ON empleados
   FOR SELECT USING (id_auth = auth.uid());
 
+-- NOTA: no usar get_empleado_rol() aquí porque causa recursión RLS.
+-- Con SECURITY DEFINER la función bypass RLS, pero la policy se evaluaría cíclicamente.
 CREATE POLICY "empleados_admin_full" ON empleados
-  FOR ALL USING (get_empleado_rol() = 'Admin');
+  FOR ALL TO authenticated USING (
+    auth.uid() IN (SELECT id_auth FROM empleados WHERE rol = 'Admin')
+  );
 
 -- Clientes: lectura autenticados, escritura recepción/admin
 ALTER TABLE clientes ENABLE ROW LEVEL SECURITY;
