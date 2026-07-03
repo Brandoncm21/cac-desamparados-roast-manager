@@ -26,13 +26,13 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const fetchPromise = fetch(event.request).then((response) => {
-        if (response.status === 200) {
+        if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => cached);
-      return cached || fetchPromise;
+      });
+      return cached || fetchPromise.catch(() => cached || new Response("Offline", { status: 503 }));
     })
   );
 });
