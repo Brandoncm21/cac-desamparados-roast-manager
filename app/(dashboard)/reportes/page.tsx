@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,7 +17,7 @@ interface PerfilConCurva {
 }
 
 export default function ReportesPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [perfiles, setPerfiles] = useState<PerfilConCurva[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [proximosVencer, setProximosVencer] = useState<Record<string, unknown>[]>([]);

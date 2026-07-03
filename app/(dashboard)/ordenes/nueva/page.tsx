@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -29,7 +29,7 @@ interface ClienteOption {
 
 export default function NuevaOrdenPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [searchCliente, setSearchCliente] = useState("");
 

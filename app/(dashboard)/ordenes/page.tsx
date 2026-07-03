@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ export default function OrdenesPage() {
   const [ordenes, setOrdenes] = useState<Orden[]>([]);
   const [estado, setEstado] = useState("");
   const [search, setSearch] = useState("");
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const load = async () => {
