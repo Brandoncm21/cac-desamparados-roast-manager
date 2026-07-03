@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Search, Plus } from "lucide-react";
+import Link from "next/link";
 
 interface Cliente {
   id_cliente: number;
@@ -53,15 +54,17 @@ export default function ClientesPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {clientes.map((cliente) => (
-          <Card key={cliente.id_cliente}>
-            <CardHeader>
-              <CardTitle className="text-lg">{cliente.nombre_completo}</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-1">
-              {cliente.telefono && <p>📞 {cliente.telefono}</p>}
-              {cliente.zona_procedencia && <p>📍 {cliente.zona_procedencia}</p>}
-            </CardContent>
-          </Card>
+          <Link key={cliente.id_cliente} href={`/clientes/${cliente.id_cliente}`} className="block">
+            <Card className="h-full transition-all hover:shadow-md hover:border-amber-200/50 cursor-pointer">
+              <CardHeader>
+                <CardTitle className="text-lg">{cliente.nombre_completo}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-1">
+                {cliente.telefono && <p>📞 {cliente.telefono}</p>}
+                {cliente.zona_procedencia && <p>📍 {cliente.zona_procedencia}</p>}
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
     </div>

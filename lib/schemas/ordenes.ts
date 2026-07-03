@@ -1,15 +1,17 @@
 import { z } from "zod";
 
 export const crearOrdenSchema = z.object({
-  num_talonario_fisico: z.string().min(1, "N° talonario obligatorio").max(20),
   id_cliente: z.number().int().positive("Seleccione un cliente"),
+  zona_finca: z.string().max(150).optional().or(z.literal("")),
+  num_talonario_fisico: z.string().max(20).optional().or(z.literal("")),
   num_factura: z.string().max(30).optional().or(z.literal("")),
   porcentaje_humedad_entrada: z.number().min(0).max(100).optional().nullable(),
-  proceso_cafe: z.enum(["Lavado", "Honey", "Natural", "Otro"]),
+  proceso_cafe: z.enum(["Lavado", "Honey", "Natural", "Otro", ""]).optional().nullable(),
   descripcion_producto: z.string().optional().or(z.literal("")),
   id_empleado_recibe: z.number().int().positive().optional().nullable(),
   id_empleado_entrega: z.number().int().positive().optional().nullable(),
   fecha_orden: z.string().optional(),
+  hora_cierre: z.string().optional().or(z.literal("")),
   firma_aprobacion_cliente: z.boolean().optional().default(false),
   fecha_aprobacion: z.string().optional().nullable(),
   servicios: z.array(z.object({

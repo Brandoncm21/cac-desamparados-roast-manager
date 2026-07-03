@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,18 +9,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Search } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 interface Orden {
   id_orden: number;
-  num_talonario_fisico: string;
+  num_talonario_fisico: string | null;
   fecha_orden: string;
   estado_orden: string;
   clientes: { nombre_completo: string } | null;
 }
 
-export default function OrdenesPage() {
+const ESTADOS = ["Pendiente", "En Proceso", "Completado", "Cancelado"];
+
+export default function OrdenesPage({ searchParams }: { searchParams: { estado?: string } }) {
+  const router = useRouter();
   const [ordenes, setOrdenes] = useState<Orden[]>([]);
-  const [estado, setEstado] = useState("");
+  const [estado, setEstado] = useState(searchParams.estado || "");
   const [search, setSearch] = useState("");
   const supabase = useMemo(() => createClient(), []);
 
@@ -33,10 +38,37 @@ export default function OrdenesPage() {
       if (estado) query = query.eq("estado_orden", estado);
 
       const { data } = await query;
-      if (data) setOrdenes(data as unknown as Orden[]);
+      if (data) {
+        const lista = data as unknown as Orden[];
+        const filtrada = search
+          ? lista.filter((o) =>
+              (o.num_talonario_fisico || "").toLowerCase().includes(search.toLowerCase()) ||
+              (o.clientes?.nombre_completo || "").toLowerCase().includes(search.toLowerCase())
+            )
+          : lista;
+        setOrdenes(filtrada);
+      }
     };
     load();
-  }, [estado, supabase]);
+  }, [estado, search, supabase]);
+
+  const cambiarEstado = async (id: number, nuevoEstado: string) => {
+    const { error } = await supabase
+      .from("ordenes_trabajo")
+      .update({ estado_orden: nuevoEstado })
+      .eq("id_orden", id);
+
+    if (error) {
+      toast.error("Error al cambiar estado: " + error.message);
+      return;
+    }
+
+    toast.success(`Estado actualizado a ${nuevoEstado}`);
+    setOrdenes((prev) =>
+      prev.map((o) => (o.id_orden === id ? { ...o, estado_orden: nuevoEstado } : o))
+    );
+    router.refresh();
+  };
 
   const estadoBadge = (estado: string) => {
     const colors: Record<string, string> = {
@@ -60,21 +92,25 @@ export default function OrdenesPage() {
         </Link>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar orden..." className="pl-10" />
+          <Input
+            placeholder="Buscar por talonario o cliente..."
+            className="pl-10"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
         <Select value={estado} onValueChange={(v) => setEstado(v ?? "")}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value=" ">Todos</SelectItem>
-            <SelectItem value="Pendiente">Pendiente</SelectItem>
-            <SelectItem value="En Proceso">En Proceso</SelectItem>
-            <SelectItem value="Completado">Completado</SelectItem>
-            <SelectItem value="Cancelado">Cancelado</SelectItem>
+            <SelectItem value="">Todos</SelectItem>
+            {ESTADOS.map((e) => (
+              <SelectItem key={e} value={e}>{e}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -93,13 +129,25 @@ export default function OrdenesPage() {
           <TableBody>
             {ordenes.map((orden) => (
               <TableRow key={orden.id_orden}>
-                <TableCell className="font-mono">{orden.num_talonario_fisico}</TableCell>
+                <TableCell className="font-mono">{orden.num_talonario_fisico || "—"}</TableCell>
                 <TableCell>{orden.clientes?.nombre_completo || "-"}</TableCell>
                 <TableCell>{orden.fecha_orden}</TableCell>
                 <TableCell>
-                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${estadoBadge(orden.estado_orden)}`}>
-                    {orden.estado_orden}
-                  </span>
+                  <Select
+                    value={orden.estado_orden}
+                    onValueChange={(v) => cambiarEstado(orden.id_orden, v)}
+                  >
+                    <SelectTrigger className="w-36 h-8 text-xs">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${estadoBadge(orden.estado_orden)}`}>
+                        {orden.estado_orden}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ESTADOS.map((e) => (
+                        <SelectItem key={e} value={e}>{e}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </TableCell>
                 <TableCell>
                   <Link href={`/ordenes/${orden.id_orden}`}>

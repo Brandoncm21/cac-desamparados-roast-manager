@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Users, Thermometer, AlertTriangle } from "lucide-react";
@@ -42,10 +43,34 @@ export default function DashboardPage() {
   }, []);
 
   const cards = [
-    { title: "Órdenes Pendientes", value: stats.ordenes_pendientes, icon: FileText, color: "text-amber-600" },
-    { title: "Clientes Registrados", value: stats.clientes, icon: Users, color: "text-blue-600" },
-    { title: "Tuestes Hoy", value: stats.perfiles_hoy, icon: Thermometer, color: "text-orange-600" },
-    { title: "Próximos a Vencer", value: stats.proximos_vencer, icon: AlertTriangle, color: "text-red-600" },
+    {
+      title: "Órdenes Pendientes",
+      value: stats.ordenes_pendientes,
+      icon: FileText,
+      color: "text-amber-600",
+      href: "/ordenes?estado=Pendiente",
+    },
+    {
+      title: "Clientes Registrados",
+      value: stats.clientes,
+      icon: Users,
+      color: "text-blue-600",
+      href: "/clientes",
+    },
+    {
+      title: "Tuestes Hoy",
+      value: stats.perfiles_hoy,
+      icon: Thermometer,
+      color: "text-orange-600",
+      href: "/tueste",
+    },
+    {
+      title: "Próximos a Vencer",
+      value: stats.proximos_vencer,
+      icon: AlertTriangle,
+      color: "text-red-600",
+      href: "/reportes",
+    },
   ];
 
   return (
@@ -55,15 +80,17 @@ export default function DashboardPage() {
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <Card key={card.title}>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-                <Icon className={`h-5 w-5 ${card.color}`} />
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">{card.value}</p>
-              </CardContent>
-            </Card>
+            <Link key={card.title} href={card.href} className="block">
+              <Card className="h-full transition-all hover:shadow-md hover:border-amber-200/50 cursor-pointer">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+                  <Icon className={`h-5 w-5 ${card.color}`} />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{card.value}</p>
+                </CardContent>
+              </Card>
+            </Link>
           );
         })}
       </div>

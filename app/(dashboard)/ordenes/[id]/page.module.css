@@ -1,0 +1,29 @@
+@media print {
+  @page {
+    size: A2;
+    margin: 20mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .printArea,
+  .printArea * {
+    visibility: visible;
+  }
+
+  .printArea {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 20mm;
+    background: white;
+    color: black;
+  }
+
+  .noPrint {
+    display: none !important;
+  }
+}

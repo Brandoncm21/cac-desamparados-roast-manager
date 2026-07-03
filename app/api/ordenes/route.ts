@@ -34,7 +34,15 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
   const { servicios, tipo_tueste, tipo_molienda, tipo_empaque,
-    especificacion_extra, observaciones, ...ordenData } = parsed.data;
+    especificacion_extra, observaciones, ...restoOrden } = parsed.data;
+
+  const ordenData = {
+    ...restoOrden,
+    num_talonario_fisico: restoOrden.num_talonario_fisico || null,
+    proceso_cafe: restoOrden.proceso_cafe || null,
+    zona_finca: restoOrden.zona_finca || null,
+    hora_cierre: restoOrden.hora_cierre || null,
+  };
 
   const { data: orden, error: ordenError } = await supabase
     .from("ordenes_trabajo")
