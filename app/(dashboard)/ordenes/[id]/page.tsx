@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Thermometer, Printer } from "lucide-react";
-import Link from "next/link";
 import { toast } from "sonner";
 import styles from "./page.module.css";
 
@@ -35,17 +34,29 @@ interface Especificaciones {
   observaciones: string | null;
 }
 
+interface Empleado {
+  nombre: string;
+}
+
 interface Orden {
   id_orden: number;
-  num_talonario_fisico: string | null;
+  numero_factura: string;
   fecha_orden: string;
+  hora_cierre: string | null;
   estado_orden: string;
   proceso_cafe: string | null;
   porcentaje_humedad_entrada: number | null;
-  num_factura: string | null;
+  descripcion_producto: string | null;
+  zona_finca: string | null;
   clientes: Cliente | null;
   servicios_ejecutados: Servicio[];
   especificaciones_orden: Especificaciones | null;
+  empleado_recibe: Empleado | null;
+  empleado_entrega: Empleado | null;
+}
+
+interface PerfilTueste {
+  id_perfil: number;
 }
 
 export default function OrdenDetallePage() {
@@ -53,18 +64,50 @@ export default function OrdenDetallePage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [orden, setOrden] = useState<Orden | null>(null);
+  const [perfilTueste, setPerfilTueste] = useState<PerfilTueste | null>(null);
+  const [loadingPerfil, setLoadingPerfil] = useState(false);
+  const [creandoPerfil, setCreandoPerfil] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase
         .from("ordenes_trabajo")
-        .select("*, clientes(*), servicios_ejecutados(*), especificaciones_orden(*)")
+        .select(
+          `
+          *,
+          clientes(*),
+          servicios_ejecutados(*),
+          especificaciones_orden(*),
+          empleado_recibe:empleados!id_empleado_recibe(nombre),
+          empleado_entrega:empleados!id_empleado_entrega(nombre)
+        `
+        )
         .eq("id_orden", Number(params.id))
         .single();
       if (data) setOrden(data as unknown as Orden);
     };
     load();
   }, [params.id, supabase]);
+
+  useEffect(() => {
+    if (!orden) return;
+    const tieneTueste = orden.servicios_ejecutados.some((s) => s.tipo_servicio === "Tueste");
+    if (!tieneTueste) {
+      setPerfilTueste(null);
+      return;
+    }
+
+    setLoadingPerfil(true);
+    supabase
+      .from("perfiles_tueste")
+      .select("id_perfil")
+      .eq("id_orden", orden.id_orden)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPerfilTueste(data as PerfilTueste | null);
+        setLoadingPerfil(false);
+      });
+  }, [orden, supabase]);
 
   const cambiarEstado = async (nuevoEstado: string) => {
     if (!orden) return;
@@ -101,14 +144,77 @@ export default function OrdenDetallePage() {
 
   const cliente = orden.clientes;
   const total = orden.servicios_ejecutados.reduce((sum, s) => sum + (Number(s.precio) || 0), 0);
+  const tieneTueste = orden.servicios_ejecutados.some((s) => s.tipo_servicio === "Tueste");
+
+  const handleIniciarTueste = async () => {
+    if (!orden || creandoPerfil) return;
+    setCreandoPerfil(true);
+    try {
+      const { data, error } = await supabase
+        .from("perfiles_tueste")
+        .insert({
+          id_orden: orden.id_orden,
+          nombre_cafe: orden.descripcion_producto || orden.clientes?.nombre_completo || "Nuevo lote",
+        })
+        .select()
+        .single();
+
+      if (error) {
+        toast.error("Error al iniciar tueste: " + error.message);
+        return;
+      }
+
+      if (data?.id_perfil) {
+        router.push(`/tueste/${data.id_perfil}`);
+      } else {
+        toast.error("No se pudo obtener el ID del perfil creado");
+      }
+    } finally {
+      setCreandoPerfil(false);
+    }
+  };
+
+  const renderTuesteSection = () => {
+    if (!tieneTueste) return null;
+
+    return (
+      <Card className="mb-8 noPrint">
+        <CardHeader>
+          <CardTitle className="text-lg">Proceso de Tueste</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingPerfil ? (
+            <p className="text-muted-foreground">Verificando perfil de tueste...</p>
+          ) : perfilTueste ? (
+            <Button
+              className="w-full h-12"
+              onClick={() => router.push(`/tueste/${perfilTueste.id_perfil}`)}
+            >
+              <Thermometer className="h-4 w-4 mr-2" />
+              Ver perfil de tueste
+            </Button>
+          ) : (
+            <Button
+              className="w-full h-12"
+              onClick={handleIniciarTueste}
+              disabled={creandoPerfil}
+            >
+              <Thermometer className="h-4 w-4 mr-2" />
+              {creandoPerfil ? "Creando perfil..." : "Iniciar Tueste"}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className={`flex items-center gap-4 flex-wrap noPrint ${styles.noPrint}`}>
+      <div className={`flex items-center gap-4 flex-wrap noPrint mt-6 ${styles.noPrint}`}>
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-2xl font-bold">Orden #{orden.num_talonario_fisico || "—"}</h1>
+        <h1 className="text-2xl font-bold">Orden #{orden.numero_factura}</h1>
         <Select value={orden.estado_orden} onValueChange={cambiarEstado}>
           <SelectTrigger className="w-36">
             <Badge className={estadoBadge(orden.estado_orden)}>
@@ -131,7 +237,7 @@ export default function OrdenDetallePage() {
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold">SCACR</h2>
           <p className="text-muted-foreground">Centro Agrícola Cantonal de Desamparados</p>
-          <p className="font-mono text-xl mt-2">Orden #{orden.num_talonario_fisico || "—"}</p>
+          <p className="font-mono text-xl mt-2">Orden #{orden.numero_factura}</p>
           <Badge className={estadoBadge(orden.estado_orden)}>{orden.estado_orden}</Badge>
         </div>
 
@@ -150,11 +256,29 @@ export default function OrdenDetallePage() {
             <CardContent className="space-y-1 text-sm">
               <p>Proceso: <span className="font-medium">{orden.proceso_cafe || "—"}</span></p>
               <p>Humedad: <span className="font-medium">{orden.porcentaje_humedad_entrada ?? "—"}%</span></p>
-              <p>Factura: <span className="font-medium">{orden.num_factura || "—"}</span></p>
+              <p>Factura: <span className="font-medium">{orden.numero_factura}</span></p>
               <p>Fecha: <span className="font-medium">{orden.fecha_orden}</span></p>
             </CardContent>
           </Card>
         </div>
+
+        <Card className="mb-8">
+          <CardHeader><CardTitle className="text-lg">Datos de Cierre</CardTitle></CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            <p>
+              Hora: <span className="font-medium">{orden.hora_cierre || "—"}</span>
+            </p>
+            <p>
+              Responsable: <span className="font-medium">{orden.empleado_recibe?.nombre || "Sin asignar"}</span>
+            </p>
+            <p>
+              Zona/Finca: <span className="font-medium">{orden.zona_finca || "Sin especificar"}</span>
+            </p>
+            <p>
+              Producto: <span className="font-medium">{orden.descripcion_producto || "Sin especificar"}</span>
+            </p>
+          </CardContent>
+        </Card>
 
         <Card className="mb-8">
           <CardHeader><CardTitle className="text-lg">Servicios</CardTitle></CardHeader>
@@ -201,14 +325,7 @@ export default function OrdenDetallePage() {
         </div>
       </div>
 
-      <div className={`noPrint ${styles.noPrint}`}>
-        <Link href={`/tueste?orden=${params.id}`}>
-          <Button variant="outline" className="w-full h-12">
-            <Thermometer className="h-4 w-4 mr-2" />
-            Ver Perfiles de Tueste Vinculados
-          </Button>
-        </Link>
-      </div>
+      {renderTuesteSection()}
     </div>
   );
 }

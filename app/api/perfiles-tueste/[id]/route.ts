@@ -12,7 +12,7 @@ export async function GET(
 
   const { data: perfil, error } = await supabase
     .from("perfiles_tueste")
-    .select("*, empleados!perfiles_tueste_id_tostador_fkey(nombre), ordenes_trabajo(num_talonario_fisico)")
+    .select("*, empleados!perfiles_tueste_id_tostador_fkey(nombre), ordenes_trabajo(numero_factura)")
     .eq("id_perfil", Number(id))
     .single();
 

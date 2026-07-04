@@ -20,7 +20,7 @@ export async function GET(
 
   const { data: ordenes } = await supabase
     .from("ordenes_trabajo")
-    .select("id_orden, num_talonario_fisico, fecha_orden, estado_orden")
+    .select("id_orden, numero_factura, fecha_orden, estado_orden")
     .eq("id_cliente", Number(id))
     .order("fecha_orden", { ascending: false });
 

@@ -18,10 +18,10 @@ INSERT INTO clientes (nombre_completo, telefono, zona_procedencia) VALUES
   ('Hacienda La Amistad', '8888-5555', 'Turrialba');
 
 -- ÓRDENES DE TRABAJO
-INSERT INTO ordenes_trabajo (num_talonario_fisico, id_cliente, num_factura, porcentaje_humedad_entrada, proceso_cafe, descripcion_producto, id_empleado_recibe, id_empleado_entrega, estado_orden, firma_aprobacion_cliente) VALUES
-  ('0451', 1, 'FAC-2026-001', 12.5, 'Lavado', 'Café especialidad Tarrazú SHB', 3, 4, 'Completado', TRUE),
-  ('0452', 2, 'FAC-2026-002', 11.8, 'Honey', 'Café honey process Los Santos', 3, 4, 'En Proceso', TRUE),
-  ('0453', 3, NULL, 13.2, 'Natural', 'Café natural Valle Central - lote experimental', 3, 4, 'Pendiente', FALSE);
+INSERT INTO ordenes_trabajo (id_cliente, porcentaje_humedad_entrada, proceso_cafe, descripcion_producto, id_empleado_recibe, id_empleado_entrega, estado_orden, firma_aprobacion_cliente) VALUES
+  (1, 12.5, 'Lavado', 'Café especialidad Tarrazú SHB', 3, 4, 'Completado', TRUE),
+  (2, 11.8, 'Honey', 'Café honey process Los Santos', 3, 4, 'En Proceso', TRUE),
+  (3, 13.2, 'Natural', 'Café natural Valle Central - lote experimental', 3, 4, 'Pendiente', FALSE);
 
 -- SERVICIOS EJECUTADOS
 INSERT INTO servicios_ejecutados (id_orden, tipo_servicio, peso_inicial, precio, id_operador) VALUES

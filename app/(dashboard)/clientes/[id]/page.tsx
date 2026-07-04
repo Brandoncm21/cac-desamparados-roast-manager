@@ -13,7 +13,7 @@ import { ArrowLeft, Phone, MapPin } from "lucide-react";
 
 interface OrdenResumen {
   id_orden: number;
-  num_talonario_fisico: string | null;
+  numero_factura: string;
   fecha_orden: string;
   estado_orden: string;
 }
@@ -36,7 +36,7 @@ export default function ClienteDetallePage() {
     const load = async () => {
       const { data } = await supabase
         .from("clientes")
-        .select("*, ordenes_trabajo(id_orden, num_talonario_fisico, fecha_orden, estado_orden)")
+        .select("*, ordenes_trabajo(id_orden, numero_factura, fecha_orden, estado_orden)")
         .eq("id_cliente", Number(params.id))
         .single();
 
@@ -67,11 +67,11 @@ export default function ClienteDetallePage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 mt-6">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-2xl font-bold">{cliente.nombre_completo}</h1>
+        <h1 className="text-2xl font-bold break-words">{cliente.nombre_completo}</h1>
       </div>
 
       <Card>
@@ -90,12 +90,12 @@ export default function ClienteDetallePage() {
       </Card>
 
       <Tabs defaultValue="pendientes">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="pendientes">
-            Órdenes Pendientes ({pendientes.length})
+        <TabsList className="flex w-full gap-2 overflow-x-auto">
+          <TabsTrigger value="pendientes" className="whitespace-nowrap flex-1">
+            Pendientes ({pendientes.length})
           </TabsTrigger>
-          <TabsTrigger value="completadas">
-            Órdenes Completadas ({completadas.length})
+          <TabsTrigger value="completadas" className="whitespace-nowrap flex-1">
+            Completadas ({completadas.length})
           </TabsTrigger>
         </TabsList>
 
@@ -123,25 +123,27 @@ function OrdenesTab({
 
   return (
     <Card>
-      <CardContent className="p-0">
-        <Table>
+      <CardContent className="p-0 overflow-x-auto">
+        <Table className="min-w-[600px]">
           <TableHeader>
             <TableRow>
-              <TableHead>N° Talonario</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="min-w-[160px]">N° Factura</TableHead>
+              <TableHead className="min-w-[120px]">Fecha</TableHead>
+              <TableHead className="min-w-[140px]">Estado</TableHead>
+              <TableHead className="min-w-[80px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {ordenes.map((o) => (
               <TableRow key={o.id_orden}>
-                <TableCell className="font-mono">{o.num_talonario_fisico || "—"}</TableCell>
-                <TableCell>{o.fecha_orden}</TableCell>
-                <TableCell>
+                <TableCell className="font-mono break-all min-w-[160px]">
+                  {o.numero_factura}
+                </TableCell>
+                <TableCell className="break-words min-w-[120px]">{o.fecha_orden}</TableCell>
+                <TableCell className="min-w-[140px]">
                   <Badge className={estadoBadge(o.estado_orden)}>{o.estado_orden}</Badge>
                 </TableCell>
-                <TableCell>
+                <TableCell className="min-w-[80px]">
                   <Link href={`/ordenes/${o.id_orden}`}>
                     <Button variant="ghost" size="sm">Ver</Button>
                   </Link>

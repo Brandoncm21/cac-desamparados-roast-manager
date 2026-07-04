@@ -34,11 +34,10 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
   const { servicios, tipo_tueste, tipo_molienda, tipo_empaque,
-    especificacion_extra, observaciones, ...restoOrden } = parsed.data;
+    observaciones, ...restoOrden } = parsed.data;
 
   const ordenData = {
     ...restoOrden,
-    num_talonario_fisico: restoOrden.num_talonario_fisico || null,
     proceso_cafe: restoOrden.proceso_cafe || null,
     zona_finca: restoOrden.zona_finca || null,
     hora_cierre: restoOrden.hora_cierre || null,
@@ -47,7 +46,7 @@ export async function POST(request: NextRequest) {
   const { data: orden, error: ordenError } = await supabase
     .from("ordenes_trabajo")
     .insert(ordenData)
-    .select()
+    .select("*, clientes(nombre_completo)")
     .single();
 
   if (ordenError) return apiError(ordenError.message, 500);
@@ -74,7 +73,6 @@ export async function POST(request: NextRequest) {
       tipo_tueste: tipo_tueste || null,
       tipo_molienda: tipo_molienda || null,
       tipo_empaque: tipo_empaque || null,
-      especificacion_extra: especificacion_extra || null,
       observaciones: observaciones || null,
     });
   }

@@ -49,6 +49,16 @@ export interface HitoRecord {
   synced: boolean;
 }
 
+export interface SyncQueueItem {
+  id?: number;
+  table: string;
+  data: Record<string, unknown> | TemperaturaRecord | HitoRecord;
+  id_perfil: number;
+  retries?: number;
+  last_error?: string;
+  created_at?: number;
+}
+
 // Temperaturas
 export async function saveTemperaturaLocal(record: TemperaturaRecord) {
   const db = await getDb();
@@ -56,11 +66,13 @@ export async function saveTemperaturaLocal(record: TemperaturaRecord) {
 }
 
 export async function getTemperaturasLocal(perfilId: number) {
+  if (!Number.isFinite(perfilId)) return [];
   const db = await getDb();
   return db.getAllFromIndex("temperaturas", "id_perfil", perfilId);
 }
 
 export async function markTemperaturaSynced(perfilId: number, minuto: number) {
+  if (!Number.isFinite(perfilId)) return;
   const db = await getDb();
   const record = await db.get("temperaturas", [perfilId, minuto]);
   if (record) {
@@ -76,11 +88,13 @@ export async function saveHitoLocal(record: HitoRecord) {
 }
 
 export async function getHitosLocal(perfilId: number) {
+  if (!Number.isFinite(perfilId)) return [];
   const db = await getDb();
   return db.getAllFromIndex("hitos", "id_perfil", perfilId);
 }
 
 export async function markHitoSynced(perfilId: number, tipoHito: string) {
+  if (!Number.isFinite(perfilId)) return;
   const db = await getDb();
   const record = await db.get("hitos", [perfilId, tipoHito]);
   if (record) {
@@ -90,17 +104,31 @@ export async function markHitoSynced(perfilId: number, tipoHito: string) {
 }
 
 // Cola de sincronización
-export async function addToSyncQueue(item: { table: string; data: Record<string, unknown> | TemperaturaRecord | HitoRecord; id_perfil: number }) {
+export async function addToSyncQueue(item: Omit<SyncQueueItem, "id" | "retries" | "created_at">) {
   const db = await getDb();
-  await db.add("pending_sync", item);
+  await db.add("pending_sync", {
+    ...item,
+    retries: 0,
+    created_at: Date.now(),
+  });
 }
 
-export async function getSyncQueue(): Promise<Record<string, unknown>[]> {
+export async function getSyncQueue(): Promise<SyncQueueItem[]> {
   const db = await getDb();
-  return db.getAll("pending_sync") as Promise<Record<string, unknown>[]>;
+  return db.getAll("pending_sync") as Promise<SyncQueueItem[]>;
 }
 
 export async function removeFromSyncQueue(id: number) {
   const db = await getDb();
   await db.delete("pending_sync", id);
+}
+
+export async function incrementSyncQueueRetry(id: number, errorMessage: string) {
+  const db = await getDb();
+  const item = await db.get("pending_sync", id);
+  if (item) {
+    item.retries = (item.retries || 0) + 1;
+    item.last_error = errorMessage;
+    await db.put("pending_sync", item);
+  }
 }

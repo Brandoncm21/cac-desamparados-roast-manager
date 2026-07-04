@@ -55,6 +55,12 @@ export default function CapturaTuestePage() {
   }, []);
 
   useEffect(() => {
+    if (!Number.isFinite(perfilId) || perfilId <= 0) {
+      toast.error("Perfil de tueste inválido");
+      router.push("/tueste");
+      return;
+    }
+
     const loadData = async () => {
       const supabase = createClient();
       const { data: perfilData } = await supabase
@@ -94,7 +100,7 @@ export default function CapturaTuestePage() {
       }
     };
     loadData();
-  }, [perfilId]);
+  }, [perfilId, router]);
 
   const registrarTemperatura = useCallback(async () => {
     const temp = Number(temperatura);

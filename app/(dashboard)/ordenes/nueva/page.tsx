@@ -106,7 +106,7 @@ export default function NuevaOrdenPage() {
   const form = useForm<CrearOrdenInput>({
     resolver: zodResolver(crearOrdenSchema) as any,
     defaultValues: {
-      id_cliente: 0 as any,
+      id_cliente: undefined as any,
       zona_finca: "",
       descripcion_producto: "",
       proceso_cafe: "",
@@ -119,7 +119,7 @@ export default function NuevaOrdenPage() {
       observaciones: "",
       fecha_orden: new Date().toISOString().split("T")[0],
       hora_cierre: "",
-      id_empleado_recibe: 0 as any,
+      id_empleado_recibe: undefined as any,
     },
   });
 
@@ -148,6 +148,15 @@ export default function NuevaOrdenPage() {
   };
 
   const onSubmit = async (values: CrearOrdenInput) => {
+    if (!values.id_cliente) {
+      toast.error("Debe seleccionar un cliente");
+      return;
+    }
+    if (!values.id_empleado_recibe) {
+      toast.error("Debe seleccionar un responsable");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {

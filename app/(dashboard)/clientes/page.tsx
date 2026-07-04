@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
 import { Search, Plus } from "lucide-react";
 import Link from "next/link";
 
@@ -16,25 +17,51 @@ interface Cliente {
 }
 
 export default function ClientesPage() {
+  const supabase = useMemo(() => createClient(), []);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [search, setSearch] = useState("");
-  const supabase = useMemo(() => createClient(), []);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+
+  // Debounce para búsqueda
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     const load = async () => {
-      let query = supabase.from("clientes").select("*").order("nombre_completo");
-      if (search) {
-        query = query.or(`nombre_completo.ilike.%${search}%,telefono.ilike.%${search}%`);
+      const from = (page - 1) * pageSize;
+      const to = page * pageSize - 1;
+
+      let query = supabase
+        .from("clientes")
+        .select("*", { count: "exact" })
+        .order("nombre_completo")
+        .range(from, to);
+
+      if (debouncedSearch) {
+        const term = debouncedSearch.trim();
+        query = query.or(`nombre_completo.ilike.%${term}%,telefono.ilike.%${term}%`);
       }
-      const { data } = await query;
+
+      const { data, count } = await query;
       if (data) setClientes(data);
+      setTotalItems(count || 0);
     };
     load();
-  }, [search, supabase]);
+  }, [debouncedSearch, page, pageSize, supabase]);
+
+  const totalPages = Math.ceil(totalItems / pageSize);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mt-6">
         <h1 className="text-2xl font-bold">Clientes</h1>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
@@ -55,7 +82,7 @@ export default function ClientesPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {clientes.map((cliente) => (
           <Link key={cliente.id_cliente} href={`/clientes/${cliente.id_cliente}`} className="block">
-            <Card className="h-full transition-all hover:shadow-md hover:border-amber-200/50 cursor-pointer">
+            <Card className="h-full transition-all hover:shadow-md hover:border-secondary cursor-pointer">
               <CardHeader>
                 <CardTitle className="text-lg">{cliente.nombre_completo}</CardTitle>
               </CardHeader>
@@ -67,6 +94,15 @@ export default function ClientesPage() {
           </Link>
         ))}
       </div>
+
+      <Pagination
+        currentPage={page}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={totalItems}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 }

@@ -3,8 +3,6 @@ import { z } from "zod";
 export const crearOrdenSchema = z.object({
   id_cliente: z.number().int().positive("Seleccione un cliente"),
   zona_finca: z.string().max(150).optional().or(z.literal("")),
-  num_talonario_fisico: z.string().max(20).optional().or(z.literal("")),
-  num_factura: z.string().max(30).optional().or(z.literal("")),
   porcentaje_humedad_entrada: z.number().min(0).max(100).optional().nullable(),
   proceso_cafe: z.enum(["Lavado", "Honey", "Natural", "Otro", ""]).optional().nullable(),
   descripcion_producto: z.string().optional().or(z.literal("")),
@@ -25,7 +23,6 @@ export const crearOrdenSchema = z.object({
   tipo_tueste: z.string().max(100).optional().or(z.literal("")),
   tipo_molienda: z.string().max(100).optional().or(z.literal("")),
   tipo_empaque: z.string().max(100).optional().or(z.literal("")),
-  especificacion_extra: z.string().optional().or(z.literal("")),
   observaciones: z.string().optional().or(z.literal("")),
 });
 
