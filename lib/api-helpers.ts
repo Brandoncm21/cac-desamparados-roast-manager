@@ -62,6 +62,7 @@ export async function requireRole(roles: string[]) {
   const { data: { user }, error } = await supabase.auth.getUser();
 
   if (error || !user) {
+    console.error("[requireRole] Auth error:", { error, hasUser: !!user });
     throw new AppError(ERROR_CODES.UNAUTHORIZED, "No autorizado", 401);
   }
 
@@ -72,8 +73,15 @@ export async function requireRole(roles: string[]) {
     .single();
 
   if (empleadoError || !empleado || !roles.includes(empleado.rol)) {
+    console.error("[requireRole] Role check failed:", {
+      userId: user.id,
+      requestedRoles: roles,
+      empleado,
+      empleadoError,
+    });
     throw new AppError(ERROR_CODES.FORBIDDEN, "No tiene permisos para esta acción", 403);
   }
 
+  console.log("[requireRole] Authorized:", { userId: user.id, role: empleado.rol });
   return { user, role: empleado.rol };
 }

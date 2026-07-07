@@ -39,16 +39,38 @@ async function put(
   const body = await request.json();
 
   const parsed = actualizarOrdenSchema.safeParse(body);
-  if (!parsed.success) return apiValidationError(parsed.error.flatten());
+  if (!parsed.success) {
+    console.error("[PUT /api/ordenes/:id] Validation error:", parsed.error.issues);
+    return apiValidationError(parsed.error.flatten());
+  }
 
-  const { data, error } = await supabase
+  const { data, error, status, statusText } = await supabase
     .from("ordenes_trabajo")
     .update(parsed.data)
     .eq("id_orden", Number(id))
+    .is("deleted_at", null)
     .select()
     .single();
 
-  if (error) return apiError(error.message, 500);
+  if (error) {
+    console.error("[PUT /api/ordenes/:id] Supabase error:", {
+      id: Number(id),
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      status,
+      statusText,
+    });
+
+    const statusCode = error.code === "PGRST116" ? 404 : 500;
+    return apiError(error.message, statusCode);
+  }
+
+  if (!data) {
+    return apiError("Orden no encontrada o no tiene permisos", 404);
+  }
+
   return apiOk(data);
 }
 
@@ -60,13 +82,41 @@ async function del(
   const supabase = await createClient();
   const { id } = await params;
 
-  const { error } = await supabase
+  const { data, error, status, statusText } = await supabase
     .from("ordenes_trabajo")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id_orden", Number(id))
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select();
 
-  if (error) return apiError(error.message, 500);
+  if (error) {
+    console.error("[DELETE /api/ordenes/:id] Supabase error:", {
+      id: Number(id),
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      status,
+      statusText,
+    });
+
+    const statusCode = error.code === "PGRST116" ? 404 : 500;
+    return apiError(error.message, statusCode);
+  }
+
+  if (!data || data.length === 0) {
+    console.warn("[DELETE /api/ordenes/:id] No rows affected:", {
+      id: Number(id),
+      message: "Orden no encontrada, ya eliminada o sin permisos",
+    });
+    return apiError("Orden no encontrada, ya eliminada o sin permisos", 404);
+  }
+
+  console.log("[DELETE /api/ordenes/:id] Soft delete success:", {
+    id: Number(id),
+    rowsAffected: data.length,
+  });
+
   return apiOk({ deleted: true });
 }
 
