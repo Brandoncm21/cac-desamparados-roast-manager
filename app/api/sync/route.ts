@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiError, apiValidationError } from "@/lib/api-helpers";
+import { apiOk, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
 
 const syncItemSchema = z.object({
   tempId: z.string(),
@@ -16,7 +16,8 @@ const syncSchema = z.object({
   items: z.array(syncItemSchema),
 });
 
-export async function POST(request: NextRequest) {
+async function post(request: NextRequest) {
+  await requireAuth();
   const supabase = await createClient();
   const body = await request.json();
 
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
       const { data: existing } = await supabase
         .from("trazabilidad_temperatura")
         .select("id_registro")
-        .match({ id_perfil: item.data.id_perfil, minuto: item.data.minuto })
+        .match({ id_perfil: item.data["id_perfil"], minuto: item.data["minuto"] })
         .maybeSingle();
 
       if (existing) {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       const { data: existing } = await supabase
         .from("hitos_termicos")
         .select("id_hito")
-        .match({ id_perfil: item.data.id_perfil, tipo_hito: item.data.tipo_hito })
+        .match({ id_perfil: item.data["id_perfil"], tipo_hito: item.data["tipo_hito"] })
         .maybeSingle();
 
       if (existing) {
@@ -71,9 +72,14 @@ export async function POST(request: NextRequest) {
         .select()
         .single();
 
-      if (data) idMap[item.tempId] = (data as any)[Object.keys(data)[0]];
+      if (data) {
+        const [firstKey] = Object.keys(data as Record<string, unknown>);
+        if (firstKey) idMap[item.tempId] = (data as Record<string, unknown>)[firstKey] as number;
+      }
     }
   }
 
   return apiOk({ idMap });
 }
+
+export const POST = withErrorHandler(post);

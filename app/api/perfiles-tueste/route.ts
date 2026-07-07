@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { crearPerfilSchema } from "@/lib/schemas/perfiles";
-import { apiOk, apiError, apiValidationError } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
 
-export async function POST(request: NextRequest) {
+async function post(request: NextRequest) {
+  await requireAuth();
   const supabase = await createClient();
   const body = await request.json();
 
@@ -19,3 +20,5 @@ export async function POST(request: NextRequest) {
   if (error) return apiError(error.message, 500);
   return apiOk(data, 201);
 }
+
+export const POST = withErrorHandler(post);

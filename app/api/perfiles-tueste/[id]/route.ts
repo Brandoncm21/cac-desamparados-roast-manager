@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { crearPerfilSchema } from "@/lib/schemas/perfiles";
-import { apiOk, apiError, apiValidationError } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
 
-export async function GET(
+async function get(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
 
@@ -49,10 +50,11 @@ export async function GET(
   });
 }
 
-export async function PUT(
+async function put(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
   const body = await request.json();
@@ -70,3 +72,6 @@ export async function PUT(
   if (error) return apiError(error.message, 500);
   return apiOk(data);
 }
+
+export const GET = withErrorHandler(get);
+export const PUT = withErrorHandler(put);

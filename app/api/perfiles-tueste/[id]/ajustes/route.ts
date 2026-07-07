@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiError, apiValidationError } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
 
 const crearAjusteSchema = z.object({
   orden_secuencia: z.number().int().min(0),
@@ -11,10 +11,11 @@ const crearAjusteSchema = z.object({
   aire: z.string().max(50).optional().nullable(),
 });
 
-export async function POST(
+async function post(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
   const body = await request.json();
@@ -31,3 +32,5 @@ export async function POST(
   if (error) return apiError(error.message, 500);
   return apiOk(data, 201);
 }
+
+export const POST = withErrorHandler(post);

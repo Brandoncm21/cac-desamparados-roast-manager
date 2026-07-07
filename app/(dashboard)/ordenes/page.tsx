@@ -169,7 +169,7 @@ export default function OrdenesPage({
                 <TableCell>
                   <Select
                     value={orden.estado_orden}
-                    onValueChange={(v) => cambiarEstado(orden.id_orden, v)}
+                    onValueChange={(v) => v && cambiarEstado(orden.id_orden, v)}
                   >
                     <SelectTrigger className="w-36 h-8 text-xs">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${estadoBadge(orden.estado_orden)}`}>

@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { apiOk, apiError } from "@/lib/api-helpers";
+import { apiOk, apiError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
 
-export async function GET(request: NextRequest) {
+async function get(request: NextRequest) {
+  await requireAuth();
   const supabase = await createClient();
   const { searchParams } = new URL(request.url);
   const rol = searchParams.get("rol");
@@ -19,3 +20,5 @@ export async function GET(request: NextRequest) {
   if (error) return apiError(error.message, 500);
   return apiOk(data);
 }
+
+export const GET = withErrorHandler(get);

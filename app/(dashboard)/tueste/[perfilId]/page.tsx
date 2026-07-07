@@ -119,7 +119,7 @@ export default function CapturaTuestePage() {
   }, [temperatura, currentMinute, perfilId, isOnline]);
 
   const registrarHito = useCallback(async (tipoHito: string) => {
-    const temp = Number(temperatura) || (puntos.length > 0 ? puntos[puntos.length - 1].temperatura : 0);
+    const temp = Number(temperatura) || (puntos.length > 0 ? puntos[puntos.length - 1]?.temperatura ?? 0 : 0);
     const record: HitoRecord = { id_perfil: perfilId, tipo_hito: tipoHito, tiempo_min: currentMinute, temperatura: temp, synced: false };
     await saveHitoLocal(record);
     await addToSyncQueue({ table: "hitos_termicos", data: record, id_perfil: perfilId });
@@ -153,10 +153,10 @@ export default function CapturaTuestePage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-12 lg:pt-0">
         <div>
           <h1 className="text-xl md:text-2xl font-bold break-words">
-            {perfil?.nombre_cafe as string || `Perfil #${perfilId}`}
+            {perfil?.["nombre_cafe"] as string || `Perfil #${perfilId}`}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Lote: {perfil?.numero_lote as string || "-"} | Minuto: {currentMinute}
+            Lote: {perfil?.["numero_lote"] as string || "-"} | Minuto: {currentMinute}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -286,28 +286,28 @@ export default function CapturaTuestePage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm">
               <div className="p-3 bg-white rounded-lg">
                 <p className="text-muted-foreground text-xs">Tiempo Desarrollo</p>
-                <p className="text-lg font-bold">{resumen.tiempo_desarrollo_min as string || "-"} min</p>
+                <p className="text-lg font-bold">{resumen["tiempo_desarrollo_min"] as string || "-"} min</p>
               </div>
               <div className="p-3 bg-white rounded-lg">
                 <p className="text-muted-foreground text-xs">DTR</p>
-                <p className="text-lg font-bold">{resumen.dtr_porcentaje as string || "-"}%</p>
+                <p className="text-lg font-bold">{resumen["dtr_porcentaje"] as string || "-"}%</p>
               </div>
               <div className="p-3 bg-white rounded-lg">
                 <p className="text-muted-foreground text-xs">Óptimo Consumo</p>
-                <p className="text-lg font-bold">{resumen.fecha_optima_consumo as string || "-"}</p>
+                <p className="text-lg font-bold">{resumen["fecha_optima_consumo"] as string || "-"}</p>
               </div>
               <div className="p-3 bg-white rounded-lg">
                 <p className="text-muted-foreground text-xs">Vencimiento</p>
-                <p className="text-lg font-bold">{resumen.fecha_vencimiento as string || "-"}</p>
+                <p className="text-lg font-bold">{resumen["fecha_vencimiento"] as string || "-"}</p>
               </div>
             </div>
-            {(resumen.metricas as Array<Record<string, unknown>>)?.length > 0 && (
+            {(resumen["metricas"] as Array<Record<string, unknown>>)?.length > 0 && (
               <div>
                 <h3 className="font-medium mb-2">Métricas</h3>
-                {(resumen.metricas as Array<Record<string, unknown>>).map((m) => (
-                  <div key={m.tipo_metrica as string} className="flex justify-between text-sm py-2 px-3 bg-white rounded-lg mb-1">
-                    <span className="font-medium">{m.tipo_metrica as string}</span>
-                    <span>Antes: {m.valor_antes as string} → Después: {m.valor_despues as string} ({m.porcentaje_diferencia as string}%)</span>
+                {(resumen["metricas"] as Array<Record<string, unknown>>).map((m) => (
+                  <div key={m["tipo_metrica"] as string} className="flex justify-between text-sm py-2 px-3 bg-white rounded-lg mb-1">
+                    <span className="font-medium">{m["tipo_metrica"] as string}</span>
+                    <span>Antes: {m["valor_antes"] as string} → Después: {m["valor_despues"] as string} ({m["porcentaje_diferencia"] as string}%)</span>
                   </div>
                 ))}
               </div>

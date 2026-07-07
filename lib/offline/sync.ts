@@ -25,7 +25,7 @@ export async function syncAll() {
           .upsert(dbData, { onConflict: "id_perfil, minuto" });
         error = result.error;
         if (!error) {
-          await markTemperaturaSynced(d.id_perfil as number, d.minuto as number);
+          await markTemperaturaSynced(d["id_perfil"] as number, d["minuto"] as number);
         }
       } else if (item.table === "hitos_termicos") {
         const { synced: _syncedH, id_hito: _idHito, ...dbData } = d;
@@ -34,7 +34,7 @@ export async function syncAll() {
           .upsert(dbData, { onConflict: "id_perfil, tipo_hito" });
         error = result.error;
         if (!error) {
-          await markHitoSynced(d.id_perfil as number, d.tipo_hito as string);
+          await markHitoSynced(d["id_perfil"] as number, d["tipo_hito"] as string);
         }
       } else {
         console.warn("syncAll: tabla desconocida", item.table);

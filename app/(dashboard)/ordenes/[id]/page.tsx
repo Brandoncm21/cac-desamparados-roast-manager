@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Thermometer, Printer } from "lucide-react";
 import { toast } from "sonner";
@@ -210,12 +210,12 @@ export default function OrdenDetallePage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className={`flex items-center gap-4 flex-wrap noPrint mt-6 ${styles.noPrint}`}>
+      <div className={`flex items-center gap-4 flex-wrap noPrint mt-6 ${styles["noPrint"]}`}>
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-2xl font-bold">Orden #{orden.numero_factura}</h1>
-        <Select value={orden.estado_orden} onValueChange={cambiarEstado}>
+        <Select value={orden.estado_orden} onValueChange={(value) => value && cambiarEstado(value)}>
           <SelectTrigger className="w-36">
             <Badge className={estadoBadge(orden.estado_orden)}>
               {orden.estado_orden}
@@ -233,7 +233,7 @@ export default function OrdenDetallePage() {
         </Button>
       </div>
 
-      <div className={`printArea ${styles.printArea}`}>
+      <div className={`printArea ${styles["printArea"]}`}>
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold">SCACR</h2>
           <p className="text-muted-foreground">Centro Agrícola Cantonal de Desamparados</p>

@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { apiOk, apiError } from "@/lib/api-helpers";
+import { apiOk, apiError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
 
-export async function GET() {
+async function get() {
+  await requireAuth();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("zonas_finca")
@@ -13,7 +14,8 @@ export async function GET() {
   return apiOk(data ?? []);
 }
 
-export async function POST(request: NextRequest) {
+async function post(request: NextRequest) {
+  await requireAuth();
   const supabase = await createClient();
   const body = await request.json();
 
@@ -29,3 +31,6 @@ export async function POST(request: NextRequest) {
   if (error) return apiError(error.message, 500);
   return apiOk(data, 201);
 }
+
+export const GET = withErrorHandler(get);
+export const POST = withErrorHandler(post);

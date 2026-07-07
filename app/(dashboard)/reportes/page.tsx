@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -96,10 +95,10 @@ export default function ReportesPage() {
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {proximosVencer.map((p) => (
-              <div key={p.id_perfil as number} className="flex justify-between">
-                <span className="font-medium">{p.numero_lote as string || `Perfil #${p.id_perfil}`}</span>
-                <span>{p.nombre_cafe as string}</span>
-                <span className="text-red-600 font-medium">Vence: {p.fecha_vencimiento as string}</span>
+              <div key={p["id_perfil"] as number} className="flex justify-between">
+                <span className="font-medium">{p["numero_lote"] as string || `Perfil #${p["id_perfil"]}`}</span>
+                <span>{p["nombre_cafe"] as string}</span>
+                <span className="text-red-600 font-medium">Vence: {p["fecha_vencimiento"] as string}</span>
               </div>
             ))}
           </CardContent>

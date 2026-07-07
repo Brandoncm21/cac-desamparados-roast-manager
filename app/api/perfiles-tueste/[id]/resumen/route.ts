@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { apiOk, apiError } from "@/lib/api-helpers";
+import { apiOk, apiError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
 
-export async function GET(
+async function get(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
 
@@ -27,3 +28,5 @@ export async function GET(
     metricas: metricas || [],
   });
 }
+
+export const GET = withErrorHandler(get);

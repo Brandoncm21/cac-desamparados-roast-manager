@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiError, apiValidationError } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
 
 const editarServicioSchema = z.object({
   peso_inicial: z.number().positive().optional().nullable(),
@@ -9,10 +9,11 @@ const editarServicioSchema = z.object({
   id_operador: z.number().int().positive().optional().nullable(),
 });
 
-export async function PUT(
+async function put(
   request: NextRequest,
   { params }: { params: Promise<{ idServicio: string }> }
 ) {
+  await requireAuth();
   const supabase = await createClient();
   const { idServicio } = await params;
   const body = await request.json();
@@ -31,10 +32,11 @@ export async function PUT(
   return apiOk(data);
 }
 
-export async function DELETE(
+async function del(
   _request: NextRequest,
   { params }: { params: Promise<{ idServicio: string }> }
 ) {
+  await requireAuth();
   const supabase = await createClient();
   const { idServicio } = await params;
 
@@ -64,3 +66,6 @@ export async function DELETE(
   if (error) return apiError(error.message, 500);
   return apiOk({ deleted: true });
 }
+
+export const PUT = withErrorHandler(put);
+export const DELETE = withErrorHandler(del);

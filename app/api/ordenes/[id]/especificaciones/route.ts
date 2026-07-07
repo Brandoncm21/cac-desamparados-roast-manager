@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiError, apiValidationError } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
 
 const upsertEspecificacionesSchema = z.object({
   tipo_tueste: z.string().max(100).optional().nullable(),
@@ -11,10 +11,11 @@ const upsertEspecificacionesSchema = z.object({
   observaciones: z.string().optional().nullable(),
 });
 
-export async function PUT(
+async function put(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
   const body = await request.json();
@@ -47,3 +48,5 @@ export async function PUT(
   if (result.error) return apiError(result.error.message, 500);
   return apiOk(result.data);
 }
+
+export const PUT = withErrorHandler(put);

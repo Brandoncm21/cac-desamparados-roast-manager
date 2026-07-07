@@ -90,7 +90,7 @@ export function InlineAddSelect({
   }
 
   return (
-    <Select value={value || "__EMPTY__"} onValueChange={handleSelect}>
+    <Select value={value || "__EMPTY__"} onValueChange={(value) => value && handleSelect(value)}>
       <SelectTrigger className="h-12 md:h-10 text-base">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>

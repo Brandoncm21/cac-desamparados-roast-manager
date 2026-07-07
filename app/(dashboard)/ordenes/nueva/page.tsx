@@ -8,7 +8,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { crearOrdenSchema, type CrearOrdenInput } from "@/lib/schemas/ordenes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,7 +66,7 @@ function SpecSelect({
 
   return (
     <div className="space-y-2">
-      <Select value={options.includes(value) ? value : value ? "__OTRO__" : ""} onValueChange={(v) => onChange(v)}>
+      <Select value={options.includes(value) ? value : value ? "__OTRO__" : ""} onValueChange={(v) => v && onChange(v)}>
         <SelectTrigger className="h-12 md:h-10 text-base">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
