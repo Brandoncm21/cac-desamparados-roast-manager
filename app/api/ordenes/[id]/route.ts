@@ -78,46 +78,68 @@ async function del(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await requireRole(['Admin', 'Recepción', 'Tostador']);
-  const supabase = await createClient();
-  const { id } = await params;
+  try {
+    console.log("[DELETE /api/ordenes/:id] Starting handler");
+    const { user, role } = await requireRole(['Admin', 'Recepción', 'Tostador']);
+    console.log("[DELETE /api/ordenes/:id] Role check passed:", { userId: user.id, role });
 
-  const { data, error, status, statusText } = await supabase
-    .from("ordenes_trabajo")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id_orden", Number(id))
-    .is("deleted_at", null)
-    .select();
+    const supabase = await createClient();
+    console.log("[DELETE /api/ordenes/:id] Supabase client created");
 
-  if (error) {
-    console.error("[DELETE /api/ordenes/:id] Supabase error:", {
+    const { id } = await params;
+    console.log("[DELETE /api/ordenes/:id] Params resolved:", { id: Number(id) });
+
+    const { data, error, status, statusText } = await supabase
+      .from("ordenes_trabajo")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id_orden", Number(id))
+      .is("deleted_at", null)
+      .select();
+
+    console.log("[DELETE /api/ordenes/:id] Supabase response:", {
       id: Number(id),
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
+      hasError: !!error,
+      dataLength: data?.length ?? 0,
       status,
       statusText,
     });
 
-    const statusCode = error.code === "PGRST116" ? 404 : 500;
-    return apiError(error.message, statusCode);
-  }
+    if (error) {
+      console.error("[DELETE /api/ordenes/:id] Supabase error:", {
+        id: Number(id),
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        status,
+        statusText,
+      });
 
-  if (!data || data.length === 0) {
-    console.warn("[DELETE /api/ordenes/:id] No rows affected:", {
+      const statusCode = error.code === "PGRST116" ? 404 : 500;
+      return apiError(error.message, statusCode);
+    }
+
+    if (!data || data.length === 0) {
+      console.warn("[DELETE /api/ordenes/:id] No rows affected:", {
+        id: Number(id),
+        message: "Orden no encontrada, ya eliminada o sin permisos",
+      });
+      return apiError("Orden no encontrada, ya eliminada o sin permisos", 404);
+    }
+
+    console.log("[DELETE /api/ordenes/:id] Soft delete success:", {
       id: Number(id),
-      message: "Orden no encontrada, ya eliminada o sin permisos",
+      rowsAffected: data.length,
     });
-    return apiError("Orden no encontrada, ya eliminada o sin permisos", 404);
+
+    return apiOk({ deleted: true });
+  } catch (error) {
+    console.error("[DELETE /api/ordenes/:id] Uncaught exception:", error);
+    if (error instanceof Error) {
+      console.error("[DELETE /api/ordenes/:id] Stack trace:", error.stack);
+    }
+    throw error;
   }
-
-  console.log("[DELETE /api/ordenes/:id] Soft delete success:", {
-    id: Number(id),
-    rowsAffected: data.length,
-  });
-
-  return apiOk({ deleted: true });
 }
 
 export const GET = withErrorHandler(get);
