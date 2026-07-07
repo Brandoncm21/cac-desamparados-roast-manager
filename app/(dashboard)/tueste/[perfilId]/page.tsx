@@ -67,6 +67,7 @@ export default function CapturaTuestePage() {
         .from("perfiles_tueste")
         .select("*")
         .eq("id_perfil", perfilId)
+        .is("deleted_at", null)
         .single();
       if (perfilData) setPerfil(perfilData);
 

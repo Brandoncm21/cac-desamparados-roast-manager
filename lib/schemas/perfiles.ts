@@ -22,6 +22,9 @@ export const upsertHitoSchema = z.object({
   temperatura: z.number().optional().nullable(),
 });
 
+export const actualizarPerfilSchema = crearPerfilSchema.partial();
+
 export type CrearPerfilInput = z.infer<typeof crearPerfilSchema>;
 export type BulkTemperaturasInput = z.infer<typeof bulkTemperaturasSchema>;
 export type UpsertHitoInput = z.infer<typeof upsertHitoSchema>;
+export type ActualizarPerfilInput = z.infer<typeof actualizarPerfilSchema>;

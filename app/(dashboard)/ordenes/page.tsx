@@ -3,12 +3,13 @@
 import { useEffect, useState, useMemo, use } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getCurrentUserRole, canEditOrder, canDeleteOrder } from "@/lib/auth-helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -38,6 +39,7 @@ export default function OrdenesPage({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [userRole, setUserRole] = useState<"Admin" | "Tostador" | "Recepción" | "Operador" | null>(null);
 
   // Debounce para búsqueda
   useEffect(() => {
@@ -53,14 +55,15 @@ export default function OrdenesPage({
     setPage(1);
   }, [estado]);
 
-  useEffect(() => {
-    const load = async () => {
+  const loadOrdenes = useMemo(() => {
+    return async () => {
       const from = (page - 1) * pageSize;
       const to = page * pageSize - 1;
 
       let query = supabase
         .from("ordenes_trabajo")
         .select("*, clientes(nombre_completo)", { count: "exact" })
+        .is("deleted_at", null)
         .order("fecha_orden", { ascending: false })
         .range(from, to);
 
@@ -81,8 +84,15 @@ export default function OrdenesPage({
       }
       setTotalItems(count || 0);
     };
-    load();
   }, [estado, debouncedSearch, page, pageSize, supabase]);
+
+  useEffect(() => {
+    loadOrdenes();
+  }, [loadOrdenes]);
+
+  useEffect(() => {
+    getCurrentUserRole().then(setUserRole);
+  }, []);
 
   const totalPages = Math.ceil(totalItems / pageSize);
 
@@ -101,6 +111,23 @@ export default function OrdenesPage({
     setOrdenes((prev) =>
       prev.map((o) => (o.id_orden === id ? { ...o, estado_orden: nuevoEstado } : o))
     );
+    router.refresh();
+  };
+
+  const eliminarOrden = async (id: number) => {
+    if (!window.confirm("¿Está seguro de que desea eliminar esta orden?")) return;
+
+    const res = await fetch(`/api/ordenes/${id}`, { method: "DELETE" });
+    const result = (await res.json()) as { data?: { deleted: boolean }; error?: { message: string } };
+
+    if (!res.ok) {
+      toast.error("Error al eliminar orden: " + (result.error?.message || "Error desconocido"));
+      return;
+    }
+
+    toast.success("Orden eliminada exitosamente");
+    setOrdenes((prev) => prev.filter((o) => o.id_orden !== id));
+    setTotalItems((prev) => Math.max(prev - 1, 0));
     router.refresh();
   };
 
@@ -157,7 +184,7 @@ export default function OrdenesPage({
               <TableHead>Cliente</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -183,10 +210,28 @@ export default function OrdenesPage({
                     </SelectContent>
                   </Select>
                 </TableCell>
-                <TableCell>
-                  <Link href={`/ordenes/${orden.id_orden}`}>
-                    <Button variant="ghost" size="sm">Ver</Button>
-                  </Link>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <Link href={`/ordenes/${orden.id_orden}`}>
+                      <Button variant="ghost" size="sm">Ver</Button>
+                    </Link>
+                    {canEditOrder(userRole) && (
+                      <Link href={`/ordenes/${orden.id_orden}/editar`}>
+                        <Button variant="outline" size="sm">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                    )}
+                    {canDeleteOrder(userRole) && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => eliminarOrden(orden.id_orden)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

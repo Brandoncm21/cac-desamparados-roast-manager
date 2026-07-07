@@ -3,12 +3,13 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getCurrentUserRole, canEditOrder, canDeleteOrder } from "@/lib/auth-helpers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Thermometer, Printer } from "lucide-react";
+import { ArrowLeft, Thermometer, Printer, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import styles from "./page.module.css";
 
@@ -67,6 +68,7 @@ export default function OrdenDetallePage() {
   const [perfilTueste, setPerfilTueste] = useState<PerfilTueste | null>(null);
   const [loadingPerfil, setLoadingPerfil] = useState(false);
   const [creandoPerfil, setCreandoPerfil] = useState(false);
+  const [userRole, setUserRole] = useState<"Admin" | "Tostador" | "Recepción" | "Operador" | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -83,6 +85,7 @@ export default function OrdenDetallePage() {
         `
         )
         .eq("id_orden", Number(params.id))
+        .is("deleted_at", null)
         .single();
       if (data) setOrden(data as unknown as Orden);
     };
@@ -102,6 +105,7 @@ export default function OrdenDetallePage() {
       .from("perfiles_tueste")
       .select("id_perfil")
       .eq("id_orden", orden.id_orden)
+      .is("deleted_at", null)
       .maybeSingle()
       .then(({ data }) => {
         setPerfilTueste(data as PerfilTueste | null);
@@ -124,6 +128,26 @@ export default function OrdenDetallePage() {
     toast.success(`Estado actualizado a ${nuevoEstado}`);
     setOrden({ ...orden, estado_orden: nuevoEstado });
     router.refresh();
+  };
+
+  useEffect(() => {
+    getCurrentUserRole().then(setUserRole);
+  }, []);
+
+  const handleEliminar = async () => {
+    if (!orden) return;
+    if (!window.confirm("¿Está seguro de que desea eliminar esta orden?")) return;
+
+    const res = await fetch(`/api/ordenes/${orden.id_orden}`, { method: "DELETE" });
+    const result = (await res.json()) as { data?: { deleted: boolean }; error?: { message: string } };
+
+    if (!res.ok) {
+      toast.error("Error al eliminar orden: " + (result.error?.message || "Error desconocido"));
+      return;
+    }
+
+    toast.success("Orden eliminada exitosamente");
+    router.push("/ordenes");
   };
 
   const handlePrint = () => {
@@ -227,6 +251,22 @@ export default function OrdenDetallePage() {
             ))}
           </SelectContent>
         </Select>
+        {canEditOrder(userRole) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/ordenes/${params.id}/editar`)}
+          >
+            <Pencil className="h-4 w-4 mr-2" />
+            Editar
+          </Button>
+        )}
+        {canDeleteOrder(userRole) && (
+          <Button variant="destructive" size="sm" onClick={handleEliminar}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Eliminar
+          </Button>
+        )}
         <Button variant="outline" onClick={handlePrint} className="ml-auto">
           <Printer className="h-4 w-4 mr-2" />
           Imprimir Orden

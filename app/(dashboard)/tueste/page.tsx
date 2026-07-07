@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { SelectOrdenDialog } from "@/components/forms/select-orden-dialog";
-import { Plus, Thermometer, Search } from "lucide-react";
+import { Plus, Thermometer, Search, AlertCircle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface Perfil {
@@ -16,6 +16,7 @@ interface Perfil {
   numero_lote: string | null;
   nombre_cafe: string | null;
   fecha_tueste: string;
+  estado: string;
   ordenes_trabajo: {
     numero_factura: string;
     clientes: { nombre_completo: string } | null;
@@ -69,6 +70,7 @@ export default function TuesteListPage() {
         `,
           { count: "exact" }
         )
+        .is("deleted_at", null)
         .order("fecha_tueste", { ascending: false })
         .range(from, to);
 
@@ -103,6 +105,9 @@ export default function TuesteListPage() {
       );
     });
   }, [perfiles, debouncedSearch]);
+
+  const perfilesPendientes = filteredPerfiles.filter((p) => p.estado !== "Completado");
+  const perfilesCompletados = filteredPerfiles.filter((p) => p.estado === "Completado");
 
   const totalPages = Math.ceil(totalItems / pageSize);
 
@@ -172,31 +177,44 @@ export default function TuesteListPage() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredPerfiles.map((p) => (
-          <Card
-            key={p.id_perfil}
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => router.push(`/tueste/${p.id_perfil}`)}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Thermometer className="h-5 w-5 text-secondary" />
-                {p.numero_lote || `Perfil #${p.id_perfil}`}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              <p>{p.nombre_cafe || "Sin nombre"}</p>
-              {p.ordenes_trabajo?.numero_factura && (
-                <p>Factura: {p.ordenes_trabajo.numero_factura}</p>
-              )}
-              {p.ordenes_trabajo?.clientes?.nombre_completo && (
-                <p>Cliente: {p.ordenes_trabajo.clientes.nombre_completo}</p>
-              )}
-              <p>{p.fecha_tueste}</p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="space-y-8">
+        {/* Sección Tuestes Pendientes */}
+        <section>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-amber-500" />
+            Tuestes Pendientes ({perfilesPendientes.length})
+          </h2>
+          {perfilesPendientes.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8 bg-amber-50/50 rounded-lg border border-amber-100">
+              No hay tuestes pendientes.
+            </p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {perfilesPendientes.map((p) => (
+                <PerfilCard key={p.id_perfil} perfil={p} variant="pending" />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Sección Tuestes Completados */}
+        <section>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-green-500" />
+            Tuestes Completados ({perfilesCompletados.length})
+          </h2>
+          {perfilesCompletados.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8 bg-green-50/50 rounded-lg border border-green-100">
+              No hay tuestes completados.
+            </p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {perfilesCompletados.map((p) => (
+                <PerfilCard key={p.id_perfil} perfil={p} variant="completed" />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
       <Pagination
@@ -217,5 +235,44 @@ export default function TuesteListPage() {
         }}
       />
     </div>
+  );
+}
+
+function PerfilCard({
+  perfil,
+  variant,
+}: {
+  perfil: Perfil;
+  variant: "pending" | "completed";
+}) {
+  const router = useRouter();
+  const isPending = variant === "pending";
+
+  return (
+    <Card
+      className={`cursor-pointer hover:shadow-md transition-shadow ${
+        isPending
+          ? "border-amber-200 bg-amber-50/30"
+          : "border-green-200 bg-green-50/30"
+      }`}
+      onClick={() => router.push(`/tueste/${perfil.id_perfil}`)}
+    >
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Thermometer className={`h-5 w-5 ${isPending ? "text-amber-500" : "text-green-500"}`} />
+          {perfil.numero_lote || `Perfil #${perfil.id_perfil}`}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">{perfil.nombre_cafe || "Sin nombre"}</p>
+        {perfil.ordenes_trabajo?.numero_factura && (
+          <p>Factura: {perfil.ordenes_trabajo.numero_factura}</p>
+        )}
+        {perfil.ordenes_trabajo?.clientes?.nombre_completo && (
+          <p>Cliente: {perfil.ordenes_trabajo.clientes.nombre_completo}</p>
+        )}
+        <p>{perfil.fecha_tueste}</p>
+      </CardContent>
+    </Card>
   );
 }

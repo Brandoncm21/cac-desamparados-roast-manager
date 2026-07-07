@@ -9,7 +9,11 @@ async function get(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
 
-  let query = supabase.from("clientes").select("*").order("nombre_completo");
+  let query = supabase
+    .from("clientes")
+    .select("*")
+    .is("deleted_at", null)
+    .order("nombre_completo");
 
   if (search) {
     query = query.or(

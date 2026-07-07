@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { crearPerfilSchema } from "@/lib/schemas/perfiles";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { actualizarPerfilSchema } from "@/lib/schemas/perfiles";
+import { apiOk, apiError, apiValidationError, requireAuth, requireRole, withErrorHandler } from "@/lib/api-helpers";
 
 async function get(
   _request: NextRequest,
@@ -15,6 +15,7 @@ async function get(
     .from("perfiles_tueste")
     .select("*, empleados!perfiles_tueste_id_tostador_fkey(nombre), ordenes_trabajo(numero_factura)")
     .eq("id_perfil", Number(id))
+    .is("deleted_at", null)
     .single();
 
   if (error) return apiError("Perfil no encontrado", 404);
@@ -54,12 +55,12 @@ async function put(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await requireAuth();
+  await requireRole(['Admin', 'Tostador']);
   const supabase = await createClient();
   const { id } = await params;
   const body = await request.json();
 
-  const parsed = crearPerfilSchema.partial().safeParse(body);
+  const parsed = actualizarPerfilSchema.safeParse(body);
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
   const { data, error } = await supabase
@@ -73,5 +74,24 @@ async function put(
   return apiOk(data);
 }
 
+async function del(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  await requireRole(['Admin', 'Tostador']);
+  const supabase = await createClient();
+  const { id } = await params;
+
+  const { error } = await supabase
+    .from("perfiles_tueste")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id_perfil", Number(id))
+    .is("deleted_at", null);
+
+  if (error) return apiError(error.message, 500);
+  return apiOk({ deleted: true });
+}
+
 export const GET = withErrorHandler(get);
 export const PUT = withErrorHandler(put);
+export const DELETE = withErrorHandler(del);

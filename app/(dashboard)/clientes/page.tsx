@@ -42,6 +42,7 @@ export default function ClientesPage() {
       let query = supabase
         .from("clientes")
         .select("*", { count: "exact" })
+        .is("deleted_at", null)
         .order("nombre_completo")
         .range(from, to);
 

@@ -15,6 +15,7 @@ async function get(request: NextRequest) {
   let query = supabase
     .from("ordenes_trabajo")
     .select("*, clientes(nombre_completo, telefono)")
+    .is("deleted_at", null)
     .order("fecha_orden", { ascending: false });
 
   if (estado) query = query.eq("estado_orden", estado);

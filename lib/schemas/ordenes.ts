@@ -30,5 +30,8 @@ export const cambiarEstadoOrdenSchema = z.object({
   estado_orden: z.enum(["Pendiente", "En Proceso", "Completado", "Cancelado"]),
 });
 
+export const actualizarOrdenSchema = crearOrdenSchema.partial();
+
 export type CrearOrdenInput = z.infer<typeof crearOrdenSchema>;
 export type CambiarEstadoOrdenInput = z.infer<typeof cambiarEstadoOrdenSchema>;
+export type ActualizarOrdenInput = z.infer<typeof actualizarOrdenSchema>;

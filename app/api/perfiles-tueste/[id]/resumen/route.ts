@@ -14,6 +14,7 @@ async function get(
     .from("perfiles_tueste")
     .select("tiempo_desarrollo_min, dtr_porcentaje, fecha_optima_consumo, fecha_vencimiento")
     .eq("id_perfil", Number(id))
+    .is("deleted_at", null)
     .single();
 
   if (error) return apiError("Perfil no encontrado", 404);
