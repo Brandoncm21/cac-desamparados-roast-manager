@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { actualizarOrdenSchema } from "@/lib/schemas/ordenes";
 import { apiOk, apiError, apiValidationError, requireAuth, requireRole, withErrorHandler } from "@/lib/api-helpers";
 
@@ -57,10 +58,11 @@ async function del(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Verificar rol antes de usar admin client para soft delete
   await requireRole(['Admin', 'Recepción', 'Tostador']);
-  const supabase = await createClient();
   const { id } = await params;
 
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("ordenes_trabajo")
     .update({ deleted_at: new Date().toISOString() })
