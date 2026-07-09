@@ -12,7 +12,7 @@ export const crearPerfilSchema = z.object({
 
 export const bulkTemperaturasSchema = z.object({
   temperaturas: z.array(z.object({
-    minuto: z.number().int().min(0),
+    minuto: z.number().min(0),
     temperatura_registrada: z.number().min(70).max(220),
   })).min(1),
 });
