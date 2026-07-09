@@ -367,17 +367,42 @@ export default function CapturaTuestePage() {
 
   const descargarPDF = async () => {
     if (!pdfRef.current) return;
-    const html2pdf = (await import("html2pdf.js")).default;
-    html2pdf()
-      .from(pdfRef.current)
-      .set({
-        margin: 8,
-        filename: `perfil-tueste-${perfilId}.pdf`,
-        image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      })
-      .save();
+    const { toPng } = await import("html-to-image");
+    const { jsPDF } = await import("jspdf");
+
+    try {
+      const dataUrl = await toPng(pdfRef.current, {
+        quality: 0.95,
+        pixelRatio: 2,
+        backgroundColor: "#ffffff",
+      });
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const imgWidth = 190;
+      const pageHeight = 280;
+      const img = new Image();
+      img.src = dataUrl;
+
+      await new Promise((resolve) => { img.onload = resolve; });
+
+      const imgHeight = (img.height * imgWidth) / img.width;
+      let heightLeft = imgHeight;
+      let position = 10;
+
+      pdf.addImage(dataUrl, "PNG", 10, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + 10;
+        pdf.addPage();
+        pdf.addImage(dataUrl, "PNG", 10, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`perfil-tueste-${perfilId}.pdf`);
+    } catch {
+      toast.error("Error al generar PDF");
+    }
   };
 
   const calcularDiferencia = (antes: string, despues: string): string => {
@@ -637,11 +662,7 @@ export default function CapturaTuestePage() {
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-medium text-muted-foreground">Hitos Rápidos</h3>
           <Dialog open={editHitosOpen} onOpenChange={setEditHitosOpen}>
-            <DialogTrigger
-              render={
-                <Button variant="outline" size="sm" />
-              }
-            >
+            <DialogTrigger className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-xs hover:bg-accent hover:text-accent-foreground">
               <Pencil className="h-3.5 w-3.5 mr-1" /> Editar Hitos
             </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
