@@ -17,7 +17,8 @@ $$ LANGUAGE plpgsql STABLE SECURITY INVOKER;
 -- ============================================================
 -- VINCULAR UUID DEL ADMIN
 -- ============================================================
-UPDATE empleados SET id_auth = '76f6292f-abff-43bf-9b64-1a7cb22da919' WHERE id_empleado = 1;
+-- Reemplazar con el UUID real del usuario admin de Supabase Auth
+UPDATE empleados SET id_auth = '<UUID_DEL_USUARIO_ADMIN>' WHERE id_empleado = 1;
 
 -- ============================================================
 -- VERIFICACIÓN

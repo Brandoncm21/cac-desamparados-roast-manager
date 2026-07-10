@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cambiarEstadoOrdenSchema } from "@/lib/schemas/ordenes";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 async function patch(
   request: NextRequest,
@@ -10,6 +10,7 @@ async function patch(
   await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
+  const ordenId = validateIdParam(id);
   const body = await request.json();
 
   const parsed = cambiarEstadoOrdenSchema.safeParse(body);
@@ -18,7 +19,7 @@ async function patch(
   const { data, error } = await supabase
     .from("ordenes_trabajo")
     .update({ estado_orden: parsed.data.estado_orden })
-    .eq("id_orden", Number(id))
+    .eq("id_orden", ordenId)
     .select()
     .single();
 

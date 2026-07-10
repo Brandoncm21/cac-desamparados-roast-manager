@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 const agregarServicioSchema = z.object({
   tipo_servicio: z.enum([
@@ -20,6 +20,7 @@ async function post(
   await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
+  const ordenId = validateIdParam(id);
   const body = await request.json();
 
   const parsed = agregarServicioSchema.safeParse(body);
@@ -27,7 +28,7 @@ async function post(
 
   const { data, error } = await supabase
     .from("servicios_ejecutados")
-    .insert({ id_orden: Number(id), ...parsed.data })
+    .insert({ id_orden: ordenId, ...parsed.data })
     .select()
     .single();
 

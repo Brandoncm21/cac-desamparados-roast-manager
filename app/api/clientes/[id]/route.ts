@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { actualizarClienteSchema } from "@/lib/schemas/clientes";
-import { apiOk, apiError, apiValidationError, requireAuth, requireRole, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, requireRole, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 async function get(
   _request: NextRequest,
@@ -10,11 +10,12 @@ async function get(
   await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
+  const clienteId = validateIdParam(id);
 
   const { data: cliente, error } = await supabase
     .from("clientes")
     .select("*")
-    .eq("id_cliente", Number(id))
+    .eq("id_cliente", clienteId)
     .is("deleted_at", null)
     .single();
 
@@ -23,7 +24,7 @@ async function get(
   const { data: ordenes } = await supabase
     .from("ordenes_trabajo")
     .select("id_orden, numero_factura, fecha_orden, estado_orden")
-    .eq("id_cliente", Number(id))
+    .eq("id_cliente", clienteId)
     .is("deleted_at", null)
     .order("fecha_orden", { ascending: false });
 
@@ -37,6 +38,7 @@ async function put(
   await requireRole(['Admin']);
   const supabase = await createClient();
   const { id } = await params;
+  const clienteId = validateIdParam(id);
   const body = await request.json();
 
   const parsed = actualizarClienteSchema.safeParse(body);
@@ -45,7 +47,7 @@ async function put(
   const { data, error } = await supabase
     .from("clientes")
     .update(parsed.data)
-    .eq("id_cliente", Number(id))
+    .eq("id_cliente", clienteId)
     .select()
     .single();
 
@@ -60,11 +62,12 @@ async function del(
   await requireRole(['Admin', 'Recepción']);
   const supabase = await createClient();
   const { id } = await params;
+  const clienteId = validateIdParam(id);
 
   const { error } = await supabase
     .from("clientes")
     .update({ deleted_at: new Date().toISOString() })
-    .eq("id_cliente", Number(id))
+    .eq("id_cliente", clienteId)
     .is("deleted_at", null);
 
   if (error) return apiError(error.message, 500);

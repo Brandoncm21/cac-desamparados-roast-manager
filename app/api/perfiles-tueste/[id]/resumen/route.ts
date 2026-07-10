@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { apiOk, apiError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 async function get(
   _request: NextRequest,
@@ -9,11 +9,12 @@ async function get(
   await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
+  const perfilId = validateIdParam(id);
 
   const { data: perfil, error } = await supabase
     .from("perfiles_tueste")
     .select("tiempo_desarrollo_min, dtr_porcentaje, fecha_optima_consumo, fecha_vencimiento")
-    .eq("id_perfil", Number(id))
+    .eq("id_perfil", perfilId)
     .is("deleted_at", null)
     .single();
 
@@ -22,7 +23,7 @@ async function get(
   const { data: metricas } = await supabase
     .from("metricas_tueste")
     .select("tipo_metrica, valor_antes, valor_despues, porcentaje_diferencia")
-    .eq("id_perfil", Number(id));
+    .eq("id_perfil", perfilId);
 
   return apiOk({
     ...perfil,

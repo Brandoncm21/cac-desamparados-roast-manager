@@ -25,10 +25,10 @@ Después de la migración, crea usuarios en Supabase Auth:
 
 | Email | Password | Rol |
 |-------|----------|-----|
-| admin@scacr.com | Admin123! | Admin |
-| tostador@scacr.com | Tostador123! | Tostador |
-| recepcion@scacr.com | Recepcion123! | Recepción |
-| operador@scacr.com | Operador123! | Operador |
+| admin@scacr.com | (contraseña segura) | Admin |
+| tostador@scacr.com | (contraseña segura) | Tostador |
+| recepcion@scacr.com | (contraseña segura) | Recepción |
+| operador@scacr.com | (contraseña segura) | Operador |
 
 4. Después de crear cada usuario, copia su UUID (User ID)
 5. Ejecuta este SQL para vincularlos con los empleados:

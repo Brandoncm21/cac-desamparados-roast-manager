@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClientWithRoleCheck } from "@/lib/supabase/admin";
 import { actualizarOrdenSchema } from "@/lib/schemas/ordenes";
-import { apiOk, apiError, apiValidationError, requireAuth, requireRole, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, requireRole, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 async function get(
   _request: NextRequest,
@@ -11,11 +11,12 @@ async function get(
   await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
+  const ordenId = validateIdParam(id);
 
   const { data: orden, error } = await supabase
     .from("ordenes_trabajo")
     .select("*, clientes(*), servicios_ejecutados(*), especificaciones_orden(*)")
-    .eq("id_orden", Number(id))
+    .eq("id_orden", ordenId)
     .is("deleted_at", null)
     .single();
 
@@ -24,7 +25,7 @@ async function get(
   const { data: perfiles } = await supabase
     .from("perfiles_tueste")
     .select("id_perfil, numero_lote, fecha_tueste")
-    .eq("id_orden", Number(id))
+    .eq("id_orden", ordenId)
     .is("deleted_at", null);
 
   return apiOk({ ...orden, perfiles_tueste: perfiles || [] });
@@ -37,6 +38,7 @@ async function put(
   await requireRole(['Admin', 'Recepción', 'Tostador']);
   const supabase = await createClient();
   const { id } = await params;
+  const ordenId = validateIdParam(id);
   const body = await request.json();
 
   const parsed = actualizarOrdenSchema.safeParse(body);
@@ -45,7 +47,7 @@ async function put(
   const { data, error } = await supabase
     .from("ordenes_trabajo")
     .update(parsed.data)
-    .eq("id_orden", Number(id))
+    .eq("id_orden", ordenId)
     .is("deleted_at", null)
     .select()
     .single();
@@ -58,15 +60,14 @@ async function del(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  // Verificar rol antes de usar admin client para soft delete
-  await requireRole(['Admin', 'Recepción', 'Tostador']);
   const { id } = await params;
+  const ordenId = validateIdParam(id);
 
-  const supabase = createAdminClient();
+  const { supabase } = await createAdminClientWithRoleCheck(['Admin', 'Recepción', 'Tostador']);
   const { data, error } = await supabase
     .from("ordenes_trabajo")
     .update({ deleted_at: new Date().toISOString() })
-    .eq("id_orden", Number(id))
+    .eq("id_orden", ordenId)
     .is("deleted_at", null)
     .select();
 

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 const crearAjusteSchema = z.object({
   orden_secuencia: z.number().int().min(0),
@@ -18,6 +18,7 @@ async function post(
   await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
+  const perfilId = validateIdParam(id);
   const body = await request.json();
 
   const parsed = crearAjusteSchema.safeParse(body);
@@ -25,7 +26,7 @@ async function post(
 
   const { data, error } = await supabase
     .from("ajustes_tueste")
-    .insert({ id_perfil: Number(id), ...parsed.data })
+    .insert({ id_perfil: perfilId, ...parsed.data })
     .select()
     .single();
 

@@ -46,6 +46,14 @@ export function withErrorHandler<
   }) as H;
 }
 
+export function validateIdParam(value: string): number {
+  const id = Number(value);
+  if (!Number.isFinite(id) || id <= 0 || !Number.isInteger(id)) {
+    throw new AppError(ERROR_CODES.INVALID_INPUT, "ID inválido", 400);
+  }
+  return id;
+}
+
 export async function requireAuth() {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();

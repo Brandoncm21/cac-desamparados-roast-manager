@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 const upsertEspecificacionesSchema = z.object({
   tipo_tueste: z.string().max(100).optional().nullable(),
@@ -18,6 +18,7 @@ async function put(
   await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
+  const ordenId = validateIdParam(id);
   const body = await request.json();
 
   const parsed = upsertEspecificacionesSchema.safeParse(body);
@@ -26,7 +27,7 @@ async function put(
   const { data: existing } = await supabase
     .from("especificaciones_orden")
     .select("id_especificacion")
-    .eq("id_orden", Number(id))
+    .eq("id_orden", ordenId)
     .single();
 
   let result;
@@ -34,13 +35,13 @@ async function put(
     result = await supabase
       .from("especificaciones_orden")
       .update(parsed.data)
-      .eq("id_orden", Number(id))
+      .eq("id_orden", ordenId)
       .select()
       .single();
   } else {
     result = await supabase
       .from("especificaciones_orden")
-      .insert({ id_orden: Number(id), ...parsed.data })
+      .insert({ id_orden: ordenId, ...parsed.data })
       .select()
       .single();
   }

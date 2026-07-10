@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { envServer } from "@/lib/env-server";
+import { requireRole } from "@/lib/api-helpers";
+import type { UserRole } from "@/lib/auth-helpers";
 
 export function createAdminClient() {
   return createClient(
@@ -12,4 +14,10 @@ export function createAdminClient() {
       },
     }
   );
+}
+
+export async function createAdminClientWithRoleCheck(roles: UserRole[]) {
+  const { user, role } = await requireRole(roles);
+  const supabase = createAdminClient();
+  return { user, role, supabase };
 }

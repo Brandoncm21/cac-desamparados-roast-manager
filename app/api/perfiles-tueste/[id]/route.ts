@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { actualizarPerfilSchema } from "@/lib/schemas/perfiles";
-import { apiOk, apiError, apiValidationError, requireAuth, requireRole, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, requireRole, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 async function get(
   _request: NextRequest,
@@ -10,11 +10,12 @@ async function get(
   await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
+  const perfilId = validateIdParam(id);
 
   const { data: perfil, error } = await supabase
     .from("perfiles_tueste")
     .select("*, empleados!perfiles_tueste_id_tostador_fkey(nombre), ordenes_trabajo(numero_factura)")
-    .eq("id_perfil", Number(id))
+    .eq("id_perfil", perfilId)
     .is("deleted_at", null)
     .single();
 
@@ -23,23 +24,23 @@ async function get(
   const { data: temperaturas } = await supabase
     .from("trazabilidad_temperatura")
     .select("*")
-    .eq("id_perfil", Number(id))
+    .eq("id_perfil", perfilId)
     .order("minuto");
 
   const { data: hitos } = await supabase
     .from("hitos_termicos")
     .select("*")
-    .eq("id_perfil", Number(id));
+    .eq("id_perfil", perfilId);
 
   const { data: metricas } = await supabase
     .from("metricas_tueste")
     .select("*")
-    .eq("id_perfil", Number(id));
+    .eq("id_perfil", perfilId);
 
   const { data: ajustes } = await supabase
     .from("ajustes_tueste")
     .select("*")
-    .eq("id_perfil", Number(id))
+    .eq("id_perfil", perfilId)
     .order("orden_secuencia");
 
   return apiOk({
@@ -58,6 +59,7 @@ async function put(
   await requireRole(['Admin', 'Tostador']);
   const supabase = await createClient();
   const { id } = await params;
+  const perfilId = validateIdParam(id);
   const body = await request.json();
 
   const parsed = actualizarPerfilSchema.safeParse(body);
@@ -66,7 +68,7 @@ async function put(
   const { data, error } = await supabase
     .from("perfiles_tueste")
     .update(parsed.data)
-    .eq("id_perfil", Number(id))
+    .eq("id_perfil", perfilId)
     .select()
     .single();
 
@@ -81,11 +83,12 @@ async function del(
   await requireRole(['Admin', 'Tostador']);
   const supabase = await createClient();
   const { id } = await params;
+  const perfilId = validateIdParam(id);
 
   const { error } = await supabase
     .from("perfiles_tueste")
     .update({ deleted_at: new Date().toISOString() })
-    .eq("id_perfil", Number(id))
+    .eq("id_perfil", perfilId)
     .is("deleted_at", null);
 
   if (error) return apiError(error.message, 500);

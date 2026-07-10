@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { bulkTemperaturasSchema } from "@/lib/schemas/perfiles";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 async function get(
   _request: NextRequest,
@@ -10,11 +10,12 @@ async function get(
   await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
+  const perfilId = validateIdParam(id);
 
   const { data, error } = await supabase
     .from("trazabilidad_temperatura")
     .select("*")
-    .eq("id_perfil", Number(id))
+    .eq("id_perfil", perfilId)
     .order("minuto");
 
   if (error) return apiError(error.message, 500);
@@ -28,13 +29,14 @@ async function post(
   await requireAuth();
   const supabase = await createClient();
   const { id } = await params;
+  const perfilId = validateIdParam(id);
   const body = await request.json();
 
   const parsed = bulkTemperaturasSchema.safeParse(body);
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
   const rows = parsed.data.temperaturas.map((t) => ({
-    id_perfil: Number(id),
+    id_perfil: perfilId,
     minuto: t.minuto,
     temperatura_registrada: t.temperatura_registrada,
   }));

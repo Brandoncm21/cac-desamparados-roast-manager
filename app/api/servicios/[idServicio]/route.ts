@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 const editarServicioSchema = z.object({
   peso_inicial: z.number().positive().optional().nullable(),
@@ -16,6 +16,7 @@ async function put(
   await requireAuth();
   const supabase = await createClient();
   const { idServicio } = await params;
+  const servicioId = validateIdParam(idServicio);
   const body = await request.json();
 
   const parsed = editarServicioSchema.safeParse(body);
@@ -24,7 +25,7 @@ async function put(
   const { data, error } = await supabase
     .from("servicios_ejecutados")
     .update(parsed.data)
-    .eq("id_servicio", Number(idServicio))
+    .eq("id_servicio", servicioId)
     .select()
     .single();
 
@@ -39,11 +40,12 @@ async function del(
   await requireAuth();
   const supabase = await createClient();
   const { idServicio } = await params;
+  const servicioId = validateIdParam(idServicio);
 
   const { data: servicio } = await supabase
     .from("servicios_ejecutados")
     .select("id_orden")
-    .eq("id_servicio", Number(idServicio))
+    .eq("id_servicio", servicioId)
     .single();
 
   if (!servicio) return apiError("Servicio no encontrado", 404);
@@ -61,7 +63,7 @@ async function del(
   const { error } = await supabase
     .from("servicios_ejecutados")
     .delete()
-    .eq("id_servicio", Number(idServicio));
+    .eq("id_servicio", servicioId);
 
   if (error) return apiError(error.message, 500);
   return apiOk({ deleted: true });

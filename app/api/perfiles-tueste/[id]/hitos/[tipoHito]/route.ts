@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { upsertHitoSchema } from "@/lib/schemas/perfiles";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 async function put(
   request: NextRequest,
@@ -10,13 +10,14 @@ async function put(
   await requireAuth();
   const supabase = await createClient();
   const { id, tipoHito } = await params;
+  const perfilId = validateIdParam(id);
   const body = await request.json();
 
   const parsed = upsertHitoSchema.safeParse(body);
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
   const hitoData = {
-    id_perfil: Number(id),
+    id_perfil: perfilId,
     tipo_hito: tipoHito,
     ...parsed.data,
   };

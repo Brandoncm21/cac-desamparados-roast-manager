@@ -2,6 +2,11 @@ import { createClient } from "@/lib/supabase/client";
 
 export type UserRole = "Admin" | "Tostador" | "Recepción" | "Operador";
 
+/**
+ * Obtiene el rol del usuario autenticado desde el cliente de navegador.
+ * Solo debe usarse en componentes cliente ("use client"). En el servidor,
+ * usar `requireRole` o `requireAuth` de `@/lib/api-helpers`.
+ */
 export async function getCurrentUserRole(): Promise<UserRole | null> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
