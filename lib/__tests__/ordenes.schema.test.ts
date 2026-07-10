@@ -9,8 +9,6 @@ describe("crearOrdenSchema", () => {
     proceso_cafe: "Lavado",
     porcentaje_humedad_entrada: 12.5,
     id_empleado_recibe: 2,
-    fecha_orden: "2026-07-10",
-    hora_cierre: "14:30",
     servicios: [{ tipo_servicio: "Tueste", peso_inicial: 50, precio: 100 }],
     tipo_tueste: "Medio",
     tipo_molienda: "Media",
@@ -23,13 +21,12 @@ describe("crearOrdenSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("acepta campos opcionales vacíos como string vacío", () => {
+  it("acepta campos opcionales vacíos como string vacío o null", () => {
     const result = crearOrdenSchema.safeParse({
       ...validData,
-      hora_cierre: "",
-      tipo_tueste: "",
+      tipo_tueste: null,
       tipo_molienda: "",
-      tipo_empaque: "",
+      tipo_empaque: null,
       zona_finca: "",
       observaciones: "",
     });

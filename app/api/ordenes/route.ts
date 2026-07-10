@@ -39,11 +39,16 @@ async function post(request: NextRequest) {
   const { servicios, tipo_tueste, tipo_molienda, tipo_empaque,
     observaciones, ...restoOrden } = parsed.data;
 
+  const ahora = new Date();
+  const fechaOrden = ahora.toISOString().split("T")[0];
+  const horaCierre = ahora.toTimeString().slice(0, 5);
+
   const ordenData = {
     ...restoOrden,
+    fecha_orden: fechaOrden,
+    hora_cierre: horaCierre,
     proceso_cafe: restoOrden.proceso_cafe || null,
     zona_finca: restoOrden.zona_finca || null,
-    hora_cierre: restoOrden.hora_cierre || null,
   };
 
   const { data: orden, error: ordenError } = await supabase

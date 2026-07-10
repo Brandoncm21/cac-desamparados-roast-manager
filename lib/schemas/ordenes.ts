@@ -8,8 +8,6 @@ export const crearOrdenSchema = z.object({
   descripcion_producto: z.string().optional().or(z.literal("")),
   id_empleado_recibe: z.number().int().positive("Seleccione un responsable"),
   id_empleado_entrega: z.number().int().positive().optional().nullable(),
-  fecha_orden: z.string().optional(),
-  hora_cierre: z.string().optional().or(z.literal("")),
   firma_aprobacion_cliente: z.boolean().optional().default(false),
   fecha_aprobacion: z.string().optional().nullable(),
   servicios: z.array(z.object({
@@ -20,9 +18,9 @@ export const crearOrdenSchema = z.object({
     peso_inicial: z.number().positive().optional().nullable(),
     precio: z.number().min(0).optional().nullable(),
   })).min(1, "Agregue al menos un servicio"),
-  tipo_tueste: z.string().max(100).optional().or(z.literal("")),
-  tipo_molienda: z.string().max(100).optional().or(z.literal("")),
-  tipo_empaque: z.string().max(100).optional().or(z.literal("")),
+  tipo_tueste: z.string().max(100).optional().nullable().or(z.literal("")),
+  tipo_molienda: z.string().max(100).optional().nullable().or(z.literal("")),
+  tipo_empaque: z.string().max(100).optional().nullable().or(z.literal("")),
   observaciones: z.string().optional().or(z.literal("")),
 });
 

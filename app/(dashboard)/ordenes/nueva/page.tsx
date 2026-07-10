@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ClienteAutocomplete } from "@/components/forms/cliente-autocomplete";
 import { InlineAddSelect } from "@/components/forms/inline-add-select";
@@ -101,6 +102,7 @@ export default function NuevaOrdenPage() {
   const [zonas, setZonas] = useState<ZonaOption[]>([]);
   const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(crearOrdenSchema),
@@ -116,8 +118,6 @@ export default function NuevaOrdenPage() {
       tipo_molienda: "",
       tipo_empaque: "",
       observaciones: "",
-      fecha_orden: new Date().toISOString().split("T")[0],
-      hora_cierre: "",
       id_empleado_recibe: undefined,
     },
   });
@@ -146,7 +146,9 @@ export default function NuevaOrdenPage() {
     remove(index);
   };
 
-  const onSubmit = async (values: CrearOrdenInput) => {
+  const [pendingValues, setPendingValues] = useState<CrearOrdenInput | null>(null);
+
+  const onSubmit = (values: CrearOrdenInput) => {
     if (!values.id_cliente || values.id_cliente <= 0) {
       form.setError("id_cliente", { message: "Debe seleccionar un cliente" });
       toast.error("Debe seleccionar un cliente");
@@ -165,20 +167,26 @@ export default function NuevaOrdenPage() {
       return;
     }
 
+    setPendingValues(values);
+    setConfirmOpen(true);
+  };
+
+  const confirmSubmit = async () => {
+    if (!pendingValues) return;
+
     setSubmitting(true);
     try {
       const payload = {
-        ...values,
-        proceso_cafe: values.proceso_cafe || null,
-        zona_finca: values.zona_finca || null,
-        hora_cierre: values.hora_cierre || "",
-        id_empleado_recibe: values.id_empleado_recibe || null,
-        id_empleado_entrega: values.id_empleado_recibe || null,
-        porcentaje_humedad_entrada: values.porcentaje_humedad_entrada ?? null,
-        tipo_tueste: values.tipo_tueste || "",
-        tipo_molienda: values.tipo_molienda || "",
-        tipo_empaque: values.tipo_empaque || "",
-        observaciones: values.observaciones || null,
+        ...pendingValues,
+        proceso_cafe: pendingValues.proceso_cafe || null,
+        zona_finca: pendingValues.zona_finca || null,
+        id_empleado_recibe: pendingValues.id_empleado_recibe || null,
+        id_empleado_entrega: pendingValues.id_empleado_recibe || null,
+        porcentaje_humedad_entrada: pendingValues.porcentaje_humedad_entrada ?? null,
+        tipo_tueste: pendingValues.tipo_tueste || null,
+        tipo_molienda: pendingValues.tipo_molienda || null,
+        tipo_empaque: pendingValues.tipo_empaque || null,
+        observaciones: pendingValues.observaciones || null,
       };
 
       const res = await fetch("/api/ordenes", {
@@ -201,6 +209,7 @@ export default function NuevaOrdenPage() {
       }
 
       toast.success("Orden creada exitosamente");
+      setConfirmOpen(false);
       router.push("/ordenes");
       router.refresh();
     } finally {
@@ -387,43 +396,27 @@ export default function NuevaOrdenPage() {
             </CardContent>
           </Card>
 
-          {/* Cierre */}
+          {/* Responsable */}
           <Card>
-            <CardHeader><CardTitle className="text-base md:text-lg">Datos de Cierre</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base md:text-lg">Responsable</CardTitle></CardHeader>
             <CardContent className="space-y-3 md:space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-                <FormField control={form.control} name="fecha_orden" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Fecha</FormLabel>
-                    <FormControl><Input type="date" {...field} className="h-12 md:h-10 text-base" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="hora_cierre" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Hora</FormLabel>
-                    <FormControl><Input type="time" {...field} className="h-12 md:h-10 text-base" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="id_empleado_recibe" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Responsable *</FormLabel>
-                    <Select onValueChange={(v) => field.onChange(Number(v))} value={field.value ? String(field.value) : ""}>
-                      <FormControl>
-                        <SelectTrigger className="h-12 md:h-10 text-base"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="">Seleccionar...</SelectItem>
-                        {empleados.map((e) => (
-                          <SelectItem key={e.id_empleado} value={String(e.id_empleado)}>{e.nombre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
+              <FormField control={form.control} name="id_empleado_recibe" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Responsable *</FormLabel>
+                  <Select onValueChange={(v) => field.onChange(Number(v))} value={field.value ? String(field.value) : ""}>
+                    <FormControl>
+                      <SelectTrigger className="h-12 md:h-10 text-base"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">Seleccionar...</SelectItem>
+                      {empleados.map((e) => (
+                        <SelectItem key={e.id_empleado} value={String(e.id_empleado)}>{e.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
             </CardContent>
           </Card>
 
@@ -510,6 +503,57 @@ export default function NuevaOrdenPage() {
           </div>
         </form>
       </Form>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar creación de orden</DialogTitle>
+            <DialogDescription>
+              Revise los datos esenciales antes de continuar.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingValues && (
+            <div className="space-y-4 text-sm">
+              <div className="space-y-1">
+                <p className="font-medium text-amber-700">Datos esenciales</p>
+                <p><span className="text-muted-foreground">Cliente:</span> {clientes.find((c) => c.id_cliente === pendingValues.id_cliente)?.nombre_completo || "No seleccionado"}</p>
+                <p><span className="text-muted-foreground">Responsable:</span> {empleados.find((e) => e.id_empleado === pendingValues.id_empleado_recibe)?.nombre || "No seleccionado"}</p>
+                <p><span className="text-muted-foreground">Servicios:</span> {pendingValues.servicios.map((s) => s.tipo_servicio).join(", ")}</p>
+              </div>
+
+              {(() => {
+                const vacios: string[] = [];
+                if (!pendingValues.zona_finca) vacios.push("Zona o Finca");
+                if (!pendingValues.proceso_cafe) vacios.push("Proceso de café");
+                if (!pendingValues.descripcion_producto) vacios.push("Descripción del producto");
+                if (!pendingValues.tipo_tueste) vacios.push("Tipo de tueste");
+                if (!pendingValues.tipo_molienda) vacios.push("Tipo de molienda");
+                if (!pendingValues.tipo_empaque) vacios.push("Tipo de empaque");
+                if (!pendingValues.observaciones) vacios.push("Observaciones");
+
+                if (vacios.length === 0) return null;
+                return (
+                  <div className="rounded-md bg-amber-50 p-3 border border-amber-200">
+                    <p className="font-medium text-amber-800 mb-1">Campos opcionales sin completar</p>
+                    <p className="text-amber-700">{vacios.join(", ")}</p>
+                    <p className="text-xs text-amber-600 mt-1">Estos datos pueden completarse más tarde desde la edición de la orden.</p>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button type="button" variant="outline" onClick={() => setConfirmOpen(false)} className="w-full sm:w-auto">
+              Revisar formulario
+            </Button>
+            <Button type="button" onClick={confirmSubmit} disabled={submitting} className="w-full sm:w-auto">
+              {submitting ? "Creando..." : "Confirmar creación"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
