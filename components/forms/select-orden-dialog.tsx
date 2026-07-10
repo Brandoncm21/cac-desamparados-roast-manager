@@ -33,7 +33,7 @@ interface OrdenRaw {
   numero_factura: string;
   fecha_orden: string;
   descripcion_producto: string | null;
-  clientes: ClienteOrden[];
+  clientes: ClienteOrden | null;
   servicios_ejecutados: ServicioOrden[];
   especificaciones_orden: EspecificacionOrden[];
 }
@@ -114,7 +114,7 @@ export function SelectOrdenDialog({ open, onOpenChange, onSelect }: SelectOrdenD
             numero_factura: o.numero_factura,
             fecha_orden: o.fecha_orden,
             descripcion_producto: o.descripcion_producto,
-            nombre_cliente: o.clientes?.[0]?.nombre_completo || null,
+            nombre_cliente: o.clientes?.nombre_completo || null,
             especificaciones: o.especificaciones_orden?.[0] || null,
           }));
 

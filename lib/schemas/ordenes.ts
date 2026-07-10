@@ -6,7 +6,7 @@ export const crearOrdenSchema = z.object({
   porcentaje_humedad_entrada: z.number().min(0).max(100).optional().nullable(),
   proceso_cafe: z.enum(["Lavado", "Honey", "Natural", "Otro", ""]).optional().nullable(),
   descripcion_producto: z.string().optional().or(z.literal("")),
-  id_empleado_recibe: z.number().int().positive().optional().nullable(),
+  id_empleado_recibe: z.number().int().positive("Seleccione un responsable"),
   id_empleado_entrega: z.number().int().positive().optional().nullable(),
   fecha_orden: z.string().optional(),
   hora_cierre: z.string().optional().or(z.literal("")),

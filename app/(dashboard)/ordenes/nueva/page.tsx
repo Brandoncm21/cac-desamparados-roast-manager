@@ -102,10 +102,10 @@ export default function NuevaOrdenPage() {
   const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const form = useForm<CrearOrdenInput>({
-    resolver: zodResolver(crearOrdenSchema) as any,
+  const form = useForm({
+    resolver: zodResolver(crearOrdenSchema),
     defaultValues: {
-      id_cliente: undefined as any,
+      id_cliente: 0,
       zona_finca: "",
       descripcion_producto: "",
       proceso_cafe: "",
@@ -118,7 +118,7 @@ export default function NuevaOrdenPage() {
       observaciones: "",
       fecha_orden: new Date().toISOString().split("T")[0],
       hora_cierre: "",
-      id_empleado_recibe: undefined as any,
+      id_empleado_recibe: undefined,
     },
   });
 
@@ -147,11 +147,20 @@ export default function NuevaOrdenPage() {
   };
 
   const onSubmit = async (values: CrearOrdenInput) => {
-    if (!values.id_cliente) {
+    if (!values.id_cliente || values.id_cliente <= 0) {
+      form.setError("id_cliente", { message: "Debe seleccionar un cliente" });
       toast.error("Debe seleccionar un cliente");
       return;
     }
+
+    if (values.servicios.length === 0) {
+      form.setError("servicios", { message: "Agregue al menos un servicio" });
+      toast.error("Debe agregar al menos un servicio");
+      return;
+    }
+
     if (!values.id_empleado_recibe) {
+      form.setError("id_empleado_recibe", { message: "Debe seleccionar un responsable" });
       toast.error("Debe seleccionar un responsable");
       return;
     }
@@ -166,6 +175,10 @@ export default function NuevaOrdenPage() {
         id_empleado_recibe: values.id_empleado_recibe || null,
         id_empleado_entrega: values.id_empleado_recibe || null,
         porcentaje_humedad_entrada: values.porcentaje_humedad_entrada ?? null,
+        tipo_tueste: values.tipo_tueste || null,
+        tipo_molienda: values.tipo_molienda || null,
+        tipo_empaque: values.tipo_empaque || null,
+        observaciones: values.observaciones || null,
       };
 
       const res = await fetch("/api/ordenes", {
@@ -177,7 +190,10 @@ export default function NuevaOrdenPage() {
       const result = await res.json();
 
       if (!res.ok) {
-        toast.error("Error al crear orden: " + (result.message || "Error desconocido"));
+        const errorMessage = result.error?.issues
+          ? result.error.issues.map((issue: { message: string }) => issue.message).join(", ")
+          : (result.error?.message || "Error desconocido");
+        toast.error("Error al crear orden: " + errorMessage);
         return;
       }
 
@@ -375,14 +391,14 @@ export default function NuevaOrdenPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                 <FormField control={form.control} name="fecha_orden" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Fecha *</FormLabel>
+                    <FormLabel>Fecha</FormLabel>
                     <FormControl><Input type="date" {...field} className="h-12 md:h-10 text-base" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="hora_cierre" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Hora *</FormLabel>
+                    <FormLabel>Hora</FormLabel>
                     <FormControl><Input type="time" {...field} className="h-12 md:h-10 text-base" /></FormControl>
                     <FormMessage />
                   </FormItem>
