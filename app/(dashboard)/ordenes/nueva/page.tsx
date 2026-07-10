@@ -171,13 +171,13 @@ export default function NuevaOrdenPage() {
         ...values,
         proceso_cafe: values.proceso_cafe || null,
         zona_finca: values.zona_finca || null,
-        hora_cierre: values.hora_cierre || null,
+        hora_cierre: values.hora_cierre || "",
         id_empleado_recibe: values.id_empleado_recibe || null,
         id_empleado_entrega: values.id_empleado_recibe || null,
         porcentaje_humedad_entrada: values.porcentaje_humedad_entrada ?? null,
-        tipo_tueste: values.tipo_tueste || null,
-        tipo_molienda: values.tipo_molienda || null,
-        tipo_empaque: values.tipo_empaque || null,
+        tipo_tueste: values.tipo_tueste || "",
+        tipo_molienda: values.tipo_molienda || "",
+        tipo_empaque: values.tipo_empaque || "",
         observaciones: values.observaciones || null,
       };
 
@@ -190,9 +190,12 @@ export default function NuevaOrdenPage() {
       const result = await res.json();
 
       if (!res.ok) {
-        const errorMessage = result.error?.issues
-          ? result.error.issues.map((issue: { message: string }) => issue.message).join(", ")
-          : (result.error?.message || "Error desconocido");
+        const flattenedIssues = result.error?.issues;
+        const fieldErrors = flattenedIssues?.fieldErrors || {};
+        const messages = Object.values(fieldErrors).flat() as string[];
+        const errorMessage = messages.length > 0
+          ? messages.join(", ")
+          : (flattenedIssues?.formErrors?.join(", ") || result.error?.message || "Error desconocido");
         toast.error("Error al crear orden: " + errorMessage);
         return;
       }
