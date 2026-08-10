@@ -47,6 +47,29 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                function stripBisSkinChecked(node) {
+                  if (node.nodeType === 1) {
+                    node.removeAttribute("bis_skin_checked");
+                    node.childNodes.forEach(stripBisSkinChecked);
+                  }
+                }
+                if (typeof document !== "undefined") {
+                  stripBisSkinChecked(document.documentElement);
+                  var observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                      mutation.addedNodes.forEach(stripBisSkinChecked);
+                    });
+                  });
+                  observer.observe(document.documentElement, { childList: true, subtree: true });
+                }
+              })();
+            `,
+          }}
+        />
         {children}
         <Toaster />
         {process.env.NODE_ENV === "production" && (
