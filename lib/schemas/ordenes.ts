@@ -1,10 +1,12 @@
 import { z } from "zod";
 
+const nullifyNaN = (v: unknown) => (typeof v === "number" && Number.isNaN(v) ? null : v);
+
 export const crearOrdenSchema = z.object({
   id_cliente: z.number().int().positive("Seleccione un cliente"),
   zona_finca: z.string().max(150).optional().or(z.literal("")),
-  porcentaje_humedad_entrada: z.number().min(0).max(100).optional().nullable(),
-  proceso_cafe: z.enum(["Lavado", "Honey", "Natural", "Otro", ""]).optional().nullable(),
+  porcentaje_humedad_entrada: z.preprocess(nullifyNaN, z.number().min(0).max(100).optional().nullable()),
+  proceso_cafe: z.enum(["Lavado", "Honey", "Natural", "Otro", ""]).nullable().optional(),
   descripcion_producto: z.string().optional().or(z.literal("")),
   id_empleado_recibe: z.number().int().positive("Seleccione un responsable"),
   id_empleado_entrega: z.number().int().positive().optional().nullable(),
@@ -15,8 +17,8 @@ export const crearOrdenSchema = z.object({
       "Chancado", "Trillado", "Clasificación Mecánica", "Clasificación Manual",
       "Tueste", "Molido", "Empacado"
     ]),
-    peso_inicial: z.number().positive().optional().nullable(),
-    precio: z.number().min(0).optional().nullable(),
+    peso_inicial: z.preprocess(nullifyNaN, z.number().positive().optional().nullable()),
+    precio: z.preprocess(nullifyNaN, z.number().min(0).optional().nullable()),
   })).min(1, "Agregue al menos un servicio"),
   tipo_tueste: z.string().max(100).optional().nullable().or(z.literal("")),
   tipo_molienda: z.string().max(100).optional().nullable().or(z.literal("")),

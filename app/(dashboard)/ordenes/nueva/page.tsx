@@ -176,23 +176,10 @@ export default function NuevaOrdenPage() {
 
     setSubmitting(true);
     try {
-      const payload = {
-        ...pendingValues,
-        proceso_cafe: pendingValues.proceso_cafe || null,
-        zona_finca: pendingValues.zona_finca || null,
-        id_empleado_recibe: pendingValues.id_empleado_recibe || null,
-        id_empleado_entrega: pendingValues.id_empleado_recibe || null,
-        porcentaje_humedad_entrada: pendingValues.porcentaje_humedad_entrada ?? null,
-        tipo_tueste: pendingValues.tipo_tueste || null,
-        tipo_molienda: pendingValues.tipo_molienda || null,
-        tipo_empaque: pendingValues.tipo_empaque || null,
-        observaciones: pendingValues.observaciones || null,
-      };
-
       const res = await fetch("/api/ordenes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(pendingValues),
       });
 
       const result = await res.json();
@@ -204,7 +191,14 @@ export default function NuevaOrdenPage() {
         const errorMessage = messages.length > 0
           ? messages.join(", ")
           : (flattenedIssues?.formErrors?.join(", ") || result.error?.message || "Error desconocido");
+
+        Object.entries(fieldErrors).forEach(([key, value]) => {
+          const msg = Array.isArray(value) ? value.join(", ") : String(value);
+          if (msg) form.setError(key as any, { message: msg });
+        });
+
         toast.error("Error al crear orden: " + errorMessage);
+        setConfirmOpen(false);
         return;
       }
 
@@ -314,7 +308,7 @@ export default function NuevaOrdenPage() {
                         max={100}
                         placeholder="Ej: 12.5"
                         className="h-12 md:h-10 text-base"
-                        value={field.value ?? ""}
+                        value={(field.value as number | null | undefined) ?? ""}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
                       />
                     </FormControl>

@@ -56,6 +56,28 @@ describe("crearOrdenSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("convierte NaN en peso_inicial, precio y porcentaje_humedad_entrada a null", () => {
+    const result = crearOrdenSchema.safeParse({
+      ...validData,
+      porcentaje_humedad_entrada: NaN,
+      servicios: [{ tipo_servicio: "Tueste", peso_inicial: NaN, precio: NaN }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.porcentaje_humedad_entrada).toBeNull();
+      expect(result.data.servicios[0].peso_inicial).toBeNull();
+      expect(result.data.servicios[0].precio).toBeNull();
+    }
+  });
+
+  it("rechaza servicio con peso_inicial negativo", () => {
+    const result = crearOrdenSchema.safeParse({
+      ...validData,
+      servicios: [{ tipo_servicio: "Tueste", peso_inicial: -10, precio: 100 }],
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("actualizarOrdenSchema", () => {
