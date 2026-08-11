@@ -66,8 +66,8 @@ describe("crearOrdenSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.porcentaje_humedad_entrada).toBeNull();
-      expect(result.data.servicios[0].peso_inicial).toBeNull();
-      expect(result.data.servicios[0].precio).toBeNull();
+      expect(result.data.servicios[0]?.peso_inicial).toBeNull();
+      expect(result.data.servicios[0]?.precio).toBeNull();
     }
   });
 

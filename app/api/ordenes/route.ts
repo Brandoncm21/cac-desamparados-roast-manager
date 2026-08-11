@@ -47,6 +47,7 @@ async function post(request: NextRequest) {
     ...restoOrden,
     fecha_orden: fechaOrden,
     hora_cierre: horaCierre,
+    proceso_cafe: restoOrden.proceso_cafe || null,
     zona_finca: restoOrden.zona_finca || null,
   };
 
