@@ -24,8 +24,16 @@ interface Cliente {
 interface Servicio {
   id_servicio: number;
   tipo_servicio: string;
+  servicio_id: number | null;
+  empaque_id: number | null;
   peso_inicial: number | null;
+  peso_kg: number | null;
   precio: number | null;
+  snapshot_precio_por_kg: number | null;
+  snapshot_precio_empaque: number | null;
+  linea_total: number | null;
+  override_precio: boolean;
+  override_motivo: string | null;
 }
 
 interface Especificaciones {
@@ -167,7 +175,10 @@ export default function OrdenDetallePage() {
   if (!orden) return <p>Cargando...</p>;
 
   const cliente = orden.clientes;
-  const total = orden.servicios_ejecutados.reduce((sum, s) => sum + (Number(s.precio) || 0), 0);
+  const total = orden.servicios_ejecutados.reduce(
+    (sum, s) => sum + (Number(s.linea_total) || Number(s.precio) || 0),
+    0
+  );
   const tieneTueste = orden.servicios_ejecutados.some((s) => s.tipo_servicio === "Tueste");
 
   const handleIniciarTueste = async () => {
@@ -327,24 +338,50 @@ export default function OrdenDetallePage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Servicio</TableHead>
-                  <TableHead>Peso Inicial</TableHead>
-                  <TableHead className="text-right">Precio</TableHead>
+                  <TableHead>Peso (kg)</TableHead>
+                  <TableHead>Precio/kg</TableHead>
+                  <TableHead>Precio Empaque</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {orden.servicios_ejecutados.map((s) => (
                   <TableRow key={s.id_servicio}>
-                    <TableCell className="font-medium">{s.tipo_servicio}</TableCell>
-                    <TableCell>{s.peso_inicial ? `${s.peso_inicial} kg` : "—"}</TableCell>
-                    <TableCell className="text-right">{s.precio ? `₡${Number(s.precio).toLocaleString()}` : "—"}</TableCell>
+                    <TableCell className="font-medium">
+                      {s.tipo_servicio}
+                      {s.override_precio && (
+                        <Badge variant="outline" className="ml-2 text-xs">Modificado</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>{s.peso_kg != null ? `${s.peso_kg} kg` : s.peso_inicial != null ? `${s.peso_inicial} kg` : "—"}</TableCell>
+                    <TableCell>
+                      {s.snapshot_precio_por_kg != null ? `₡${Number(s.snapshot_precio_por_kg).toLocaleString()}` : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {s.snapshot_precio_empaque ? `₡${Number(s.snapshot_precio_empaque).toLocaleString()}` : "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      ₡{Number(s.linea_total || s.precio || 0).toLocaleString()}
+                    </TableCell>
                   </TableRow>
                 ))}
                 <TableRow>
-                  <TableCell colSpan={2} className="font-bold">Total</TableCell>
+                  <TableCell colSpan={4} className="font-bold">Total</TableCell>
                   <TableCell className="text-right font-bold">₡{total.toLocaleString()}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>
+            {orden.servicios_ejecutados.some((s) => s.override_precio && s.override_motivo) && (
+              <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                {orden.servicios_ejecutados
+                  .filter((s) => s.override_precio && s.override_motivo)
+                  .map((s) => (
+                    <p key={s.id_servicio}>
+                      <span className="font-medium">{s.tipo_servicio}:</span> Motivo de modificación — {s.override_motivo}
+                    </p>
+                  ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

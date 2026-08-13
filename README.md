@@ -122,6 +122,43 @@ Todas las rutas `/api/*` requieren autenticación mediante Supabase Auth.
 - `GET /api/zonas` - Listar zonas de finca
 - `POST /api/sync` - Sincronizar datos offline
 
+### Administración (solo Admin)
+- `GET/POST /api/admin/servicios` - Listar/crear servicios del maestro
+- `GET/PUT/DELETE /api/admin/servicios/[id]` - Obtener/actualizar/desactivar servicio
+- `GET/POST /api/admin/servicios/[id]/precios` - Historial/nuevo precio por kg
+- `GET/POST /api/admin/empaques` - Listar/crear empaques
+- `GET/PUT/DELETE /api/admin/empaques/[id]` - Obtener/actualizar/desactivar empaque
+- `GET/POST /api/admin/empaques/[id]/precios` - Historial/nuevo precio de empaque
+- `GET /api/servicios-activos` - Servicios y empaques activos con precio vigente
+
+## 📦 Módulo Productos/Servicios y Empaques
+
+El módulo permite al Admin gestionar un catálogo maestro de servicios y empaques con precios históricos.
+
+### Flujo de creación de órdenes
+1. El formulario de nueva orden carga los servicios/empaques activos desde `/api/servicios-activos`.
+2. Al seleccionar un servicio, se auto-completa `peso_inicial` (desde `default_peso_kg`) y `precio` (precio vigente por kg).
+3. Al seleccionar un empaque, se agrega su precio vigente.
+4. El sistema calcula `linea_total = peso_kg * precio_por_kg + precio_empaque` en tiempo real.
+5. Si el usuario modifica el precio manualmente, debe marcar el override y registrar un motivo (auditoría).
+
+### Snapshots de precios
+Cada línea de `servicios_ejecutados` guarda:
+- `snapshot_precio_por_kg`: precio por kg al momento de crear la orden
+- `snapshot_precio_empaque`: precio del empaque al momento
+- `linea_total`: total calculado
+- `override_precio` / `override_motivo`: si el precio se modificó manualmente
+
+Cambiar un precio desde el módulo Admin **no altera** órdenes ya creadas: cada cambio cierra el precio anterior (`valid_to`) y crea uno nuevo (`valid_from`).
+
+### Precios históricos
+- `servicio_precios` y `empaque_precios` guardan la historia con `valid_from`/`valid_to`.
+- Solo un precio vigente por servicio/empaque (aquel con `valid_to IS NULL`).
+- Los cambios registran `creado_por` (usuario autenticado).
+
+### Nota sobre unidades
+Los pesos se almacenan en **kilogramos** usando `NUMERIC(10,2)` (nunca FLOAT) para evitar errores de precisión.
+
 ## 🔐 Autenticación
 
 Utiliza Supabase Auth con política de sesión basada en cookies. El middleware verifica automáticamente cada request y redirige a `/login` si es necesario.

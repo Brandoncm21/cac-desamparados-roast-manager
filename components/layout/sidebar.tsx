@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Users, FileText, Flame, BarChart3, LogOut, Coffee, Menu, X, Plus,
+  Package, Box,
 } from "lucide-react";
+import { getCurrentUserRole, type UserRole } from "@/lib/auth-helpers";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -18,11 +20,21 @@ const navItems = [
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
 ];
 
+const adminNavItems = [
+  { href: "/admin/servicios", label: "Servicios", icon: Package },
+  { href: "/admin/empaques", label: "Empaques", icon: Box },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+
+  useEffect(() => {
+    getCurrentUserRole().then(setUserRole);
+  }, []);
 
   useEffect(() => {
     setOpen(false);
@@ -102,6 +114,33 @@ export function Sidebar() {
               </Link>
             );
           })}
+
+          {userRole === "Admin" && (
+            <>
+              <div className="pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Administración
+              </div>
+              {adminNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all min-h-[48px] active:scale-95",
+                      isActive
+                        ? "bg-secondary-container text-on-secondary-container"
+                        : "text-muted-foreground hover:bg-surface-container-high hover:text-on-surface"
+                    )}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         {/* CTA + Cerrar sesión */}

@@ -49,12 +49,60 @@ describe("crearOrdenSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rechaza servicio con tipo_servicio inválido", () => {
+  it("rechaza servicio con tipo_servicio vacío", () => {
     const result = crearOrdenSchema.safeParse({
       ...validData,
-      servicios: [{ tipo_servicio: "Servicio inválido" }],
+      servicios: [{ tipo_servicio: "" }],
     });
     expect(result.success).toBe(false);
+  });
+
+  it("acepta servicio con nombre libre (desde maestro)", () => {
+    const result = crearOrdenSchema.safeParse({
+      ...validData,
+      servicios: [{ tipo_servicio: "Tueste Medio Premium" }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("acepta servicio con servicio_id y empaque_id opcionales", () => {
+    const result = crearOrdenSchema.safeParse({
+      ...validData,
+      servicios: [{
+        tipo_servicio: "Tueste",
+        servicio_id: 1,
+        empaque_id: 2,
+        peso_inicial: 50,
+        precio: 100,
+        override_precio: false,
+      }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("acepta override de precio con motivo", () => {
+    const result = crearOrdenSchema.safeParse({
+      ...validData,
+      servicios: [{
+        tipo_servicio: "Tueste",
+        precio: 150,
+        override_precio: true,
+        override_motivo: "Precio especial cliente VIP",
+      }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.servicios[0]?.override_precio).toBe(true);
+      expect(result.data.servicios[0]?.override_motivo).toBe("Precio especial cliente VIP");
+    }
+  });
+
+  it("default de override_precio es false si no se especifica", () => {
+    const result = crearOrdenSchema.safeParse(validData);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.servicios[0]?.override_precio).toBe(false);
+    }
   });
 
   it("convierte NaN en peso_inicial, precio y porcentaje_humedad_entrada a null", () => {

@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ClienteAutocomplete } from "@/components/forms/cliente-autocomplete";
 import { InlineAddSelect } from "@/components/forms/inline-add-select";
+import { calcularLineaTotal } from "@/lib/calculo-precios";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -49,6 +50,22 @@ interface EmpleadoOption {
 interface ZonaOption {
   id_zona: number;
   nombre: string;
+}
+
+interface ServicioActivo {
+  id_servicio_maestro: number;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+  default_peso_kg: number | null;
+  precio_por_kg: number | null;
+}
+
+interface EmpaqueActivo {
+  id_empaque: number;
+  nombre: string;
+  unit_weight_kg: number | null;
+  precio: number | null;
 }
 
 function SpecSelect({
@@ -101,6 +118,8 @@ export default function NuevaOrdenPage() {
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [zonas, setZonas] = useState<ZonaOption[]>([]);
   const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
+  const [serviciosActivos, setServiciosActivos] = useState<ServicioActivo[]>([]);
+  const [empaquesActivos, setEmpaquesActivos] = useState<EmpaqueActivo[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -122,29 +141,60 @@ export default function NuevaOrdenPage() {
     },
   });
 
+  const { setValue, watch } = form;
+
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "servicios" });
 
   useEffect(() => {
     const load = async () => {
-      const [{ data: cli }, { data: zon }, { data: emp }] = await Promise.all([
+      const [{ data: cli }, { data: zon }, { data: emp }, resServicios] = await Promise.all([
         supabase.from("clientes").select("id_cliente, nombre_completo").order("nombre_completo"),
         supabase.from("zonas_finca").select("id_zona, nombre").order("nombre"),
         supabase.from("empleados").select("id_empleado, nombre").eq("activo", true).order("nombre"),
+        fetch("/api/servicios-activos"),
       ]);
       if (cli) setClientes(cli);
       if (zon) setZonas(zon);
       if (emp) setEmpleados(emp);
+
+      if (resServicios.ok) {
+        const { data } = await resServicios.json();
+        setServiciosActivos(data?.servicios || []);
+        setEmpaquesActivos(data?.empaques || []);
+      }
     };
     load();
   }, [supabase]);
 
-  const addServicio = (tipo: typeof TIPOS_SERVICIO[number]) => {
-    append({ tipo_servicio: tipo, peso_inicial: null as any, precio: null as any });
+  const addServicio = (servicioId: number) => {
+    const servicio = serviciosActivos.find((s) => s.id_servicio_maestro === servicioId);
+    if (!servicio) return;
+    append({
+      tipo_servicio: servicio.nombre,
+      servicio_id: servicio.id_servicio_maestro,
+      empaque_id: null,
+      peso_inicial: servicio.default_peso_kg ?? (null as any),
+      precio: servicio.precio_por_kg ?? (null as any),
+      override_precio: false,
+      override_motivo: null,
+    } as any);
   };
 
   const removeServicio = (index: number) => {
     remove(index);
   };
+
+  const calcularLineaTotalRow = (s: CrearOrdenInput["servicios"][number]) => {
+    const empaque = empaquesActivos.find((e) => e.id_empaque === s.empaque_id);
+    return calcularLineaTotal({
+      pesoKg: s.peso_inicial,
+      precioPorKg: s.precio,
+      precioEmpaque: empaque?.precio,
+    });
+  };
+
+  const serviciosWatch = watch("servicios") as CrearOrdenInput["servicios"];
+  const totalGeneral = serviciosWatch.reduce((sum, s) => sum + calcularLineaTotalRow(s), 0);
 
   const [pendingValues, setPendingValues] = useState<CrearOrdenInput | null>(null);
 
@@ -337,8 +387,10 @@ export default function NuevaOrdenPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Servicio</TableHead>
+                      <TableHead>Empaque</TableHead>
                       <TableHead>Peso inicial (kg)</TableHead>
-                      <TableHead>Precio (₡)</TableHead>
+                      <TableHead>Precio/kg (₡)</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -347,22 +399,68 @@ export default function NuevaOrdenPage() {
                       <TableRow key={field.id}>
                         <TableCell className="font-medium">{field.tipo_servicio}</TableCell>
                         <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            className="h-12 md:h-10 text-base"
-                            {...form.register(`servicios.${index}.peso_inicial` as const, { valueAsNumber: true })}
-                          />
+                          <Select
+                            value={field.empaque_id ? String(field.empaque_id) : ""}
+                            onValueChange={(v) => {
+                              const empaqueId = Number(v);
+                              setValue(`servicios.${index}.empaque_id`, empaqueId || null);
+                            }}
+                          >
+                            <SelectTrigger className="h-10 text-sm">
+                              <SelectValue placeholder="Sin empaque" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">Sin empaque</SelectItem>
+                              {empaquesActivos.map((e) => (
+                                <SelectItem key={e.id_empaque} value={String(e.id_empaque)}>
+                                  {e.nombre}{e.precio ? ` (₡${Number(e.precio).toLocaleString()})` : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell>
                           <Input
                             type="number"
-                            step="1"
-                            placeholder="0"
-                            className="h-12 md:h-10 text-base"
-                            {...form.register(`servicios.${index}.precio` as const, { valueAsNumber: true })}
+                            step="0.01"
+                            placeholder="0.00"
+                            className="h-10 text-sm"
+                            {...form.register(`servicios.${index}.peso_inicial` as const, { valueAsNumber: true })}
                           />
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <Input
+                              type="number"
+                              step="1"
+                              placeholder="0"
+                              className="h-10 text-sm"
+                              disabled={!form.watch(`servicios.${index}.override_precio`)}
+                              {...form.register(`servicios.${index}.precio` as const, { valueAsNumber: true })}
+                            />
+                            {form.watch(`servicios.${index}.override_precio`) ? (
+                              <Input
+                                placeholder="Motivo de modificación..."
+                                className="h-8 text-xs"
+                                {...form.register(`servicios.${index}.override_motivo`)}
+                              />
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs text-amber-600 hover:text-amber-700"
+                                onClick={() => {
+                                  setValue(`servicios.${index}.override_precio`, true);
+                                }}
+                              >
+                                Modificar precio
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          ₡{calcularLineaTotalRow(form.watch(`servicios.${index}`) as CrearOrdenInput["servicios"][number]).toLocaleString()}
                         </TableCell>
                         <TableCell>
                           <Button type="button" variant="ghost" size="icon" onClick={() => removeServicio(index)}>
@@ -371,19 +469,42 @@ export default function NuevaOrdenPage() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    <TableRow>
+                      <TableCell colSpan={4} className="font-bold text-right">Total General</TableCell>
+                      <TableCell className="text-right font-bold">₡{totalGeneral.toLocaleString()}</TableCell>
+                      <TableCell />
+                    </TableRow>
                   </TableBody>
                 </Table>
               )}
 
-              <Select onValueChange={(v) => addServicio(v as typeof TIPOS_SERVICIO[number])}>
+              <Select
+                onValueChange={(v) => {
+                  const val = String(v);
+                  if (val.startsWith("legacy:")) {
+                    append({ tipo_servicio: val.replace("legacy:", ""), servicio_id: null, empaque_id: null, peso_inicial: null as any, precio: null as any, override_precio: false, override_motivo: null } as any);
+                    return;
+                  }
+                  const id = Number(val);
+                  if (id) addServicio(id);
+                }}
+              >
                 <SelectTrigger className="h-14 md:h-12 text-base">
                   <Plus className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Agregar servicio..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIPOS_SERVICIO.map((tipo) => (
-                    <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
-                  ))}
+                  {serviciosActivos.length > 0 ? (
+                    serviciosActivos.map((s) => (
+                      <SelectItem key={s.id_servicio_maestro} value={String(s.id_servicio_maestro)}>
+                        {s.nombre}{s.precio_por_kg ? ` (₡${Number(s.precio_por_kg).toLocaleString()}/kg)` : " (sin precio)"}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    TIPOS_SERVICIO.map((tipo) => (
+                      <SelectItem key={tipo} value={`legacy:${tipo}`}>{tipo}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               <FormMessage>{form.formState.errors.servicios?.message}</FormMessage>
