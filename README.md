@@ -122,6 +122,48 @@ Todas las rutas `/api/*` requieren autenticación mediante Supabase Auth.
 - `GET /api/zonas` - Listar zonas de finca
 - `POST /api/sync` - Sincronizar datos offline
 
+### Administración (solo Admin)
+- `GET/POST /api/admin/servicios` - Listar/crear servicios (con intervalos de precio)
+- `GET/PUT/DELETE /api/admin/servicios/[id]` - Obtener/actualizar/desactivar servicio e intervalos
+- `GET/POST /api/admin/empaques` - Listar/crear empaques
+- `GET/PUT/DELETE /api/admin/empaques/[id]` - Obtener/actualizar/desactivar empaque
+- `GET/POST /api/admin/empaques/[id]/precios` - Historial/nuevo precio de empaque
+- `GET /api/servicios-activos` - Servicios activos con sus intervalos y empaques activos con precio vigente
+
+## 📦 Módulo Productos/Servicios y Empaques
+
+El módulo permite al Admin gestionar un catálogo maestro de servicios con **tarifas por intervalo de peso** y empaques con precios vigentes.
+
+### Cómo crear/editar un servicio
+1. En **Admin → Servicios → Nuevo Servicio**.
+2. Complete `nombre`, `descripcion` (opcional), `prioridad` (orden en el proceso, único) y `tipo`:
+   - **General**: proceso regular (chancado, trillado, molido, etc.).
+   - **Tueste**: paso especial que requiere confirmación manual del operador.
+   - **Empacado**: paso especial que solicita selección de empaque.
+3. Agregue uno o más **intervalos de precio**:
+   - `peso_min_kg` (inclusive), `peso_max_kg` (exclusivo; vacío = sin límite superior), `precio_por_kg`.
+4. Validaciones: mínimo 1 intervalo, `peso_min < peso_max`, `precio > 0`, sin solapes entre intervalos del mismo servicio.
+5. Guarde: el servicio y sus intervalos se persisten juntos.
+6. Para editar, desde la lista pulse el lápiz: puede modificar datos, agregar/editar/eliminar intervalos y **desactivar** (soft delete) el servicio.
+
+### Cómo funcionan los intervalos de precio
+- El precio se aplica por **rango de peso**: `peso_min_kg <= peso < peso_max_kg`.
+- Al iniciar un paso de la orden, el sistema busca la tarifa que corresponda al peso inicial.
+- Los intervalos no pueden solaparse (validado en frontend, API y base de datos con un trigger).
+- Los intervalos inactivos no se consideran al cotizar ni al resolver la tarifa.
+
+### Flujo de creación de órdenes
+1. El formulario de nueva orden carga los servicios activos (con sus intervalos) desde `/api/servicios-activos`.
+2. El operador selecciona los servicios; el costo se calculará por intervalo al ejecutar cada paso en la orden.
+
+### Datos iniciales (seed)
+La migración `0021` inserta servicios base (Chancado, Trillado, Clasificación Mecánica/Manual, Tueste, Molido, Empacado) con **3 intervalos de ejemplo cada uno** (Chancado usa rangos más amplios).
+
+> **Importante:** estos precios son valores **de referencia iniciales**, totalmente editables por el Admin desde la UI. No representan tarifas fijas de mercado.
+
+### Nota sobre unidades
+Los pesos se almacenan en **kilogramos** usando `NUMERIC(10,2)` (nunca FLOAT) para evitar errores de precisión.
+
 ## 🔐 Autenticación
 
 Utiliza Supabase Auth con política de sesión basada en cookies. El middleware verifica automáticamente cada request y redirige a `/login` si es necesario.

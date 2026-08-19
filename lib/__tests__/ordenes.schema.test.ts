@@ -9,7 +9,7 @@ describe("crearOrdenSchema", () => {
     proceso_cafe: "Lavado",
     porcentaje_humedad_entrada: 12.5,
     id_empleado_recibe: 2,
-    servicios: [{ tipo_servicio: "Tueste", peso_inicial: 50, precio: 100 }],
+    servicios: [{ servicio_id: 1, tipo_servicio: "Tueste" }],
     tipo_tueste: "Medio",
     tipo_molienda: "Media",
     tipo_empaque: "Bolsa con válvula 1Kg",
@@ -49,34 +49,43 @@ describe("crearOrdenSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rechaza servicio con tipo_servicio inválido", () => {
+  it("rechaza servicio con tipo_servicio vacío", () => {
     const result = crearOrdenSchema.safeParse({
       ...validData,
-      servicios: [{ tipo_servicio: "Servicio inválido" }],
+      servicios: [{ servicio_id: 1, tipo_servicio: "" }],
     });
     expect(result.success).toBe(false);
   });
 
-  it("convierte NaN en peso_inicial, precio y porcentaje_humedad_entrada a null", () => {
+  it("rechaza servicio sin servicio_id", () => {
+    const result = crearOrdenSchema.safeParse({
+      ...validData,
+      servicios: [{ tipo_servicio: "Tueste" }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("acepta varios servicios seleccionados", () => {
+    const result = crearOrdenSchema.safeParse({
+      ...validData,
+      servicios: [
+        { servicio_id: 1, tipo_servicio: "Chancado" },
+        { servicio_id: 2, tipo_servicio: "Trillado" },
+        { servicio_id: 5, tipo_servicio: "Tueste" },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("convierte NaN en porcentaje_humedad_entrada a null", () => {
     const result = crearOrdenSchema.safeParse({
       ...validData,
       porcentaje_humedad_entrada: NaN,
-      servicios: [{ tipo_servicio: "Tueste", peso_inicial: NaN, precio: NaN }],
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.porcentaje_humedad_entrada).toBeNull();
-      expect(result.data.servicios[0]?.peso_inicial).toBeNull();
-      expect(result.data.servicios[0]?.precio).toBeNull();
     }
-  });
-
-  it("rechaza servicio con peso_inicial negativo", () => {
-    const result = crearOrdenSchema.safeParse({
-      ...validData,
-      servicios: [{ tipo_servicio: "Tueste", peso_inicial: -10, precio: 100 }],
-    });
-    expect(result.success).toBe(false);
   });
 });
 

@@ -4,12 +4,22 @@ import { z } from "zod";
 import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 const agregarServicioSchema = z.object({
-  tipo_servicio: z.enum([
-    "Chancado", "Trillado", "Clasificación Mecánica", "Clasificación Manual",
-    "Tueste", "Molido", "Empacado",
-  ]),
+  tipo_servicio: z
+    .enum([
+      "Chancado", "Trillado", "Clasificación Mecánica", "Clasificación Manual",
+      "Tueste", "Molido", "Empacado",
+    ])
+    .or(z.string().min(1)),
+  servicio_id: z.number().int().positive().optional().nullable(),
+  empaque_id: z.number().int().positive().optional().nullable(),
   peso_inicial: z.number().positive().optional().nullable(),
+  peso_kg: z.number().positive().optional().nullable(),
   precio: z.number().min(0).optional().nullable(),
+  snapshot_precio_por_kg: z.number().min(0).optional().nullable(),
+  snapshot_precio_empaque: z.number().min(0).optional().nullable(),
+  linea_total: z.number().min(0).optional().nullable(),
+  override_precio: z.boolean().optional().default(false),
+  override_motivo: z.string().optional().nullable(),
   id_operador: z.number().int().positive().optional().nullable(),
 });
 

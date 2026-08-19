@@ -14,16 +14,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ClienteAutocomplete } from "@/components/forms/cliente-autocomplete";
 import { InlineAddSelect } from "@/components/forms/inline-add-select";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
-
-const TIPOS_SERVICIO = [
-  "Chancado", "Trillado", "Clasificación Mecánica", "Clasificación Manual",
-  "Tueste", "Molido", "Empacado",
-] as const;
 
 const OPCIONES_TUESTE = ["Claro", "Medio", "Oscuro"];
 const OPCIONES_MOLIENDA = ["Fina", "Media", "Gruesa", "Grano Entero"];
@@ -51,16 +45,31 @@ interface ZonaOption {
   nombre: string;
 }
 
+interface ServicioActivo {
+  id_servicio_maestro: number;
+  nombre: string;
+  descripcion: string | null;
+  tipo: string;
+  prioridad: number;
+  intervalos: { id_precio: number; precio_por_kg: number; min_weight_kg: number; max_weight_kg: number | null }[];
+}
+
 function SpecSelect({
   value,
   onChange,
   options,
   placeholder,
+  id,
+  "aria-describedby": ariaDescribedby,
+  "aria-invalid": ariaInvalid,
 }: {
   value: string;
   onChange: (val: string) => void;
   options: string[];
   placeholder: string;
+  id?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
 }) {
   const [otro, setOtro] = useState(!options.includes(value) && value ? value : "");
   const isOtro = value === "__OTRO__" || (!options.includes(value) && !!value);
@@ -68,7 +77,12 @@ function SpecSelect({
   return (
     <div className="space-y-2">
       <Select value={options.includes(value) ? value : value ? "__OTRO__" : ""} onValueChange={(v) => v && onChange(v)}>
-        <SelectTrigger className="h-12 md:h-10 text-base">
+        <SelectTrigger
+          id={id}
+          aria-describedby={ariaDescribedby}
+          aria-invalid={ariaInvalid}
+          className="h-12 md:h-10 text-base"
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -81,6 +95,9 @@ function SpecSelect({
       </Select>
       {isOtro && (
         <Input
+          id={id}
+          aria-describedby={ariaDescribedby}
+          aria-invalid={ariaInvalid}
           value={otro}
           onChange={(e) => {
             setOtro(e.target.value);
@@ -101,6 +118,7 @@ export default function NuevaOrdenPage() {
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [zonas, setZonas] = useState<ZonaOption[]>([]);
   const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
+  const [serviciosActivos, setServiciosActivos] = useState<ServicioActivo[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -122,24 +140,40 @@ export default function NuevaOrdenPage() {
     },
   });
 
+  const { watch } = form;
+
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "servicios" });
 
   useEffect(() => {
     const load = async () => {
-      const [{ data: cli }, { data: zon }, { data: emp }] = await Promise.all([
+      const [{ data: cli }, { data: zon }, { data: emp }, resServicios] = await Promise.all([
         supabase.from("clientes").select("id_cliente, nombre_completo").order("nombre_completo"),
         supabase.from("zonas_finca").select("id_zona, nombre").order("nombre"),
         supabase.from("empleados").select("id_empleado, nombre").eq("activo", true).order("nombre"),
+        fetch("/api/servicios-activos"),
       ]);
       if (cli) setClientes(cli);
       if (zon) setZonas(zon);
       if (emp) setEmpleados(emp);
+
+      if (resServicios.ok) {
+        const { data } = await resServicios.json();
+        setServiciosActivos(data?.servicios || []);
+      }
     };
     load();
   }, [supabase]);
 
-  const addServicio = (tipo: typeof TIPOS_SERVICIO[number]) => {
-    append({ tipo_servicio: tipo, peso_inicial: null as any, precio: null as any });
+  const serviciosSeleccionados = watch("servicios") as CrearOrdenInput["servicios"];
+  const idsSeleccionados = new Set(serviciosSeleccionados.map((s) => s.servicio_id));
+
+  const addServicio = (servicioId: number) => {
+    const servicio = serviciosActivos.find((s) => s.id_servicio_maestro === servicioId);
+    if (!servicio || idsSeleccionados.has(servicioId)) return;
+    append({
+      servicio_id: servicio.id_servicio_maestro,
+      tipo_servicio: servicio.nombre,
+    });
   };
 
   const removeServicio = (index: number) => {
@@ -333,57 +367,50 @@ export default function NuevaOrdenPage() {
             </CardHeader>
             <CardContent className="space-y-3 md:space-y-4">
               {fields.length > 0 && (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Servicio</TableHead>
-                      <TableHead>Peso inicial (kg)</TableHead>
-                      <TableHead>Precio (₡)</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {fields.map((field, index) => (
-                      <TableRow key={field.id}>
-                        <TableCell className="font-medium">{field.tipo_servicio}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            className="h-12 md:h-10 text-base"
-                            {...form.register(`servicios.${index}.peso_inicial` as const, { valueAsNumber: true })}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="1"
-                            placeholder="0"
-                            className="h-12 md:h-10 text-base"
-                            {...form.register(`servicios.${index}.precio` as const, { valueAsNumber: true })}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button type="button" variant="ghost" size="icon" onClick={() => removeServicio(index)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="flex flex-wrap gap-2">
+                  {fields.map((field, index) => (
+                    <div
+                      key={field.id}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/50"
+                    >
+                      <span className="font-medium">{field.tipo_servicio}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => removeServicio(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               )}
 
-              <Select onValueChange={(v) => addServicio(v as typeof TIPOS_SERVICIO[number])}>
+              <Select
+                onValueChange={(v) => {
+                  const id = Number(v);
+                  if (id) addServicio(id);
+                }}
+              >
                 <SelectTrigger className="h-14 md:h-12 text-base">
                   <Plus className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Agregar servicio..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIPOS_SERVICIO.map((tipo) => (
-                    <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
-                  ))}
+                  {serviciosActivos
+                    .filter((s) => !idsSeleccionados.has(s.id_servicio_maestro))
+                    .map((s) => (
+                      <SelectItem key={s.id_servicio_maestro} value={String(s.id_servicio_maestro)}>
+                        {s.nombre}
+                      </SelectItem>
+                    ))}
+                  {serviciosActivos.filter((s) => !idsSeleccionados.has(s.id_servicio_maestro)).length === 0 && (
+                    <SelectItem value="__none__" disabled>
+                      No hay más servicios disponibles
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
               <FormMessage>{form.formState.errors.servicios?.message}</FormMessage>

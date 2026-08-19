@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { crearOrdenSchema } from "@/lib/schemas/ordenes";
+import { crearPasosOrden } from "@/lib/services/orquestador";
 import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
 
 async function get(request: NextRequest) {
@@ -49,6 +50,7 @@ async function post(request: NextRequest) {
     hora_cierre: horaCierre,
     proceso_cafe: restoOrden.proceso_cafe || null,
     zona_finca: restoOrden.zona_finca || null,
+    estado_orden: "Pendiente",
   };
 
   const { data: orden, error: ordenError } = await supabase
@@ -59,20 +61,15 @@ async function post(request: NextRequest) {
 
   if (ordenError) return apiError(ordenError.message, 500);
 
-  const serviciosData = servicios.map((s) => ({
-    id_orden: orden.id_orden,
-    tipo_servicio: s.tipo_servicio,
-    peso_inicial: s.peso_inicial,
-    precio: s.precio,
-  }));
-
-  const { error: serviciosError } = await supabase
-    .from("servicios_ejecutados")
-    .insert(serviciosData);
-
-  if (serviciosError) {
+  try {
+    await crearPasosOrden(
+      supabase,
+      orden.id_orden,
+      servicios.map((s) => ({ servicio_id: s.servicio_id, tipo_servicio: s.tipo_servicio }))
+    );
+  } catch (err) {
     await supabase.from("ordenes_trabajo").delete().eq("id_orden", orden.id_orden);
-    return apiError(serviciosError.message, 500);
+    return apiError(err instanceof Error ? err.message : "Error creando pasos", 500);
   }
 
   if (tipo_tueste || tipo_molienda || tipo_empaque || observaciones) {

@@ -28,6 +28,9 @@ interface ClienteAutocompleteProps {
   value: number;
   onChange: (id: number) => void;
   placeholder?: string;
+  id?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
 }
 
 export function ClienteAutocomplete({
@@ -35,6 +38,9 @@ export function ClienteAutocomplete({
   value,
   onChange,
   placeholder = "Buscar cliente...",
+  id,
+  "aria-describedby": ariaDescribedby,
+  "aria-invalid": ariaInvalid,
 }: ClienteAutocompleteProps) {
   const [open, setOpen] = useState(false);
 
@@ -52,6 +58,9 @@ export function ClienteAutocomplete({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            id={id}
+            aria-describedby={ariaDescribedby}
+            aria-invalid={ariaInvalid}
             className="w-full justify-between h-12 md:h-10 text-base font-normal"
           />
         }
