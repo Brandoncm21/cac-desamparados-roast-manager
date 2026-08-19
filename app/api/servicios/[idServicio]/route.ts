@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 const editarServicioSchema = z.object({
   peso_inicial: z.number().positive().optional().nullable(),
@@ -13,7 +13,7 @@ async function put(
   request: NextRequest,
   { params }: { params: Promise<{ idServicio: string }> }
 ) {
-  await requireAuth();
+  await requireRole(["Admin", "Recepción"]);
   const supabase = await createClient();
   const { idServicio } = await params;
   const servicioId = validateIdParam(idServicio);
@@ -37,7 +37,7 @@ async function del(
   _request: NextRequest,
   { params }: { params: Promise<{ idServicio: string }> }
 ) {
-  await requireAuth();
+  await requireRole(["Admin", "Recepción"]);
   const supabase = await createClient();
   const { idServicio } = await params;
   const servicioId = validateIdParam(idServicio);

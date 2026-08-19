@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiValidationError, requireRole, withErrorHandler } from "@/lib/api-helpers";
 
 const syncItemSchema = z.object({
   tempId: z.string(),
@@ -17,7 +17,7 @@ const syncSchema = z.object({
 });
 
 async function post(request: NextRequest) {
-  await requireAuth();
+  await requireRole(["Admin", "Recepción", "Tostador"]);
   const supabase = await createClient();
   const body = await request.json();
 

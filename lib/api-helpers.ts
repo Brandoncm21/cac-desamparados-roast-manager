@@ -1,7 +1,10 @@
+import "server-only";
+
 import { NextRequest, NextResponse } from "next/server";
 import type { ZodError } from "zod";
 import { AppError, ERROR_CODES, handleApiError } from "./error-handler";
 import { createClient } from "./supabase/server";
+import type { UserRole } from "./auth-helpers";
 
 export function apiOk<T>(data: T, status = 200) {
   return NextResponse.json({ data }, { status });
@@ -54,6 +57,17 @@ export function validateIdParam(value: string): number {
   return id;
 }
 
+/**
+ * Conjuntos de roles autorizados reutilizables.
+ * Centralizar aquí evita listas inconsistentes entre endpoints.
+ */
+export const ROLE_SETS = {
+  ADMIN: ["Admin"] as UserRole[],
+  ADMIN_OR_RECEPCION: ["Admin", "Recepción"] as UserRole[],
+  ADMIN_OR_RECEPCION_OR_TOSTADOR: ["Admin", "Recepción", "Tostador"] as UserRole[],
+  ADMIN_OR_TOSTADOR: ["Admin", "Tostador"] as UserRole[],
+} as const;
+
 export async function requireAuth() {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -65,7 +79,25 @@ export async function requireAuth() {
   return user;
 }
 
-export async function requireRole(roles: string[]) {
+/**
+ * Verifica que el usuario autenticado pertenezca a uno de los roles permitidos.
+ *
+ * Reglas:
+ *   - `roles` debe ser un array no vacío de `UserRole`. Pasar `[]` o `undefined`
+ *     lanza `AppError` con `FORBIDDEN` (defensa contra endpoints
+ *     mal configurados).
+ *   - El mensaje de error 403 NO enumera los roles esperados para no filtrar
+ *     información a un atacante.
+ */
+export async function requireRole(roles: readonly UserRole[]) {
+  if (!Array.isArray(roles) || roles.length === 0) {
+    throw new AppError(
+      ERROR_CODES.FORBIDDEN,
+      "Configuración de roles inválida",
+      403
+    );
+  }
+
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
 
@@ -79,9 +111,13 @@ export async function requireRole(roles: string[]) {
     .eq("id_auth", user.id)
     .single();
 
-  if (empleadoError || !empleado || !roles.includes(empleado.rol)) {
-    throw new AppError(ERROR_CODES.FORBIDDEN, "No tiene permisos para esta acción", 403);
+  if (empleadoError || !empleado || !roles.includes(empleado.rol as UserRole)) {
+    throw new AppError(
+      ERROR_CODES.FORBIDDEN,
+      "No tiene permisos para esta acción",
+      403
+    );
   }
 
-  return { user, role: empleado.rol };
+  return { user, role: empleado.rol as UserRole };
 }

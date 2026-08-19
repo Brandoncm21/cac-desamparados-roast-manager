@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { confirmarTuesteSchema } from "@/lib/schemas/orden-pasos";
 import { calcularMerma } from "@/lib/services/resolver-tarifa";
 import { hayPasosPendientes } from "@/lib/services/orquestador";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, withErrorHandler } from "@/lib/api-helpers";
 
 interface Params {
   params: Promise<{ id: string; pasoId: string }>;
@@ -14,7 +14,7 @@ async function post(request: NextRequest, { params }: Params) {
   const idOrdenNum = Number(idOrden);
   const pasoIdNum = Number(pasoId);
 
-  await requireAuth();
+  await requireRole(["Admin", "Recepción", "Tostador"]);
   const supabase = await createClient();
 
   const body = await request.json();
