@@ -20,7 +20,7 @@ interface PrecioEmpaque {
 interface Empaque {
   id_empaque: number;
   nombre: string;
-  unit_weight_kg: number | null;
+  capacidad_kg: number | null;
   activo: boolean;
   empaque_precios: PrecioEmpaque[];
 }
@@ -109,7 +109,7 @@ export default function AdminEmpaquesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
-                  <TableHead>Peso unitario (kg)</TableHead>
+                  <TableHead>Capacidad (kg)</TableHead>
                   <TableHead className="text-right">Precio (₡)</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -119,7 +119,7 @@ export default function AdminEmpaquesPage() {
                 {filtrados.map((e) => (
                   <TableRow key={e.id_empaque}>
                     <TableCell className="font-medium">{e.nombre}</TableCell>
-                    <TableCell>{e.unit_weight_kg ?? "—"}</TableCell>
+                    <TableCell>{e.capacidad_kg ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       {precioVigente(e) != null ? `₡${Number(precioVigente(e)).toLocaleString()}` : <Badge variant="outline">Sin precio</Badge>}
                     </TableCell>

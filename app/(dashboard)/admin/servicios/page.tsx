@@ -11,26 +11,35 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
-interface PrecioServicio {
+interface Intervalo {
+  id_precio: number;
   precio_por_kg: number;
-  valid_from: string;
-  valid_to: string | null;
+  min_weight_kg: number;
+  max_weight_kg: number | null;
+  activo: boolean;
 }
 
 interface ServicioMaestro {
   id_servicio_maestro: number;
-  codigo: string;
   nombre: string;
   descripcion: string | null;
-  default_peso_kg: number | null;
+  prioridad: number;
+  tipo: string;
   activo: boolean;
-  servicio_precios: PrecioServicio[];
+  servicio_precios: Intervalo[];
 }
 
-function precioVigente(servicio: ServicioMaestro): number | null {
-  const vigentes = (servicio.servicio_precios || []).filter((p) => !p.valid_to);
-  if (vigentes.length === 0) return null;
-  return vigentes[0]?.precio_por_kg ?? null;
+const ETIQUETAS_TIPO: Record<string, string> = {
+  general: "General",
+  tueste: "Tueste",
+  empacado: "Empacado",
+};
+
+function formatearIntervalo(i: Intervalo): string {
+  const min = Number(i.min_weight_kg);
+  const max = i.max_weight_kg != null ? Number(i.max_weight_kg) : null;
+  const rango = max == null ? `${min} kg o más` : `${min}–${max} kg`;
+  return `${rango} · ₡${Number(i.precio_por_kg).toLocaleString()}/kg`;
 }
 
 export default function AdminServiciosPage() {
@@ -46,9 +55,10 @@ export default function AdminServiciosPage() {
         .from("servicios_maestro")
         .select(`
           *,
-          servicio_precios(precio_por_kg, valid_from, valid_to)
+          servicio_precios(id_precio, precio_por_kg, min_weight_kg, max_weight_kg, activo)
         `)
-        .order("nombre");
+        .eq("servicio_precios.activo", true)
+        .order("prioridad");
 
       if (error) {
         toast.error("Error al cargar servicios: " + error.message);
@@ -60,10 +70,8 @@ export default function AdminServiciosPage() {
     load();
   }, [supabase]);
 
-  const filtrados = servicios.filter(
-    (s) =>
-      s.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      s.codigo.toLowerCase().includes(search.toLowerCase())
+  const filtrados = servicios.filter((s) =>
+    s.nombre.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -79,7 +87,7 @@ export default function AdminServiciosPage() {
       <div className="relative">
         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Buscar por nombre o código..."
+          placeholder="Buscar por nombre..."
           className="pl-10"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -99,10 +107,10 @@ export default function AdminServiciosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Código</TableHead>
+                  <TableHead>Prioridad</TableHead>
                   <TableHead>Nombre</TableHead>
-                  <TableHead>Peso default (kg)</TableHead>
-                  <TableHead className="text-right">Precio/kg (₡)</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Intervalos</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -110,11 +118,27 @@ export default function AdminServiciosPage() {
               <TableBody>
                 {filtrados.map((s) => (
                   <TableRow key={s.id_servicio_maestro}>
-                    <TableCell className="font-mono text-xs">{s.codigo}</TableCell>
-                    <TableCell className="font-medium">{s.nombre}</TableCell>
-                    <TableCell>{s.default_peso_kg ?? "—"}</TableCell>
-                    <TableCell className="text-right">
-                      {precioVigente(s) != null ? `₡${Number(precioVigente(s)).toLocaleString()}` : <Badge variant="outline">Sin precio</Badge>}
+                    <TableCell className="font-mono text-xs">{s.prioridad}</TableCell>
+                    <TableCell className="font-medium">
+                      {s.nombre}
+                      {s.descripcion && (
+                        <span className="block text-xs text-muted-foreground">{s.descripcion}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{ETIQUETAS_TIPO[s.tipo] || "General"}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        {(s.servicio_precios || []).map((i) => (
+                          <p key={i.id_precio} className="text-xs text-muted-foreground">
+                            {formatearIntervalo(i)}
+                          </p>
+                        ))}
+                        {(!s.servicio_precios || s.servicio_precios.length === 0) && (
+                          <Badge variant="cancelado">Sin intervalos</Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={s.activo ? "completado" : "cancelado"}>
@@ -123,7 +147,11 @@ export default function AdminServiciosPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => router.push(`/admin/servicios/${s.id_servicio_maestro}/editar`)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => router.push(`/admin/servicios/${s.id_servicio_maestro}/editar`)}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </div>

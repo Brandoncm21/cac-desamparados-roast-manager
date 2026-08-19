@@ -1,112 +1,139 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { actualizarServicioMaestroSchema, type ActualizarServicioMaestroInput } from "@/lib/schemas/servicios-maestro";
+import {
+  crearServicioSchema,
+  TIPOS_SERVICIO,
+  type CrearServicioInput,
+} from "@/lib/schemas/servicios-maestro";
+import { IntervalosEditor, type IntervaloForm } from "@/components/forms/intervalos-servicio-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Loader2, Plus } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface PrecioServicio {
+interface IntervaloDB {
   id_precio: number;
   precio_por_kg: number;
-  valid_from: string;
-  valid_to: string | null;
+  min_weight_kg: number;
+  max_weight_kg: number | null;
+  activo: boolean;
 }
 
-interface ServicioMaestro {
+interface ServicioCompleto {
   id_servicio_maestro: number;
-  codigo: string;
   nombre: string;
   descripcion: string | null;
-  default_peso_kg: number | null;
+  prioridad: number;
+  tipo: string;
   activo: boolean;
-  servicio_precios: PrecioServicio[];
+  servicio_precios: IntervaloDB[];
 }
+
+const ETIQUETAS_TIPO: Record<string, string> = {
+  general: "General",
+  tueste: "Tueste (paso especial)",
+  empacado: "Empacado (paso especial)",
+};
 
 export default function EditarServicioPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [servicioId, setServicioId] = useState<number | null>(null);
-  const [precios, setPrecios] = useState<PrecioServicio[]>([]);
-  const [nuevoPrecio, setNuevoPrecio] = useState("");
-  const [guardandoPrecio, setGuardandoPrecio] = useState(false);
+  const [servicio, setServicio] = useState<ServicioCompleto | null>(null);
 
-  const form = useForm<ActualizarServicioMaestroInput>({
-    resolver: zodResolver(actualizarServicioMaestroSchema),
+  const form = useForm<CrearServicioInput>({
+    resolver: zodResolver(crearServicioSchema),
     defaultValues: {
-      codigo: "",
       nombre: "",
       descripcion: "",
-      default_peso_kg: null,
+      prioridad: undefined,
+      tipo: "general",
+      activo: true,
+      intervalos: [],
     },
   });
 
   useEffect(() => {
+    const id = Number(params.id);
+    if (Number.isNaN(id)) {
+      toast.error("ID de servicio invalido");
+      router.push("/admin/servicios");
+      return;
+    }
+
     const load = async () => {
-      const id = Number(params.id);
-      if (Number.isNaN(id)) {
-        toast.error("ID de servicio inválido");
-        router.push("/admin/servicios");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("servicios_maestro")
-        .select(`
-          *,
-          servicio_precios(id_precio, precio_por_kg, valid_from, valid_to)
-        `)
-        .eq("id_servicio_maestro", id)
-        .single();
-
-      if (error || !data) {
+      const res = await fetch(`/api/admin/servicios/${id}`);
+      const result = await res.json();
+      if (!res.ok || !result.data) {
         toast.error("Servicio no encontrado");
         router.push("/admin/servicios");
         return;
       }
 
-      const servicio = data as unknown as ServicioMaestro;
-      setServicioId(servicio.id_servicio_maestro);
-      setPrecios((servicio.servicio_precios || []).sort(
-        (a, b) => new Date(b.valid_from).getTime() - new Date(a.valid_from).getTime()
-      ));
+      const data = result.data as ServicioCompleto;
+      setServicioId(data.id_servicio_maestro);
+      setServicio(data);
       form.reset({
-        codigo: servicio.codigo,
-        nombre: servicio.nombre,
-        descripcion: servicio.descripcion || "",
-        default_peso_kg: servicio.default_peso_kg,
+        nombre: data.nombre,
+        descripcion: data.descripcion || "",
+        prioridad: data.prioridad,
+        tipo: data.tipo === "tueste" || data.tipo === "empacado" ? data.tipo : "general",
+        activo: data.activo,
+        intervalos: (data.servicio_precios || []).map((i) => ({
+          id_precio: i.id_precio,
+          peso_min_kg: Number(i.min_weight_kg),
+          peso_max_kg: i.max_weight_kg != null ? Number(i.max_weight_kg) : null,
+          precio_por_kg: Number(i.precio_por_kg),
+        })),
       });
       setLoading(false);
     };
     load();
-  }, [params.id, router, supabase, form]);
+  }, [params.id, router, form]);
 
-  const handleSubmit = async (values: ActualizarServicioMaestroInput) => {
+  const handleSubmit = async (values: CrearServicioInput) => {
     if (!servicioId) return;
     setSaving(true);
     try {
+      const body = {
+        nombre: values.nombre,
+        descripcion: values.descripcion,
+        prioridad: values.prioridad,
+        tipo: values.tipo,
+        activo: values.activo,
+        intervalos: (values.intervalos as IntervaloForm[]).map((i) => ({
+          ...(i.id_precio ? { id_precio: i.id_precio } : {}),
+          peso_min_kg: i.peso_min_kg,
+          peso_max_kg: i.peso_max_kg,
+          precio_por_kg: i.precio_por_kg,
+        })),
+      };
+
       const res = await fetch(`/api/admin/servicios/${servicioId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(body),
       });
       const result = await res.json();
 
       if (!res.ok) {
-        toast.error("Error al actualizar: " + (result.error?.message || "Error desconocido"));
+        const msg =
+          result.error?.message ||
+          result.error?.issues?.formErrors?.join(", ") ||
+          "Error desconocido";
+        toast.error("Error al actualizar: " + msg);
         return;
       }
       toast.success("Servicio actualizado");
@@ -114,55 +141,6 @@ export default function EditarServicioPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const agregarPrecio = async () => {
-    if (!servicioId) return;
-    const valor = Number(nuevoPrecio);
-    if (!nuevoPrecio || Number.isNaN(valor) || valor < 0) {
-      toast.error("Ingrese un precio válido");
-      return;
-    }
-
-    setGuardandoPrecio(true);
-    try {
-      const res = await fetch(`/api/admin/servicios/${servicioId}/precios`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ precio_por_kg: valor }),
-      });
-      const result = await res.json();
-
-      if (!res.ok) {
-        toast.error("Error al guardar precio: " + (result.error?.message || "Error desconocido"));
-        return;
-      }
-
-      toast.success("Precio actualizado");
-      setNuevoPrecio("");
-      setPrecios((prev) => [
-        { ...result.data, valid_to: null },
-        ...prev.map((p) => ({ ...p, valid_to: p.valid_to ?? new Date().toISOString() })),
-      ]);
-    } finally {
-      setGuardandoPrecio(false);
-    }
-  };
-
-  const desactivar = async () => {
-    if (!servicioId) return;
-    if (!window.confirm("¿Desactivar este servicio? Los datos históricos se preservan.")) return;
-    const { error } = await supabase
-      .from("servicios_maestro")
-      .update({ activo: false })
-      .eq("id_servicio_maestro", servicioId);
-    if (error) {
-      toast.error("Error al desactivar: " + error.message);
-      return;
-    }
-    toast.success("Servicio desactivado");
-    router.push("/admin/servicios");
-    router.refresh();
   };
 
   if (loading) {
@@ -181,6 +159,9 @@ export default function EditarServicioPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-2xl font-bold">Editar Servicio</h1>
+        <Badge variant={servicio?.activo ? "completado" : "cancelado"}>
+          {servicio?.activo ? "Activo" : "Inactivo"}
+        </Badge>
       </div>
 
       <Card>
@@ -189,36 +170,37 @@ export default function EditarServicioPage() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="codigo"
+                  name="nombre"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Código</FormLabel>
+                      <FormLabel>Nombre del servicio *</FormLabel>
                       <FormControl>
-                        <Input {...field} className="font-mono" />
+                        <Input placeholder="Ej: Trillado, Chancado, Tueste" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
-                  name="default_peso_kg"
+                  name="prioridad"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Peso default (kg)</FormLabel>
+                      <FormLabel>Prioridad (orden del proceso) *</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.01"
-                          min={0}
+                          min={1}
                           value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                          onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
                         />
                       </FormControl>
+                      <FormDescription>Numero unico que define la secuencia de pasos.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -227,13 +209,31 @@ export default function EditarServicioPage() {
 
               <FormField
                 control={form.control}
-                name="nombre"
+                name="tipo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
+                    <FormLabel>Tipo</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar tipo..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {TIPOS_SERVICIO.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {ETIQUETAS_TIPO[t]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      {field.value === "tueste"
+                        ? "El paso de tueste requiere confirmacion manual del operador."
+                        : field.value === "empacado"
+                          ? "El paso de empacado solicita seleccion de empaque."
+                          : "Servicio de proceso regular."}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -253,6 +253,40 @@ export default function EditarServicioPage() {
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="activo"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-3">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <FormLabel className="mb-0">Servicio activo</FormLabel>
+                    <FormDescription>Desactivar lo oculta del selector de ordenes (soft delete).</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Intervalos de precio</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Precio por rango de peso: minimo inclusive, maximo exclusivo. Deje el maximo vacio para el ultimo tramo sin limite.
+                  </p>
+                  <Controller
+                    control={form.control}
+                    name="intervalos"
+                    render={({ field }) => (
+                      <IntervalosEditor value={field.value as IntervaloForm[]} onChange={field.onChange} />
+                    )}
+                  />
+                  <FormMessage>{form.formState.errors.intervalos?.message}</FormMessage>
+                </CardContent>
+              </Card>
+
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button type="submit" disabled={saving} className="flex-1">
                   {saving ? (
@@ -264,71 +298,12 @@ export default function EditarServicioPage() {
                     "Guardar cambios"
                   )}
                 </Button>
-                <Button type="button" variant="destructive" onClick={desactivar} disabled={saving}>
-                  Desactivar
-                </Button>
                 <Button type="button" variant="outline" onClick={() => router.back()} disabled={saving}>
                   Cancelar
                 </Button>
               </div>
             </form>
           </Form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Precio por kg</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              type="number"
-              step="0.01"
-              min={0}
-              placeholder="Nuevo precio por kg (₡)"
-              value={nuevoPrecio}
-              onChange={(e) => setNuevoPrecio(e.target.value)}
-              disabled={guardandoPrecio}
-            />
-            <Button onClick={agregarPrecio} disabled={guardandoPrecio}>
-              <Plus className="h-4 w-4 mr-2" />
-              {guardandoPrecio ? "Guardando..." : "Actualizar precio"}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Al actualizar el precio se cierra el anterior y se crea uno nuevo. Las órdenes existentes conservan sus snapshots.
-          </p>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Precio (₡/kg)</TableHead>
-                <TableHead>Desde</TableHead>
-                <TableHead>Hasta</TableHead>
-                <TableHead>Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {precios.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-muted-foreground">Sin precios registrados.</TableCell>
-                </TableRow>
-              )}
-              {precios.map((p) => (
-                <TableRow key={p.id_precio}>
-                  <TableCell className="font-medium">₡{Number(p.precio_por_kg).toLocaleString()}</TableCell>
-                  <TableCell>{new Date(p.valid_from).toLocaleDateString()}</TableCell>
-                  <TableCell>{p.valid_to ? new Date(p.valid_to).toLocaleDateString() : "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant={p.valid_to ? "outline" : "completado"}>
-                      {p.valid_to ? "Histórico" : "Vigente"}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </CardContent>
       </Card>
     </div>

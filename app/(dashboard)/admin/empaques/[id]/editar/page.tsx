@@ -25,7 +25,7 @@ interface PrecioEmpaque {
 interface Empaque {
   id_empaque: number;
   nombre: string;
-  unit_weight_kg: number | null;
+  capacidad_kg: number | null;
   activo: boolean;
   empaque_precios: PrecioEmpaque[];
 }
@@ -45,7 +45,7 @@ export default function EditarEmpaquePage() {
     resolver: zodResolver(actualizarEmpaqueSchema),
     defaultValues: {
       nombre: "",
-      unit_weight_kg: null,
+      capacidad_kg: null,
     },
   });
 
@@ -80,7 +80,7 @@ export default function EditarEmpaquePage() {
       ));
       form.reset({
         nombre: empaque.nombre,
-        unit_weight_kg: empaque.unit_weight_kg,
+        capacidad_kg: empaque.capacidad_kg,
       });
       setLoading(false);
     };
@@ -183,15 +183,16 @@ export default function EditarEmpaquePage() {
 
               <FormField
                 control={form.control}
-                name="unit_weight_kg"
+                name="capacidad_kg"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Peso unitario (kg)</FormLabel>
+                    <FormLabel>Capacidad (kg)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.01"
                         min={0}
+                        placeholder="Ej: 0.5 para 500 g"
                         value={field.value ?? ""}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
                       />

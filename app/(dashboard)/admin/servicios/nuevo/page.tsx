@@ -2,14 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { crearServicioMaestroSchema, type CrearServicioMaestroInput } from "@/lib/schemas/servicios-maestro";
+import {
+  crearServicioSchema,
+  TIPOS_SERVICIO,
+  type CrearServicioInput,
+} from "@/lib/schemas/servicios-maestro";
+import { IntervalosEditor, type IntervaloForm } from "@/components/forms/intervalos-servicio-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,17 +24,19 @@ export default function NuevoServicioPage() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
-  const form = useForm<CrearServicioMaestroInput>({
-    resolver: zodResolver(crearServicioMaestroSchema),
+  const form = useForm<CrearServicioInput>({
+    resolver: zodResolver(crearServicioSchema),
     defaultValues: {
-      codigo: "",
       nombre: "",
       descripcion: "",
-      default_peso_kg: null,
+      prioridad: undefined,
+      tipo: "general",
+      activo: true,
+      intervalos: [],
     },
   });
 
-  const onSubmit = async (values: CrearServicioMaestroInput) => {
+  const onSubmit = async (values: CrearServicioInput) => {
     setSubmitting(true);
     try {
       const res = await fetch("/api/admin/servicios", {
@@ -38,7 +47,8 @@ export default function NuevoServicioPage() {
       const result = await res.json();
 
       if (!res.ok) {
-        toast.error("Error al crear servicio: " + (result.error?.message || "Error desconocido"));
+        const msg = result.error?.message || result.error?.issues?.formErrors?.join(", ") || "Error desconocido";
+        toast.error("Error al crear servicio: " + msg);
         return;
       }
       toast.success("Servicio creado exitosamente");
@@ -47,6 +57,12 @@ export default function NuevoServicioPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const etiquetasTipo: Record<string, string> = {
+    general: "General",
+    tueste: "Tueste (paso especial)",
+    empacado: "Empacado (paso especial)",
   };
 
   return (
@@ -64,37 +80,38 @@ export default function NuevoServicioPage() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="codigo"
+                  name="nombre"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Código *</FormLabel>
+                      <FormLabel>Nombre del servicio *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ej: TUESTE-MED" {...field} className="font-mono" />
+                        <Input placeholder="Ej: Trillado, Chancado, Tueste" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
-                  name="default_peso_kg"
+                  name="prioridad"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Peso default (kg)</FormLabel>
+                      <FormLabel>Prioridad (orden del proceso) *</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
-                          step="0.01"
-                          min={0}
-                          placeholder="Ej: 50"
+                          min={1}
+                          placeholder="Ej: 1"
                           value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                          onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
                         />
                       </FormControl>
+                      <FormDescription>Numero unico que define la secuencia de pasos.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -103,13 +120,31 @@ export default function NuevoServicioPage() {
 
               <FormField
                 control={form.control}
-                name="nombre"
+                name="tipo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nombre *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ej: Tueste Medio" {...field} />
-                    </FormControl>
+                    <FormLabel>Tipo</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar tipo..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {TIPOS_SERVICIO.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {etiquetasTipo[t]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      {field.value === "tueste"
+                        ? "El paso de tueste requiere confirmacion manual del operador."
+                        : field.value === "empacado"
+                          ? "El paso de empacado solicita seleccion de empaque."
+                          : "Servicio de proceso regular."}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -122,12 +157,45 @@ export default function NuevoServicioPage() {
                   <FormItem>
                     <FormLabel>Descripción</FormLabel>
                     <FormControl>
-                      <Textarea rows={3} placeholder="Descripción del servicio..." {...field} value={field.value ?? ""} />
+                      <Textarea rows={3} placeholder="Descripción del servicio (opcional)..." {...field} value={field.value ?? ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="activo"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-3">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <FormLabel className="mb-0">Servicio activo</FormLabel>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Intervalos de precio</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    El precio se aplica por rango de peso: minimo inclusive, maximo exclusivo. Deje el maximo vacio para el ultimo tramo sin limite.
+                  </p>
+                  <Controller
+                    control={form.control}
+                    name="intervalos"
+                    render={({ field }) => (
+                      <IntervalosEditor value={field.value as IntervaloForm[]} onChange={field.onChange} />
+                    )}
+                  />
+                  <FormMessage>{form.formState.errors.intervalos?.message}</FormMessage>
+                </CardContent>
+              </Card>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button type="submit" disabled={submitting} className="flex-1">
@@ -137,7 +205,7 @@ export default function NuevoServicioPage() {
                       Creando...
                     </>
                   ) : (
-                    "Crear Servicio"
+                    "Guardar servicio"
                   )}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => router.back()} disabled={submitting}>

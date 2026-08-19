@@ -20,7 +20,7 @@ export default function NuevoEmpaquePage() {
     resolver: zodResolver(crearEmpaqueSchema),
     defaultValues: {
       nombre: "",
-      unit_weight_kg: null,
+      capacidad_kg: null,
     },
   });
 
@@ -78,16 +78,16 @@ export default function NuevoEmpaquePage() {
 
               <FormField
                 control={form.control}
-                name="unit_weight_kg"
+                name="capacidad_kg"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Peso unitario (kg)</FormLabel>
+                    <FormLabel>Capacidad (kg)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
                         step="0.01"
                         min={0}
-                        placeholder="Ej: 1"
+                        placeholder="Ej: 0.5 para 500 g"
                         value={field.value ?? ""}
                         onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
                       />

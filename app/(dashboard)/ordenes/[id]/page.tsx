@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Thermometer, Printer, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { PasosPanel } from "@/components/ordenes/pasos-panel";
 import styles from "./page.module.css";
 
 const ESTADOS = ["Pendiente", "En Proceso", "Completado", "Cancelado"];
@@ -36,6 +37,10 @@ interface Servicio {
   override_motivo: string | null;
 }
 
+interface Paso {
+  servicios_maestro: { tipo: string };
+}
+
 interface Especificaciones {
   tipo_tueste: string | null;
   tipo_molienda: string | null;
@@ -59,6 +64,7 @@ interface Orden {
   zona_finca: string | null;
   clientes: Cliente | null;
   servicios_ejecutados: Servicio[];
+  orden_pasos: Paso[];
   especificaciones_orden: Especificaciones | null;
   empleado_recibe: Empleado | null;
   empleado_entrega: Empleado | null;
@@ -87,6 +93,7 @@ export default function OrdenDetallePage() {
           *,
           clientes(*),
           servicios_ejecutados(*),
+          orden_pasos(servicios_maestro(tipo)),
           especificaciones_orden(*),
           empleado_recibe:empleados!id_empleado_recibe(nombre),
           empleado_entrega:empleados!id_empleado_entrega(nombre)
@@ -102,7 +109,9 @@ export default function OrdenDetallePage() {
 
   useEffect(() => {
     if (!orden) return;
-    const tieneTueste = orden.servicios_ejecutados.some((s) => s.tipo_servicio === "Tueste");
+    const tieneTueste =
+      orden.servicios_ejecutados.some((s) => s.tipo_servicio === "Tueste") ||
+      (orden.orden_pasos || []).some((p) => p.servicios_maestro?.tipo === "tueste");
     if (!tieneTueste) {
       setPerfilTueste(null);
       return;
@@ -179,7 +188,9 @@ export default function OrdenDetallePage() {
     (sum, s) => sum + (Number(s.linea_total) || Number(s.precio) || 0),
     0
   );
-  const tieneTueste = orden.servicios_ejecutados.some((s) => s.tipo_servicio === "Tueste");
+  const tieneTueste =
+    orden.servicios_ejecutados.some((s) => s.tipo_servicio === "Tueste") ||
+    (orden.orden_pasos || []).some((p) => p.servicios_maestro?.tipo === "tueste");
 
   const handleIniciarTueste = async () => {
     if (!orden || creandoPerfil) return;
@@ -403,6 +414,8 @@ export default function OrdenDetallePage() {
       </div>
 
       {renderTuesteSection()}
+
+      <PasosPanel idOrden={orden.id_orden} />
     </div>
   );
 }

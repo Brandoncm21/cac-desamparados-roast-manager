@@ -14,17 +14,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ClienteAutocomplete } from "@/components/forms/cliente-autocomplete";
 import { InlineAddSelect } from "@/components/forms/inline-add-select";
-import { calcularLineaTotal } from "@/lib/calculo-precios";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
-
-const TIPOS_SERVICIO = [
-  "Chancado", "Trillado", "Clasificación Mecánica", "Clasificación Manual",
-  "Tueste", "Molido", "Empacado",
-] as const;
 
 const OPCIONES_TUESTE = ["Claro", "Medio", "Oscuro"];
 const OPCIONES_MOLIENDA = ["Fina", "Media", "Gruesa", "Grano Entero"];
@@ -54,18 +47,11 @@ interface ZonaOption {
 
 interface ServicioActivo {
   id_servicio_maestro: number;
-  codigo: string;
   nombre: string;
   descripcion: string | null;
-  default_peso_kg: number | null;
-  precio_por_kg: number | null;
-}
-
-interface EmpaqueActivo {
-  id_empaque: number;
-  nombre: string;
-  unit_weight_kg: number | null;
-  precio: number | null;
+  tipo: string;
+  prioridad: number;
+  intervalos: { id_precio: number; precio_por_kg: number; min_weight_kg: number; max_weight_kg: number | null }[];
 }
 
 function SpecSelect({
@@ -73,11 +59,17 @@ function SpecSelect({
   onChange,
   options,
   placeholder,
+  id,
+  "aria-describedby": ariaDescribedby,
+  "aria-invalid": ariaInvalid,
 }: {
   value: string;
   onChange: (val: string) => void;
   options: string[];
   placeholder: string;
+  id?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
 }) {
   const [otro, setOtro] = useState(!options.includes(value) && value ? value : "");
   const isOtro = value === "__OTRO__" || (!options.includes(value) && !!value);
@@ -85,7 +77,12 @@ function SpecSelect({
   return (
     <div className="space-y-2">
       <Select value={options.includes(value) ? value : value ? "__OTRO__" : ""} onValueChange={(v) => v && onChange(v)}>
-        <SelectTrigger className="h-12 md:h-10 text-base">
+        <SelectTrigger
+          id={id}
+          aria-describedby={ariaDescribedby}
+          aria-invalid={ariaInvalid}
+          className="h-12 md:h-10 text-base"
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -98,6 +95,9 @@ function SpecSelect({
       </Select>
       {isOtro && (
         <Input
+          id={id}
+          aria-describedby={ariaDescribedby}
+          aria-invalid={ariaInvalid}
           value={otro}
           onChange={(e) => {
             setOtro(e.target.value);
@@ -119,7 +119,6 @@ export default function NuevaOrdenPage() {
   const [zonas, setZonas] = useState<ZonaOption[]>([]);
   const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
   const [serviciosActivos, setServiciosActivos] = useState<ServicioActivo[]>([]);
-  const [empaquesActivos, setEmpaquesActivos] = useState<EmpaqueActivo[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -141,7 +140,7 @@ export default function NuevaOrdenPage() {
     },
   });
 
-  const { setValue, watch } = form;
+  const { watch } = form;
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "servicios" });
 
@@ -160,41 +159,26 @@ export default function NuevaOrdenPage() {
       if (resServicios.ok) {
         const { data } = await resServicios.json();
         setServiciosActivos(data?.servicios || []);
-        setEmpaquesActivos(data?.empaques || []);
       }
     };
     load();
   }, [supabase]);
 
+  const serviciosSeleccionados = watch("servicios") as CrearOrdenInput["servicios"];
+  const idsSeleccionados = new Set(serviciosSeleccionados.map((s) => s.servicio_id));
+
   const addServicio = (servicioId: number) => {
     const servicio = serviciosActivos.find((s) => s.id_servicio_maestro === servicioId);
-    if (!servicio) return;
+    if (!servicio || idsSeleccionados.has(servicioId)) return;
     append({
-      tipo_servicio: servicio.nombre,
       servicio_id: servicio.id_servicio_maestro,
-      empaque_id: null,
-      peso_inicial: servicio.default_peso_kg ?? (null as any),
-      precio: servicio.precio_por_kg ?? (null as any),
-      override_precio: false,
-      override_motivo: null,
-    } as any);
+      tipo_servicio: servicio.nombre,
+    });
   };
 
   const removeServicio = (index: number) => {
     remove(index);
   };
-
-  const calcularLineaTotalRow = (s: CrearOrdenInput["servicios"][number]) => {
-    const empaque = empaquesActivos.find((e) => e.id_empaque === s.empaque_id);
-    return calcularLineaTotal({
-      pesoKg: s.peso_inicial,
-      precioPorKg: s.precio,
-      precioEmpaque: empaque?.precio,
-    });
-  };
-
-  const serviciosWatch = watch("servicios") as CrearOrdenInput["servicios"];
-  const totalGeneral = serviciosWatch.reduce((sum, s) => sum + calcularLineaTotalRow(s), 0);
 
   const [pendingValues, setPendingValues] = useState<CrearOrdenInput | null>(null);
 
@@ -383,109 +367,30 @@ export default function NuevaOrdenPage() {
             </CardHeader>
             <CardContent className="space-y-3 md:space-y-4">
               {fields.length > 0 && (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Servicio</TableHead>
-                      <TableHead>Empaque</TableHead>
-                      <TableHead>Peso inicial (kg)</TableHead>
-                      <TableHead>Precio/kg (₡)</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {fields.map((field, index) => (
-                      <TableRow key={field.id}>
-                        <TableCell className="font-medium">{field.tipo_servicio}</TableCell>
-                        <TableCell>
-                          <Select
-                            value={field.empaque_id ? String(field.empaque_id) : ""}
-                            onValueChange={(v) => {
-                              const empaqueId = Number(v);
-                              setValue(`servicios.${index}.empaque_id`, empaqueId || null);
-                            }}
-                          >
-                            <SelectTrigger className="h-10 text-sm">
-                              <SelectValue placeholder="Sin empaque" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">Sin empaque</SelectItem>
-                              {empaquesActivos.map((e) => (
-                                <SelectItem key={e.id_empaque} value={String(e.id_empaque)}>
-                                  {e.nombre}{e.precio ? ` (₡${Number(e.precio).toLocaleString()})` : ""}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            className="h-10 text-sm"
-                            {...form.register(`servicios.${index}.peso_inicial` as const, { valueAsNumber: true })}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <Input
-                              type="number"
-                              step="1"
-                              placeholder="0"
-                              className="h-10 text-sm"
-                              disabled={!form.watch(`servicios.${index}.override_precio`)}
-                              {...form.register(`servicios.${index}.precio` as const, { valueAsNumber: true })}
-                            />
-                            {form.watch(`servicios.${index}.override_precio`) ? (
-                              <Input
-                                placeholder="Motivo de modificación..."
-                                className="h-8 text-xs"
-                                {...form.register(`servicios.${index}.override_motivo`)}
-                              />
-                            ) : (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 text-xs text-amber-600 hover:text-amber-700"
-                                onClick={() => {
-                                  setValue(`servicios.${index}.override_precio`, true);
-                                }}
-                              >
-                                Modificar precio
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ₡{calcularLineaTotalRow(form.watch(`servicios.${index}`) as CrearOrdenInput["servicios"][number]).toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Button type="button" variant="ghost" size="icon" onClick={() => removeServicio(index)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow>
-                      <TableCell colSpan={4} className="font-bold text-right">Total General</TableCell>
-                      <TableCell className="text-right font-bold">₡{totalGeneral.toLocaleString()}</TableCell>
-                      <TableCell />
-                    </TableRow>
-                  </TableBody>
-                </Table>
+                <div className="flex flex-wrap gap-2">
+                  {fields.map((field, index) => (
+                    <div
+                      key={field.id}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/50"
+                    >
+                      <span className="font-medium">{field.tipo_servicio}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => removeServicio(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               )}
 
               <Select
                 onValueChange={(v) => {
-                  const val = String(v);
-                  if (val.startsWith("legacy:")) {
-                    append({ tipo_servicio: val.replace("legacy:", ""), servicio_id: null, empaque_id: null, peso_inicial: null as any, precio: null as any, override_precio: false, override_motivo: null } as any);
-                    return;
-                  }
-                  const id = Number(val);
+                  const id = Number(v);
                   if (id) addServicio(id);
                 }}
               >
@@ -494,16 +399,17 @@ export default function NuevaOrdenPage() {
                   <SelectValue placeholder="Agregar servicio..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {serviciosActivos.length > 0 ? (
-                    serviciosActivos.map((s) => (
+                  {serviciosActivos
+                    .filter((s) => !idsSeleccionados.has(s.id_servicio_maestro))
+                    .map((s) => (
                       <SelectItem key={s.id_servicio_maestro} value={String(s.id_servicio_maestro)}>
-                        {s.nombre}{s.precio_por_kg ? ` (₡${Number(s.precio_por_kg).toLocaleString()}/kg)` : " (sin precio)"}
+                        {s.nombre}
                       </SelectItem>
-                    ))
-                  ) : (
-                    TIPOS_SERVICIO.map((tipo) => (
-                      <SelectItem key={tipo} value={`legacy:${tipo}`}>{tipo}</SelectItem>
-                    ))
+                    ))}
+                  {serviciosActivos.filter((s) => !idsSeleccionados.has(s.id_servicio_maestro)).length === 0 && (
+                    <SelectItem value="__none__" disabled>
+                      No hay más servicios disponibles
+                    </SelectItem>
                   )}
                 </SelectContent>
               </Select>

@@ -24,6 +24,9 @@ interface InlineAddSelectProps {
   onAdd: (label: string) => Promise<string | void>;
   placeholder?: string;
   addLabel?: string;
+  id?: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
 }
 
 export function InlineAddSelect({
@@ -33,6 +36,9 @@ export function InlineAddSelect({
   onAdd,
   placeholder = "Seleccionar...",
   addLabel = "Agregar nuevo...",
+  id,
+  "aria-describedby": ariaDescribedby,
+  "aria-invalid": ariaInvalid,
 }: InlineAddSelectProps) {
   const [adding, setAdding] = useState(false);
   const [newValue, setNewValue] = useState("");
@@ -64,6 +70,9 @@ export function InlineAddSelect({
     return (
       <div className="flex gap-2">
         <Input
+          id={id}
+          aria-describedby={ariaDescribedby}
+          aria-invalid={ariaInvalid}
           value={newValue}
           onChange={(e) => setNewValue(e.target.value)}
           placeholder="Nuevo valor..."
@@ -91,7 +100,12 @@ export function InlineAddSelect({
 
   return (
     <Select value={value || "__EMPTY__"} onValueChange={(value) => value && handleSelect(value)}>
-      <SelectTrigger className="h-12 md:h-10 text-base">
+      <SelectTrigger
+        id={id}
+        aria-describedby={ariaDescribedby}
+        aria-invalid={ariaInvalid}
+        className="h-12 md:h-10 text-base"
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
