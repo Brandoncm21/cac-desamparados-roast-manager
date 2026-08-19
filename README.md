@@ -184,6 +184,21 @@ Utiliza Supabase Auth con política de sesión basada en cookies. El middleware 
 
 Las APIs requieren autenticación mediante `requireAuth()` en cada handler.
 
+### Cookies de sesión
+Las cookies emitidas por Supabase SSR se reescriben a través de
+`lib/cookies.ts`, que garantiza flags homogéneos en todas las respuestas:
+
+| Flag        | Desarrollo | Producción | Razón                                                                 |
+|-------------|------------|------------|-----------------------------------------------------------------------|
+| `httpOnly`  | `true`     | `true`     | Impide que JavaScript del cliente lea tokens de sesión.              |
+| `secure`    | `false`    | `true`     | Sólo sobre HTTPS en producción para que funcione en `localhost`.      |
+| `sameSite`  | `lax`      | `lax`      | Mitigación CSRF para flujos de navegación top-level.                 |
+| `path`      | `/`        | `/`        | Disponible en toda la app.                                            |
+
+El middleware también aplica `Cache-Control: private, no-store` (más
+`Pragma: no-cache` y `Expires: 0`) para evitar que CDNs o proxies
+cacheen respuestas con tokens de sesión.
+
 ## 🔐 Seguridad
 
 ### Service Role Key
