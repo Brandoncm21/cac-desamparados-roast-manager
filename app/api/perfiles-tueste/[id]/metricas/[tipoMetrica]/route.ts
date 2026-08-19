@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
-import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 const upsertMetricaSchema = z.object({
   valor_antes: z.number().optional().nullable(),
@@ -12,7 +12,7 @@ async function put(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; tipoMetrica: string }> }
 ) {
-  await requireAuth();
+  await requireRole(["Admin", "Tostador"]);
   const supabase = await createClient();
   const { id, tipoMetrica } = await params;
   const perfilId = validateIdParam(id);

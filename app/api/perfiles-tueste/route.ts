@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { crearPerfilSchema } from "@/lib/schemas/perfiles";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, withErrorHandler } from "@/lib/api-helpers";
 
 async function post(request: NextRequest) {
-  await requireAuth();
+  await requireRole(["Admin", "Tostador"]);
   const supabase = await createClient();
   const body = await request.json();
 

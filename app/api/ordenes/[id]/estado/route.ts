@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { cambiarEstadoOrdenSchema } from "@/lib/schemas/ordenes";
-import { apiOk, apiError, apiValidationError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 async function patch(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await requireAuth();
+  await requireRole(["Admin", "Recepción", "Tostador"]);
   const supabase = await createClient();
   const { id } = await params;
   const ordenId = validateIdParam(id);

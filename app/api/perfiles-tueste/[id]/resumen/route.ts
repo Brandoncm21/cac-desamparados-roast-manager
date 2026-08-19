@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { apiOk, apiError, requireAuth, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, requireRole, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 
 async function get(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  await requireAuth();
+  await requireRole(["Admin", "Tostador"]);
   const supabase = await createClient();
   const { id } = await params;
   const perfilId = validateIdParam(id);

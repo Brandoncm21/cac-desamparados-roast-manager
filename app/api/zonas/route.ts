@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { apiOk, apiError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, requireRole, withErrorHandler } from "@/lib/api-helpers";
 
 async function get() {
-  await requireAuth();
+  await requireRole(["Admin", "Recepción", "Tostador"]);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("zonas_finca")
@@ -15,7 +15,7 @@ async function get() {
 }
 
 async function post(request: NextRequest) {
-  await requireAuth();
+  await requireRole(["Admin", "Recepción"]);
   const supabase = await createClient();
   const body = await request.json();
 

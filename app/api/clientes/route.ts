@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { crearClienteSchema } from "@/lib/schemas/clientes";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, withErrorHandler } from "@/lib/api-helpers";
 
 async function get(request: NextRequest) {
-  await requireAuth();
+  await requireRole(["Admin", "Recepción", "Tostador"]);
   const supabase = await createClient();
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
@@ -27,7 +27,7 @@ async function get(request: NextRequest) {
 }
 
 async function post(request: NextRequest) {
-  await requireAuth();
+  await requireRole(["Admin", "Recepción"]);
   const supabase = await createClient();
   const body = await request.json();
 

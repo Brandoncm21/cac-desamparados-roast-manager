@@ -4,7 +4,7 @@ import { cerrarGeneralSchema, cerrarEmpacadoSchema } from "@/lib/schemas/orden-p
 import { calcularMerma } from "@/lib/services/resolver-tarifa";
 import { calcularEmpaques } from "@/lib/services/empacado";
 import { hayPasosPendientes } from "@/lib/services/orquestador";
-import { apiOk, apiError, apiValidationError, requireAuth, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, withErrorHandler } from "@/lib/api-helpers";
 
 interface Params {
   params: Promise<{ id: string; pasoId: string }>;
@@ -15,7 +15,7 @@ async function post(request: NextRequest, { params }: Params) {
   const idOrdenNum = Number(idOrden);
   const pasoIdNum = Number(pasoId);
 
-  await requireAuth();
+  await requireRole(["Admin", "Recepción", "Tostador"]);
   const supabase = await createClient();
 
   const { data: paso, error: pasoError } = await supabase
