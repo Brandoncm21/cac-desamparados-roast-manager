@@ -36,15 +36,29 @@ Abre http://localhost:3016
 ## 📋 Variables de Entorno Requeridas
 
 ```bash
-# Supabase
+# Supabase — públicas (NEXT_PUBLIC_*), disponibles en cliente y servidor
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3016
 NODE_ENV=development
 ```
+
+> ⚠️ **SERVER-ONLY**: `SUPABASE_SERVICE_ROLE_KEY` **no debe** ser
+> `NEXT_PUBLIC_*`. Sólo la consumen módulos server-side.
+>
+> Acceso desde código:
+>
+> ```ts
+> // server-only: marca el archivo; rompe builds en cliente.
+> import { createAdminClient } from "@/lib/supabase/service-role";
+> import { createAdminClientWithRoleCheck } from "@/lib/supabase/admin";
+> ```
+>
+> El script `npm run check-secrets` falla el build si detecta
+> `NEXT_PUBLIC_*` con `SERVICE_ROLE` en `.env*` versionados, en
+> `process.env`, o literales hardcodeados con patrón de service role.
 
 ## 📁 Estructura del Proyecto
 
@@ -169,6 +183,34 @@ Los pesos se almacenan en **kilogramos** usando `NUMERIC(10,2)` (nunca FLOAT) pa
 Utiliza Supabase Auth con política de sesión basada en cookies. El middleware verifica automáticamente cada request y redirige a `/login` si es necesario.
 
 Las APIs requieren autenticación mediante `requireAuth()` en cada handler.
+
+## 🔐 Seguridad
+
+### Service Role Key
+- `SUPABASE_SERVICE_ROLE_KEY` es un secreto con privilegios elevados y bypassa
+  RLS. Sólo la consumen módulos server-side (`lib/supabase/service-role.ts`,
+  `lib/supabase/admin.ts`). El módulo `service-role.ts` marca el archivo con
+  `import "server-only";` para impedir su importación desde cliente.
+- El script `npm run check-secrets` se ejecuta antes del build
+  (`prebuild`) y falla si detecta:
+  - variables `NEXT_PUBLIC_*` con `SERVICE_ROLE` en `.env*` versionados o
+    en `process.env`;
+  - literales hardcodeados con patrón de service role key en código
+    rastreado.
+
+### Rotación de credenciales históricas
+> ⚠️ `scripts/apply-migration.mjs` contiene credenciales de Supabase
+> (`PROJECT_REF`, `DB_PASSWORD`) **hardcodeadas en el historial de git**.
+> Como tarea separada de este PR, se recomienda:
+>
+> 1. Rotar la `DB_PASSWORD` del proyecto Supabase.
+> 2. Mover las credenciales a variables de entorno (por ejemplo
+>    `.env.local`, no versionado) o a un secret manager.
+> 3. Reescribir el historial con `git filter-repo` o crear una rama sin
+>    la credencial y reemplazar `main` con `force-push` coordinado con el
+>    equipo.
+>
+> No se imprimen ni se exponen valores de secretos en logs del PR.
 
 ## 🛠️ Comandos de Desarrollo
 
