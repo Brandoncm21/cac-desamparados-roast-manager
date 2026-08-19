@@ -13,18 +13,8 @@ export const crearOrdenSchema = z.object({
   firma_aprobacion_cliente: z.boolean().optional().default(false),
   fecha_aprobacion: z.string().optional().nullable(),
   servicios: z.array(z.object({
-    tipo_servicio: z
-      .enum([
-        "Chancado", "Trillado", "Clasificación Mecánica", "Clasificación Manual",
-        "Tueste", "Molido", "Empacado"
-      ])
-      .or(z.string().min(1)),
-    servicio_id: z.number().int().positive().optional().nullable(),
-    empaque_id: z.number().int().positive().optional().nullable(),
-    peso_inicial: z.preprocess(nullifyNaN, z.number().positive().optional().nullable()),
-    precio: z.preprocess(nullifyNaN, z.number().min(0).optional().nullable()),
-    override_precio: z.boolean().optional().default(false),
-    override_motivo: z.string().optional().nullable(),
+    servicio_id: z.number().int().positive("Servicio inválido"),
+    tipo_servicio: z.string().min(1, "El tipo de servicio es obligatorio"),
   })).min(1, "Agregue al menos un servicio"),
   tipo_tueste: z.string().max(100).optional().nullable().or(z.literal("")),
   tipo_molienda: z.string().max(100).optional().nullable().or(z.literal("")),
