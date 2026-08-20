@@ -1,13 +1,21 @@
 "use client";
 
 import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ContextHeader } from "./components/ContextHeader";
 import { RendimientosTable } from "./components/RendimientosTable";
 import { TemperatureInput } from "./components/TemperatureInput";
 import { QuickMilestones } from "./components/QuickMilestones";
-import { LiveChart } from "./components/LiveChart";
+
+const LiveChart = dynamic(
+  () => import("./components/LiveChart").then((m) => m.LiveChart),
+  {
+    ssr: false,
+    loading: () => <p className="text-sm text-muted-foreground p-4">Cargando gráfico...</p>,
+  }
+);
 import { MachineAdjustments } from "./components/MachineAdjustments";
 import { RegisteredMilestones } from "./components/RegisteredMilestones";
 import { Summary } from "./components/Summary";
