@@ -3,6 +3,25 @@
 Sistema completo de gestión para el Centro Agrícola Cantonal de Desamparados (CAC).
 Administra órdenes de trabajo, clientes, empleados y perfiles de tueste de café.
 
+## 📚 Documentation
+
+Documentación técnica completa en [`docs/`](./docs/):
+
+| Documento | Descripción |
+|-----------|-------------|
+| [Overview](./docs/OVERVIEW.md) | Resumen ejecutivo, público objetivo y stack |
+| [Architecture](./docs/ARCHITECTURE.md) | Componentes, flujo de datos y diagrama Mermaid ([`system_arch.mmd`](./docs/diagrams/system_arch.mmd)) |
+| [Setup & Run](./docs/SETUP_AND_RUN.md) | Instalación, variables de entorno, migrations y seed |
+| [API Reference](./docs/API_REFERENCE.md) | 28+ endpoints con auth, params y ejemplos |
+| [DB Schema](./docs/DB_SCHEMA.md) | Tablas, `NUMERIC(10,2)`, triggers, RLS y seed |
+| [Security](./docs/SECURITY.md) | Prácticas, riesgos y checklist |
+| [Tests & CI](./docs/TESTS_AND_CI.md) | Vitest, coverage (66.07% stmts) y workflow CI |
+| [Contributing](./docs/CONTRIBUTING.md) | Ramas, estilo y validaciones pre-PR |
+| [Runbook](./docs/RUNBOOK.md) | Despliegue, rollback y diagnóstico |
+| [Changelog Guide](./docs/CHANGELOG_GUIDE.md) | Política de versiones y plantilla de PR |
+
+> Detalle completo en `docs/`; este README mantiene lo esencial para puesta en marcha rápida.
+
 ## 🚀 Quick Start
 
 ### Requisitos
@@ -186,18 +205,20 @@ Las APIs requieren autenticación mediante `requireAuth()` en cada handler.
 
 ### Cookies de sesión
 Las cookies emitidas por Supabase SSR se reescriben a través de
-`lib/cookies.ts`, que garantiza flags homogéneos en todas las respuestas:
+`lib/cookies.ts`, que preserva el `httpOnly` del upstream (requerido por
+`createBrowserClient` para leer la sesión vía `document.cookie`) y aplica
+defaults seguros para el resto:
 
 | Flag        | Desarrollo | Producción | Razón                                                                 |
 |-------------|------------|------------|-----------------------------------------------------------------------|
-| `httpOnly`  | `true`     | `true`     | Impide que JavaScript del cliente lea tokens de sesión.              |
+| `httpOnly`  | *Preservado del upstream* (no forzado, legible por JS) | *Preservado del upstream* | Supabase SSR requiere cookies legibles por el cliente; forzarlo rompería `getCurrentUserRole()` y RLS |
 | `secure`    | `false`    | `true`     | Sólo sobre HTTPS en producción para que funcione en `localhost`.      |
 | `sameSite`  | `lax`      | `lax`      | Mitigación CSRF para flujos de navegación top-level.                 |
 | `path`      | `/`        | `/`        | Disponible en toda la app.                                            |
 
 El middleware también aplica `Cache-Control: private, no-store` (más
 `Pragma: no-cache` y `Expires: 0`) para evitar que CDNs o proxies
-cacheen respuestas con tokens de sesión.
+cacheen respuestas con tokens de sesión. Detalle completo en [`docs/SECURITY.md`](./docs/SECURITY.md) y [`docs/RUNBOOK.md`](./docs/RUNBOOK.md#51-síntomas-y-causas-conocidas).
 
 ## 🔐 Seguridad
 
