@@ -180,9 +180,31 @@ Los pesos se almacenan en **kilogramos** usando `NUMERIC(10,2)` (nunca FLOAT) pa
 
 ## 🔐 Autenticación
 
-Utiliza Supabase Auth con política de sesión basada en cookies. El middleware verifica automáticamente cada request y redirige a `/login` si es necesario.
+Utiliza Supabase Auth con política de sesión basada en cookies.
 
-Las APIs requieren autenticación mediante `requireAuth()` en cada handler.
+### Middleware
+El middleware (`middleware.ts`) sólo se ejecuta sobre páginas (`/`, `/login`, `/admin/*`, `/clientes/*`, `/ordenes/*`, `/tueste/*`, `/reportes/*`). **No se ejecuta sobre `/api/*` ni sobre assets estáticos** (`/_next/*`, `favicon.ico`, etc.). Cada Route Handler valida por sí mismo con `requireAuth()` / `requireRole()` (`lib/api-helpers.ts`), lo que elimina una llamada `getUser()` a Supabase Auth por cada request a la API y reduce el TTFB de `/api/*`.
+
+Flujo:
+- Página protegida sin sesión → redirige a `/login`.
+- Usuario autenticado en `/login` → redirige a `/`.
+- Páginas con sesión nunca se cachean (`Cache-Control: private, no-store`).
+
+Si añades una nueva página protegida, edita `middleware.ts` (`config.matcher`) y `lib/routes.ts` (`isProtectedPage`).
+
+### Cookies de sesión
+Las cookies emitidas por Supabase SSR se reescriben a través de `lib/cookies.ts`, que garantiza flags homogéneos:
+
+| Flag | Desarrollo | Producción | Razón |
+|------|------------|------------|-------|
+| `httpOnly` | `true` | `true` | Impide lectura desde JS del cliente. |
+| `secure` | `false` | `true` | Sólo HTTPS en producción (funciona en `localhost`). |
+| `sameSite` | `lax` | `lax` | Mitigación CSRF. |
+| `path` | `/` | `/` | Disponible en toda la app. |
+
+El middleware aplica además `Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0` (más `Pragma: no-cache`, `Expires: 0`) para evitar que CDNs/proxies cacheen respuestas con tokens.
+
+Las APIs requieren autenticación mediante `requireRole()` en cada handler.
 
 ## 🔐 Seguridad
 
