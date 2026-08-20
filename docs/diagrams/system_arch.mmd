@@ -1,0 +1,45 @@
+%% SCACR - Diagrama de Arquitectura de Alto Nivel
+%% Renderizable en GitHub (Mermaid) y en docsify/mkdocs
+%% Permalink base: 80b1dd5
+
+graph TB
+    Browser[Browser<br/>React 19 / Next.js App Router]
+    Middleware[Middleware<br/>middleware.ts<br/>Auth + Cookies + Cache-Control]
+    API[API Routes<br/>app/api/**<br/>requireAuth / requireRole + Zod]
+    Services[Services<br/>lib/services/**<br/>resolver-tarifa, empacado, orquestador]
+    Schemas[Schemas<br/>lib/schemas/**<br/>Zod validation]
+    SupabaseClient[Supabase Client<br/>lib/supabase/client.ts<br/>Browser - anon key]
+    SupabaseServer[Supabase Server<br/>lib/supabase/server.ts<br/>SSR - anon key + cookies]
+    SupabaseAdmin[Supabase Admin<br/>lib/supabase/service-role.ts<br/>Service Role - server-only]
+    DB[(PostgreSQL<br/>Supabase<br/>RLS + Triggers)]
+    Auth[Supabase Auth<br/>JWT + Cookies]
+    OfflineDB[(IndexedDB<br/>lib/offline/db.ts<br/>idb)]
+    Sync[Sync Queue<br/>lib/offline/sync.ts<br/>POST /api/sync]
+
+    Browser -->|1. Request| Middleware
+    Middleware -->|2. getUser + cookies| Auth
+    Middleware -->|3. Redirect if unauth| Browser
+    Middleware -->|4. Next| API
+    API -->|5. Validate| Schemas
+    API -->|6a. Read/Write| SupabaseServer
+    API -->|6b. Admin ops| SupabaseAdmin
+    API -->|7. Business logic| Services
+    Services -->|8. Query| DB
+    SupabaseServer --> DB
+    SupabaseAdmin --> DB
+    Auth --> DB
+    Browser -->|9a. Direct queries RLS| SupabaseClient
+    SupabaseClient --> DB
+    Browser -->|9b. Offline queue| OfflineDB
+    OfflineDB -->|10. Sync when online| Sync
+    Sync --> API
+
+    classDef browser fill:#e3f2fd,stroke:#1565c0
+    classDef server fill:#fff3e0,stroke:#ef6c00
+    classDef db fill:#e8f5e9,stroke:#2e7d32
+    classDef offline fill:#fce4ec,stroke:#c2185b
+
+    class Browser browser
+    class Middleware,API,Services,Schemas,SupabaseServer,SupabaseAdmin server
+    class DB,Auth db
+    class OfflineDB,Sync,SupabaseClient offline
