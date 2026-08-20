@@ -206,6 +206,21 @@ El middleware aplica además `Cache-Control: private, no-store, no-cache, must-r
 
 Las APIs requieren autenticación mediante `requireRole()` en cada handler.
 
+### Cookies de sesión
+Las cookies emitidas por Supabase SSR se reescriben a través de
+`lib/cookies.ts`, que garantiza flags homogéneos en todas las respuestas:
+
+| Flag        | Desarrollo | Producción | Razón                                                                 |
+|-------------|------------|------------|-----------------------------------------------------------------------|
+| `httpOnly`  | `true`     | `true`     | Impide que JavaScript del cliente lea tokens de sesión.              |
+| `secure`    | `false`    | `true`     | Sólo sobre HTTPS en producción para que funcione en `localhost`.      |
+| `sameSite`  | `lax`      | `lax`      | Mitigación CSRF para flujos de navegación top-level.                 |
+| `path`      | `/`        | `/`        | Disponible en toda la app.                                            |
+
+El middleware también aplica `Cache-Control: private, no-store` (más
+`Pragma: no-cache` y `Expires: 0`) para evitar que CDNs o proxies
+cacheen respuestas con tokens de sesión.
+
 ## 🔐 Seguridad
 
 ### Service Role Key
@@ -234,6 +249,27 @@ Las APIs requieren autenticación mediante `requireRole()` en cada handler.
 >
 > No se imprimen ni se exponen valores de secretos en logs del PR.
 
+## ✅ CI / Seguridad
+
+[![CI](https://github.com/Brandoncm21/cac-desamparados-roast-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/Brandoncm21/cac-desamparados-roast-manager/actions/workflows/ci.yml)
+
+El pipeline `.github/workflows/ci.yml` se ejecuta en cada `push` y `pull_request` a `main`:
+
+| Job | Comando | Descripción |
+|-----|---------|-------------|
+| `check-secrets` | `npm run check-secrets` | Falla si existe `NEXT_PUBLIC_*SERVICE_ROLE` en `.env*` o `process.env`. |
+| `lint` | `npm run lint` | ESLint 9 (flat config, `eslint.config.mjs`). |
+| `typecheck` | `npm run typecheck` | `tsc --noEmit`. |
+| `test` | `npm run test` | Vitest en `jsdom`. |
+| `coverage` | `npm run test:coverage` | `@vitest/coverage-v8`, artifact `coverage/`. |
+| `audit` | `npm audit --audit-level=moderate` | Reporta vulnerabilidades (actualmente 12, `continue-on-error` hasta resolver `postcss`/`sharp`/`undici`). |
+| `secret-scan` | `gitleaks` | Escaneo de secretos en el historial. |
+
+Dependabot (`.github/dependabot.yml`) abre PRs semanales para `npm` y `github-actions`.
+
+### Configurar secretos en CI
+Nunca commitear `.env.local`. En GitHub: `Settings → Secrets and variables → Actions → New repository secret` para `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+
 ## 🛠️ Comandos de Desarrollo
 
 ```bash
@@ -248,6 +284,10 @@ npm run lint
 
 # Verificar TypeScript
 npx tsc --noEmit
+
+# Tests y cobertura
+npm run test
+npm run test:coverage
 ```
 
 ## 📄 Licencia

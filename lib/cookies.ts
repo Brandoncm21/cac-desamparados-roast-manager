@@ -47,6 +47,9 @@ function isProduction(): boolean {
  *   - `secure` se activa automáticamente en producción.
  *   - `sameSite` por defecto es `"lax"` (mitigación CSRF).
  *   - `path` por defecto es `"/"`.
+ *
+ * El parámetro `env` opcional permite a tests inyectar el valor de
+ * `NODE_ENV`. En runtime real se omite.
  */
 export function secureCookieOptions(
   extra?: Partial<SerializeOptions>,
@@ -67,6 +70,11 @@ export function secureCookieOptions(
   };
 }
 
+/**
+ * Fusiona las opciones del upstream (Supabase SSR) con los flags
+ * seguros. Nunca degrada un flag seguro ya presente, pero completa
+ * los ausentes con los valores por defecto seguros.
+ */
 function mergeWithSecureDefaults(
   options: Partial<SerializeOptions> | undefined,
   env: "production" | "development" | "test" = isProduction()
@@ -77,6 +85,11 @@ function mergeWithSecureDefaults(
   return secureCookieOptions(options, env);
 }
 
+/**
+ * Aplica cookies seguras al response de Next.js, propaga los valores
+ * al request (para que estén disponibles aguas abajo) y reenvía los
+ * headers de no-cache que entrega Supabase SSR.
+ */
 export function applySecureCookies(
   request: NextRequest,
   response: NextResponse,
@@ -88,6 +101,8 @@ export function applySecureCookies(
     : "development";
 
   for (const { name, value, options } of cookiesToSet) {
+    // Propaga al request para que el resto del pipeline (route handlers
+    // y Server Components) lean el valor actualizado.
     request.cookies.set(name, value);
     const merged = mergeWithSecureDefaults(options, env);
     response.cookies.set(name, value, merged);

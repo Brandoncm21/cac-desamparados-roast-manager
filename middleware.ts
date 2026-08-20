@@ -52,6 +52,7 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Llama getUser() (no getSession) para forzar verificación server-side.
   const { data: { user } } = await supabase.auth.getUser();
   const isAuthenticated = !!user;
 
