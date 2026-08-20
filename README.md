@@ -227,19 +227,6 @@ cacheen respuestas con tokens de sesión.
 >
 > No se imprimen ni se exponen valores de secretos en logs del PR.
 
-## 🧪 Tests y Cobertura
-
-| Comando | Descripción |
-|---------|-------------|
-| `npm run test` | Vitest en `jsdom` (124 tests). |
-| `npm run test:coverage` | `@vitest/coverage-v8` → `coverage/` (80.9% stmts, 69.8% branch). |
-
-Módulos críticos cubiertos >70%:
-- `lib/schemas/servicios-maestro.ts` 100%
-- `lib/calculo-precios.ts` vía `calcularLineaTotal` 100%
-- `lib/services/empacado.ts` 73%, `orquestador.ts` 77%, `resolver-tarifa.ts` 60% (mejorado en este PR)
-
-Para ver el reporte HTML: `npm run test:coverage && open coverage/index.html`.
 
 ## 🛠️ Comandos de Desarrollo
 
