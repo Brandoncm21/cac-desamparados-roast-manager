@@ -61,10 +61,14 @@ export default function RootLayout({
                   stripBisSkinChecked(document.documentElement);
                   var observer = new MutationObserver(function(mutations) {
                     mutations.forEach(function(mutation) {
-                      mutation.addedNodes.forEach(stripBisSkinChecked);
+                      if (mutation.type === "attributes" && mutation.attributeName === "bis_skin_checked") {
+                        mutation.target.removeAttribute("bis_skin_checked");
+                      } else {
+                        mutation.addedNodes.forEach(stripBisSkinChecked);
+                      }
                     });
                   });
-                  observer.observe(document.documentElement, { childList: true, subtree: true });
+                  observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ["bis_skin_checked"] });
                 }
               })();
             `,
