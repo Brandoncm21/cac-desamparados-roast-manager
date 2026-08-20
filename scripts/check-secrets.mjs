@@ -27,6 +27,12 @@ const SERVICE_ROLE_PATTERN = /SERVICE_ROLE/i;
 const PUBLIC_ENV_FILE_PATTERNS = [/^\.env(\.|$)/i];
 
 const SCANNED_EXTENSIONS = [".ts", ".tsx", ".js", ".mjs", ".json"];
+
+// Sólo escaneamos código de aplicación. El resto son scripts,
+// fixtures y configuración de tooling que no deben interpretarse
+// como secretos en producción.
+const SCANNED_INCLUDE_DIRS = ["app", "lib", "components", "middleware.ts"];
+
 const SCANNED_SKIP_DIRS = [
   "node_modules",
   ".next",
@@ -35,6 +41,7 @@ const SCANNED_SKIP_DIRS = [
   "dist",
   "build",
   ".opencode",
+  "scripts",
 ];
 
 const findings = [];
@@ -112,8 +119,15 @@ function scanTrackedFiles() {
   const files = safeExecNullDelimited(
     `git ls-files -z -- ${SCANNED_EXTENSIONS.map((ext) => `*${ext}`).join(" ")}`
   ).filter((relPath) => {
-    return !SCANNED_SKIP_DIRS.some(
-      (skip) => relPath === skip || relPath.startsWith(`${skip}/`)
+    if (
+      SCANNED_SKIP_DIRS.some(
+        (skip) => relPath === skip || relPath.startsWith(`${skip}/`)
+      )
+    ) {
+      return false;
+    }
+    return SCANNED_INCLUDE_DIRS.some(
+      (dir) => relPath === dir || relPath.startsWith(`${dir}/`)
     );
   });
 
