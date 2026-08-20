@@ -6,15 +6,19 @@ import type { SerializeOptions } from "cookie";
 /**
  * Helpers centralizados para cookies seguras.
  *
- * Toda cookie escrita por el servidor (Supabase SSR, sesión, refresh,
- * tokens) debe pasar por `applySecureCookies` para garantizar flags
- * seguros de forma homogénea:
+ * Toda cookie escrita por el servidor pasa por `applySecureCookies`,
+ * pero con un matiz importante para Supabase SSR:
  *
- *   - `httpOnly: true`  → no accesible desde JavaScript del cliente.
- *   - `secure: true`    → sólo sobre HTTPS en producción.
- *   - `sameSite: "lax"` → mitigación de CSRF para flows de navegación
- *                         top-level.
- *   - `path: "/"`       → disponible en toda la app.
+ *   - Las cookies de sesión de Supabase (`sb-...-auth-token`) DEBEN
+ *     permanecer legibles por JavaScript, porque `createBrowserClient`
+ *     las lee vía `document.cookie`. Forzar `httpOnly: true` las hace
+ *     invisibles para el cliente y rompe `getCurrentUserRole()` y todas
+ *     las queries con RLS (el cliente queda como `anon`).
+ *   - Por eso `httpOnly` SE RESPETA tal cual lo envía el upstream
+ *     (Supabase). Si el upstream no lo define, se deja sin setear
+ *     (legible por JS), que es el comportamiento intencionado de Supabase.
+ *   - `secure: true` sólo en producción, `sameSite: "lax"` y `path: "/"`
+ *     sí se aplican como defaults seguros (sin sobrescribir el upstream).
  *
  * El helper también aplica los headers `Cache-Control: private, no-store`
  * y equivalentes que entrega Supabase para evitar que CDNs o proxies
@@ -38,15 +42,15 @@ function isProduction(): boolean {
 
 /**
  * Devuelve opciones seguras para una cookie del lado servidor.
- * Mezcla los flags seguros con cualquier `extra` provisto por el
- * llamador, pero **fuerza** los flags críticos incluso si el upstream
- * los desactiva por error:
  *
- *   - `httpOnly` siempre se fuerza a `true` para impedir lectura desde
- *     JavaScript del cliente.
- *   - `secure` se activa automáticamente en producción.
- *   - `sameSite` por defecto es `"lax"` (mitigación CSRF).
- *   - `path` por defecto es `"/"`.
+ * `httpOnly` se preserva tal cual lo envía el upstream. Para las cookies
+ * de sesión de Supabase el upstream no define `httpOnly` (quedan legibles
+ * por JS, necesario para `createBrowserClient`). Forzarlo a `true` rompería
+ * la sesión del cliente.
+ *
+ * `secure` se activa automáticamente en producción.
+ * `sameSite` por defecto es `"lax"` (mitigación CSRF).
+ * `path` por defecto es `"/"`.
  *
  * El parámetro `env` opcional permite a tests inyectar el valor de
  * `NODE_ENV`. En runtime real se omite.
@@ -61,13 +65,22 @@ export function secureCookieOptions(
   const sameSite = extra?.sameSite ?? DEFAULT_SAME_SITE;
   const path = extra?.path ?? DEFAULT_PATH;
 
-  return {
+  const result: SecureCookieOptions = {
     ...extra,
-    httpOnly: true,
     secure,
     sameSite,
     path,
   };
+
+  // Preservar httpOnly del upstream; si no viene definido, no forzarlo
+  // (dejar la cookie legible por JS, como espera Supabase SSR).
+  if (extra?.["httpOnly"] !== undefined) {
+    (result as Record<string, unknown>)["httpOnly"] = extra["httpOnly"];
+  } else {
+    delete (result as Record<string, unknown>)["httpOnly"];
+  }
+
+  return result;
 }
 
 /**

@@ -29,17 +29,17 @@ function buildMockRequest() {
 }
 
 describe("secureCookieOptions", () => {
-  it("httpOnly=true, secure=false, sameSite=lax en desarrollo", () => {
+  it("preserva httpOnly indefinido (legible por JS) en desarrollo", () => {
     const opts = secureCookieOptions(undefined, "development");
-    expect(opts["httpOnly"]).toBe(true);
+    expect(opts["httpOnly"]).toBeUndefined();
     expect(opts["secure"]).toBe(false);
     expect(opts["sameSite"]).toBe("lax");
     expect(opts["path"]).toBe("/");
   });
 
-  it("httpOnly=true, secure=true, sameSite=lax en producción", () => {
+  it("preserva httpOnly indefinido en producción (Supabase SSR)", () => {
     const opts = secureCookieOptions(undefined, "production");
-    expect(opts["httpOnly"]).toBe(true);
+    expect(opts["httpOnly"]).toBeUndefined();
     expect(opts["secure"]).toBe(true);
     expect(opts["sameSite"]).toBe("lax");
     expect(opts["path"]).toBe("/");
@@ -50,8 +50,13 @@ describe("secureCookieOptions", () => {
     expect(opts["secure"]).toBe(true);
   });
 
-  it("fuerza httpOnly=true incluso si el extra lo desactiva", () => {
+  it("preserva httpOnly=false del upstream (no lo fuerza a true)", () => {
     const opts = secureCookieOptions({ httpOnly: false }, "production");
+    expect(opts["httpOnly"]).toBe(false);
+  });
+
+  it("preserva httpOnly=true del upstream cuando viene explícito", () => {
+    const opts = secureCookieOptions({ httpOnly: true }, "production");
     expect(opts["httpOnly"]).toBe(true);
   });
 
@@ -134,7 +139,7 @@ describe("applySecureCookies", () => {
     );
   });
 
-  it("no sobrescribe un httpOnly existente del upstream con false", () => {
+  it("preserva httpOnly=false del upstream (sesión JS-legible)", () => {
     const { response, setCookieSpy } = buildMockResponse();
     const { request } = buildMockRequest();
 
@@ -162,6 +167,24 @@ describe("applySecureCookies", () => {
       string,
       Record<string, unknown>
     ];
-    expect(options["httpOnly"]).toBe(true);
+    expect(options["httpOnly"]).toBe(false);
+  });
+
+  it("no setea httpOnly si el upstream no lo define (Supabase SSR)", () => {
+    const { response, setCookieSpy } = buildMockResponse();
+    const { request } = buildMockRequest();
+
+    applySecureCookies(
+      request as unknown as Parameters<typeof applySecureCookies>[0],
+      response as unknown as Parameters<typeof applySecureCookies>[1],
+      [{ name: "sb-access-token", value: "abc", options: {} }]
+    );
+
+    const [, , options] = setCookieSpy.mock.calls[0] as [
+      string,
+      string,
+      Record<string, unknown>
+    ];
+    expect(options["httpOnly"]).toBeUndefined();
   });
 });
