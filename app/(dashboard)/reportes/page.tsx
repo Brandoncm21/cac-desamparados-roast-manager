@@ -1,12 +1,18 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle } from "lucide-react";
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
+
+const ComparativaChart = dynamic(
+  () => import("./components/ComparativaChart").then((m) => m.ComparativaChart),
+  {
+    ssr: false,
+    loading: () => <p className="text-sm text-muted-foreground p-4">Cargando gráfico...</p>,
+  }
+);
 
 interface PerfilConCurva {
   id_perfil: number;
@@ -78,8 +84,6 @@ export default function ReportesPage() {
     }
   }
 
-  const COLORS = ["#ea580c", "#2563eb", "#16a34a", "#9333ea", "#dc2626", "#0891b2"];
-
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Reportes</h1>
@@ -128,25 +132,7 @@ export default function ReportesPage() {
           </div>
 
           {selectedData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="minuto" label={{ value: "Minutos", position: "insideBottom", offset: -5 }} />
-                <YAxis domain={[70, 220]} label={{ value: "°C", angle: -90, position: "insideLeft" }} />
-                <Tooltip />
-                <Legend />
-                {selectedData.map((p, i) => (
-                  <Line
-                    key={p.id_perfil}
-                    type="monotone"
-                    dataKey={p.numero_lote || `Perfil ${p.id_perfil}`}
-                    stroke={COLORS[i % COLORS.length]}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+            <ComparativaChart chartData={chartData} selectedData={selectedData} />
           ) : (
             <p className="text-center text-muted-foreground py-8">
               Seleccione uno o más perfiles para comparar curvas

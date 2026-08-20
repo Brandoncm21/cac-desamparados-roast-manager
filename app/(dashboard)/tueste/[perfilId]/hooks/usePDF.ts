@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import { toPng } from "html-to-image";
-import { jsPDF } from "jspdf";
 import type {
   AjusteLocal,
   HitoRecord,
@@ -45,6 +43,10 @@ export function usePDF({
   };
 
   const descargarPDF = useCallback(async () => {
+    const [{ jsPDF }, { toPng }] = await Promise.all([
+      import("jspdf"),
+      import("html-to-image"),
+    ]);
     const pdf = new jsPDF("p", "mm", "a4");
     const W = 210;
     const M = 10;
