@@ -16,6 +16,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ClienteAutocomplete } from "@/components/forms/cliente-autocomplete";
 import { InlineAddSelect } from "@/components/forms/inline-add-select";
+import {
+  MOLIENDA_DEFAULT,
+  requiereHumedad,
+  tieneMolido,
+  tieneTipoEmpacado,
+  tieneTipoTueste,
+} from "@/lib/services/visibilidad";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -167,6 +174,24 @@ export default function NuevaOrdenPage() {
   const serviciosSeleccionados = watch("servicios") as CrearOrdenInput["servicios"];
   const idsSeleccionados = new Set(serviciosSeleccionados.map((s) => s.servicio_id));
 
+  const serviciosInfo = serviciosSeleccionados
+    .map((s) => serviciosActivos.find((sa) => sa.id_servicio_maestro === s.servicio_id))
+    .filter((s): s is ServicioActivo => Boolean(s));
+
+  const hayTueste = tieneTipoTueste(serviciosInfo);
+  const hayEmpaque = tieneTipoEmpacado(serviciosInfo);
+  const hayMolido = tieneMolido(serviciosInfo);
+  const hayHumedad = requiereHumedad(serviciosInfo);
+
+  useEffect(() => {
+    if (hayMolido) return;
+    const actual = form.getValues("tipo_molienda") ?? "";
+    const objetivo = hayTueste ? MOLIENDA_DEFAULT : "";
+    if (actual !== objetivo) {
+      form.setValue("tipo_molienda", objetivo);
+    }
+  }, [hayTueste, hayMolido, form]);
+
   const addServicio = (servicioId: number) => {
     const servicio = serviciosActivos.find((s) => s.id_servicio_maestro === servicioId);
     if (!servicio || idsSeleccionados.has(servicioId)) return;
@@ -309,57 +334,6 @@ export default function NuevaOrdenPage() {
             </CardContent>
           </Card>
 
-          {/* Encabezado */}
-          <Card>
-            <CardHeader><CardTitle className="text-base md:text-lg">Encabezado de Orden</CardTitle></CardHeader>
-            <CardContent className="space-y-3 md:space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                <FormField control={form.control} name="proceso_cafe" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Proceso de Café</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                      <FormControl>
-                        <SelectTrigger className="h-12 md:h-10 text-base"><SelectValue placeholder="Sin especificar" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="">Sin especificar</SelectItem>
-                        {OPCIONES_PROCESO.map((opt) => (
-                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="porcentaje_humedad_entrada" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>% Humedad</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        max={100}
-                        placeholder="Ej: 12.5"
-                        className="h-12 md:h-10 text-base"
-                        value={(field.value as number | null | undefined) ?? ""}
-                        onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              <FormField control={form.control} name="descripcion_producto" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descripción del Producto</FormLabel>
-                  <FormControl><Input {...field} className="h-12 md:h-10 text-base" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </CardContent>
-          </Card>
-
           {/* Servicios */}
           <Card>
             <CardHeader>
@@ -417,6 +391,36 @@ export default function NuevaOrdenPage() {
             </CardContent>
           </Card>
 
+          {/* Humedad de Entrada: solo para servicios de Tueste o Secado */}
+          {hayHumedad && (
+            <Card>
+              <CardHeader><CardTitle className="text-base md:text-lg">Humedad de Entrada</CardTitle></CardHeader>
+              <CardContent className="space-y-3 md:space-y-4">
+                <FormField control={form.control} name="porcentaje_humedad_entrada" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>% Humedad Inicial</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        max={100}
+                        placeholder="Ej: 12.5"
+                        className="h-12 md:h-10 text-base"
+                        value={(field.value as number | null | undefined) ?? ""}
+                        onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <p className="text-xs text-muted-foreground">
+                  Con cuánta humedad entra el café al proceso (relevante para tueste y secado).
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Responsable */}
           <Card>
             <CardHeader><CardTitle className="text-base md:text-lg">Responsable</CardTitle></CardHeader>
@@ -441,39 +445,66 @@ export default function NuevaOrdenPage() {
             </CardContent>
           </Card>
 
-          {/* Especificaciones */}
-          <Card>
-            <CardHeader><CardTitle className="text-base md:text-lg">Especificaciones</CardTitle></CardHeader>
-            <CardContent className="space-y-3 md:space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-                <FormField control={form.control} name="tipo_tueste" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo de Tueste</FormLabel>
-                    <FormControl>
-                      <SpecSelect
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        options={OPCIONES_TUESTE}
-                        placeholder="Seleccionar..."
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="tipo_molienda" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo de Molienda</FormLabel>
-                    <FormControl>
-                      <SpecSelect
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        options={OPCIONES_MOLIENDA}
-                        placeholder="Seleccionar..."
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+          {/* Especificaciones de Tueste: solo si se contrató Tueste */}
+          {hayTueste && (
+            <Card>
+              <CardHeader><CardTitle className="text-base md:text-lg">Especificaciones de Tueste</CardTitle></CardHeader>
+              <CardContent className="space-y-3 md:space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                  <FormField control={form.control} name="tipo_tueste" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Tueste</FormLabel>
+                      <FormControl>
+                        <SpecSelect
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          options={OPCIONES_TUESTE}
+                          placeholder="Seleccionar..."
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="tipo_molienda" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Tipo de Molienda {hayMolido ? "*" : "(default)"}
+                      </FormLabel>
+                      <FormControl>
+                        {hayMolido ? (
+                          <SpecSelect
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            options={OPCIONES_MOLIENDA}
+                            placeholder="Seleccionar..."
+                          />
+                        ) : (
+                          <Input
+                            value={field.value || MOLIENDA_DEFAULT}
+                            readOnly
+                            disabled
+                            className="h-12 md:h-10 text-base bg-muted"
+                          />
+                        )}
+                      </FormControl>
+                      <FormMessage />
+                      {!hayMolido && (
+                        <p className="text-xs text-muted-foreground">
+                          Por defecto {MOLIENDA_DEFAULT}. Solo se puede cambiar si contrata el servicio Molido.
+                        </p>
+                      )}
+                    </FormItem>
+                  )} />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tipo de Empaque: solo si se contrató Empaque */}
+          {hayEmpaque && (
+            <Card>
+              <CardHeader><CardTitle className="text-base md:text-lg">Tipo de Empaque</CardTitle></CardHeader>
+              <CardContent>
                 <FormField control={form.control} name="tipo_empaque" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de Empaque</FormLabel>
@@ -488,7 +519,38 @@ export default function NuevaOrdenPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-              </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Encabezado de Orden: al final del proceso */}
+          <Card>
+            <CardHeader><CardTitle className="text-base md:text-lg">Encabezado de Orden</CardTitle></CardHeader>
+            <CardContent className="space-y-3 md:space-y-4">
+              <FormField control={form.control} name="proceso_cafe" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Proceso de Café</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger className="h-12 md:h-10 text-base"><SelectValue placeholder="Sin especificar" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">Sin especificar</SelectItem>
+                      {OPCIONES_PROCESO.map((opt) => (
+                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="descripcion_producto" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descripción del Producto</FormLabel>
+                  <FormControl><Input {...field} className="h-12 md:h-10 text-base" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <FormField control={form.control} name="observaciones" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Observaciones</FormLabel>
@@ -548,9 +610,9 @@ export default function NuevaOrdenPage() {
                 if (!pendingValues.zona_finca) vacios.push("Zona o Finca");
                 if (!pendingValues.proceso_cafe) vacios.push("Proceso de café");
                 if (!pendingValues.descripcion_producto) vacios.push("Descripción del producto");
-                if (!pendingValues.tipo_tueste) vacios.push("Tipo de tueste");
-                if (!pendingValues.tipo_molienda) vacios.push("Tipo de molienda");
-                if (!pendingValues.tipo_empaque) vacios.push("Tipo de empaque");
+                if (hayTueste && !pendingValues.tipo_tueste) vacios.push("Tipo de tueste");
+                if (hayTueste && hayMolido && !pendingValues.tipo_molienda) vacios.push("Tipo de molienda");
+                if (hayEmpaque && !pendingValues.tipo_empaque) vacios.push("Tipo de empaque");
                 if (!pendingValues.observaciones) vacios.push("Observaciones");
 
                 if (vacios.length === 0) return null;
