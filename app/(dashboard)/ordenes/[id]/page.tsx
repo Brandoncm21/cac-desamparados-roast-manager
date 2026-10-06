@@ -74,6 +74,21 @@ interface PerfilTueste {
   id_perfil: number;
 }
 
+interface ResumenPerfilTueste {
+  estado: string | null;
+  tiempo_desarrollo_min: number | null;
+  dtr_porcentaje: number | null;
+  fecha_optima_consumo: string | null;
+  fecha_vencimiento: string | null;
+}
+
+interface MetricaTuesteRow {
+  tipo_metrica: string;
+  valor_antes: number | null;
+  valor_despues: number | null;
+  porcentaje_diferencia: number | null;
+}
+
 export default function OrdenDetallePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -82,6 +97,8 @@ export default function OrdenDetallePage() {
   const [perfilTueste, setPerfilTueste] = useState<PerfilTueste | null>(null);
   const [loadingPerfil, setLoadingPerfil] = useState(false);
   const [creandoPerfil, setCreandoPerfil] = useState(false);
+  const [resumenTueste, setResumenTueste] = useState<ResumenPerfilTueste | null>(null);
+  const [metricasTueste, setMetricasTueste] = useState<MetricaTuesteRow[]>([]);
   const [userRole, setUserRole] = useState<"Admin" | "Tostador" | "Recepción" | "Operador" | null>(null);
 
   useEffect(() => {
@@ -129,6 +146,27 @@ export default function OrdenDetallePage() {
         setLoadingPerfil(false);
       });
   }, [orden, supabase]);
+
+  useEffect(() => {
+    if (!perfilTueste) {
+      setResumenTueste(null);
+      setMetricasTueste([]);
+      return;
+    }
+    const idPerfil = perfilTueste.id_perfil;
+    supabase
+      .from("perfiles_tueste")
+      .select("estado, tiempo_desarrollo_min, dtr_porcentaje, fecha_optima_consumo, fecha_vencimiento")
+      .eq("id_perfil", idPerfil)
+      .is("deleted_at", null)
+      .single()
+      .then(({ data }) => setResumenTueste(data as ResumenPerfilTueste | null));
+    supabase
+      .from("metricas_tueste")
+      .select("tipo_metrica, valor_antes, valor_despues, porcentaje_diferencia")
+      .eq("id_perfil", idPerfil)
+      .then(({ data }) => setMetricasTueste((data || []) as MetricaTuesteRow[]));
+  }, [perfilTueste, supabase]);
 
   const cambiarEstado = async (nuevoEstado: string) => {
     if (!orden) return;
@@ -248,6 +286,73 @@ export default function OrdenDetallePage() {
               <Thermometer className="h-4 w-4 mr-2" />
               {creandoPerfil ? "Creando perfil..." : "Iniciar Tueste"}
             </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const calcularRendimiento = (m: MetricaTuesteRow): string => {
+    if (m.porcentaje_diferencia != null) return `${m.porcentaje_diferencia}%`;
+    if (m.valor_antes != null && m.valor_despues != null && m.valor_antes !== 0) {
+      return `${(((m.valor_antes - m.valor_despues) / m.valor_antes) * 100).toFixed(2)}%`;
+    }
+    return "—";
+  };
+
+  const renderResumenTuesteSection = () => {
+    if (!perfilTueste) return null;
+
+    return (
+      <Card className="mb-8 noPrint">
+        <CardHeader>
+          <CardTitle className="text-lg">Resumen de Tueste</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          {resumenTueste && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Estado</p>
+                <p className="font-medium">{resumenTueste.estado || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Tiempo Desarrollo</p>
+                <p className="font-medium">{resumenTueste.tiempo_desarrollo_min ?? "—"} min</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">DTR</p>
+                <p className="font-medium">{resumenTueste.dtr_porcentaje ?? "—"}%</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Óptimo Consumo</p>
+                <p className="font-medium">{resumenTueste.fecha_optima_consumo || "—"}</p>
+              </div>
+            </div>
+          )}
+
+          {metricasTueste.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Métrica</TableHead>
+                  <TableHead>Antes</TableHead>
+                  <TableHead>Después</TableHead>
+                  <TableHead className="text-right">Rendimiento</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {metricasTueste.map((m) => (
+                  <TableRow key={m.tipo_metrica}>
+                    <TableCell className="font-medium">{m.tipo_metrica}</TableCell>
+                    <TableCell>{m.valor_antes ?? "—"}</TableCell>
+                    <TableCell>{m.valor_despues ?? "—"}</TableCell>
+                    <TableCell className="text-right font-mono">{calcularRendimiento(m)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-muted-foreground">Sin métricas registradas todavía.</p>
           )}
         </CardContent>
       </Card>
@@ -414,6 +519,8 @@ export default function OrdenDetallePage() {
       </div>
 
       {renderTuesteSection()}
+
+      {renderResumenTuesteSection()}
 
       <PasosPanel idOrden={orden.id_orden} />
     </div>

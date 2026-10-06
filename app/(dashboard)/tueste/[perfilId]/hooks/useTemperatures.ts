@@ -19,6 +19,11 @@ interface UseTemperaturesProps {
   initialCurrentMinute: number;
 }
 
+interface RegistroTemperaturaExitoso {
+  minuto: number;
+  temperatura: number;
+}
+
 interface UseTemperaturesReturn {
   temperatura: string;
   setTemperatura: (value: string) => void;
@@ -26,7 +31,7 @@ interface UseTemperaturesReturn {
   setMinutoManual: (value: string) => void;
   puntos: PuntoTemperatura[];
   currentMinute: number;
-  registrarTemperatura: () => Promise<void>;
+  registrarTemperatura: () => Promise<RegistroTemperaturaExitoso | null>;
   loadServerTemperatures: () => Promise<void>;
 }
 
@@ -65,17 +70,17 @@ export function useTemperatures({
     }
   }, [perfilId, timeStep]);
 
-  const registrarTemperatura = useCallback(async () => {
+  const registrarTemperatura = useCallback(async (): Promise<RegistroTemperaturaExitoso | null> => {
     const temp = Number(temperatura);
     if (temp < 70 || temp > 220) {
       toast.error("Temperatura debe estar entre 70°C y 220°C");
-      return;
+      return null;
     }
 
     const minuto = minutoManual !== "" ? Number(minutoManual) : currentMinute;
     if (minuto < 0) {
       toast.error("Minuto inválido");
-      return;
+      return null;
     }
 
     const record: TemperaturaRecord = {
@@ -101,6 +106,8 @@ export function useTemperatures({
     setMinutoManual("");
 
     if (isOnline) syncAll();
+
+    return { minuto, temperatura: temp };
   }, [temperatura, minutoManual, currentMinute, perfilId, isOnline, timeStep]);
 
   return {

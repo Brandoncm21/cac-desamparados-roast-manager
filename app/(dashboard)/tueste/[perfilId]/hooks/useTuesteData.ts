@@ -57,7 +57,7 @@ export function useTuesteData(perfilId: number, timeStep: number): TuesteData {
         const { data: perfilData } = await supabase
           .from("perfiles_tueste")
           .select(
-            "*, empleados!perfiles_tueste_id_tostador_fkey(nombre), ordenes_trabajo(numero_factura)"
+            "*, empleados!perfiles_tueste_id_tostador_fkey(nombre), ordenes_trabajo(numero_factura, porcentaje_humedad_entrada)"
           )
           .eq("id_perfil", perfilId)
           .is("deleted_at", null)
