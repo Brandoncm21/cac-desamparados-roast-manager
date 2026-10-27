@@ -172,22 +172,27 @@ export function PasosPanel({ idOrden }: { idOrden: number }) {
     }
     setCreandoPerfil(true);
     try {
-      const { data, error } = await supabase
-        .from("perfiles_tueste")
-        .insert({
+      const res = await fetch("/api/perfiles-tueste", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           id_orden: idOrden,
           nombre_cafe: `Tueste orden #${idOrden}`,
-        })
-        .select("id_perfil")
-        .single();
+        }),
+      });
+      const result = await res.json();
 
-      if (error || !data) {
-        toast.error("Error al crear perfil de tueste: " + (error?.message || "sin ID"));
+      if (!res.ok) {
+        toast.error(
+          "Error al crear perfil de tueste: " +
+            (result.error?.message || "sin ID")
+        );
         return;
       }
+
       toast.success("Perfil de tueste creado");
-      setPerfilTueste(data as PerfilTueste);
-      router.push(`/tueste/${data.id_perfil}`);
+      setPerfilTueste(result.data as PerfilTueste);
+      router.push(`/tueste/${result.data.id_perfil}`);
     } finally {
       setCreandoPerfil(false);
     }

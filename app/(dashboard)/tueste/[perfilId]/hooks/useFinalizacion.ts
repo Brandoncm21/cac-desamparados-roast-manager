@@ -13,7 +13,7 @@ interface UseFinalizacionProps {
 interface UseFinalizacionReturn {
   showResumen: boolean;
   resumen: ResumenTueste | null;
-  finalizarTueste: (isOnline: boolean) => Promise<void>;
+  finalizarTueste: (isOnline: boolean) => Promise<boolean>;
 }
 
 export function useFinalizacion({ perfilId }: UseFinalizacionProps): UseFinalizacionReturn {
@@ -21,10 +21,32 @@ export function useFinalizacion({ perfilId }: UseFinalizacionProps): UseFinaliza
   const [resumen, setResumen] = useState<ResumenTueste | null>(null);
 
   const finalizarTueste = useCallback(
-    async (isOnline: boolean) => {
+    async (isOnline: boolean): Promise<boolean> => {
       if (isOnline) {
         await syncAll();
         const supabase = createClient();
+
+        // Marcar el perfil como Completado vía API (no update directo).
+        try {
+          const res = await fetch(`/api/perfiles-tueste/${perfilId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ estado: "Completado" }),
+          });
+          if (!res.ok) {
+            const result = await res.json();
+            toast.error(
+              "Error al finalizar el tueste: " +
+                (result.error?.message || "Error desconocido")
+            );
+            setShowResumen(true);
+            return false;
+          }
+        } catch {
+          toast.error("Error al finalizar el tueste");
+          setShowResumen(true);
+          return false;
+        }
 
         const { data } = await supabase
           .from("perfiles_tueste")
@@ -43,16 +65,12 @@ export function useFinalizacion({ perfilId }: UseFinalizacionProps): UseFinaliza
           ...(data || {}),
           metricas: (metricasData || []) as MetricaTueste[],
         });
-
-        await supabase
-          .from("perfiles_tueste")
-          .update({ estado: "Completado" })
-          .eq("id_perfil", perfilId);
       } else {
         toast.error("Conéctese a internet para ver el resumen");
       }
 
       setShowResumen(true);
+      return true;
     },
     [perfilId]
   );

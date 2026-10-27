@@ -115,22 +115,25 @@ export default function TuesteListPage() {
     if (creating) return;
     setCreating(true);
     try {
-      const { data, error } = await supabase
-        .from("perfiles_tueste")
-        .insert({
+      const res = await fetch("/api/perfiles-tueste", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           nombre_cafe: "Nuevo lote",
           id_orden: ordenId || null,
-        })
-        .select()
-        .single();
+        }),
+      });
+      const result = await res.json();
 
-      if (error) {
-        toast.error("Error al crear perfil: " + error.message);
+      if (!res.ok) {
+        toast.error(
+          "Error al crear perfil: " + (result.error?.message || "Error desconocido")
+        );
         return;
       }
 
-      if (data) {
-        router.push(`/tueste/${data.id_perfil}`);
+      if (result.data?.id_perfil) {
+        router.push(`/tueste/${result.data.id_perfil}`);
       }
     } finally {
       setCreating(false);

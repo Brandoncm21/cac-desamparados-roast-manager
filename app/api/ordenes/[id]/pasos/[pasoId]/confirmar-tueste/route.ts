@@ -1,8 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { confirmarTuesteSchema } from "@/lib/schemas/orden-pasos";
-import { calcularMerma } from "@/lib/services/resolver-tarifa";
-import { hayPasosPendientes } from "@/lib/services/orquestador";
 import { apiOk, apiError, apiValidationError, requireRole, withErrorHandler } from "@/lib/api-helpers";
 
 interface Params {
@@ -14,6 +12,13 @@ async function post(request: NextRequest, { params }: Params) {
   const idOrdenNum = Number(idOrden);
   const pasoIdNum = Number(pasoId);
 
+  if (!Number.isInteger(idOrdenNum) || idOrdenNum <= 0 || !Number.isInteger(pasoIdNum) || pasoIdNum <= 0) {
+    return apiValidationError({
+      formErrors: ["Identificadores inválidos"],
+      fieldErrors: {},
+    });
+  }
+
   await requireRole(["Admin", "Recepción", "Tostador"]);
   const supabase = await createClient();
 
@@ -21,66 +26,37 @@ async function post(request: NextRequest, { params }: Params) {
   const parsed = confirmarTuesteSchema.safeParse(body);
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
+  // Pre-validaciones (mensajes y status precisos antes de la transacción)
   const { data: paso, error: pasoError } = await supabase
     .from("orden_pasos")
-    .select("*, servicios_maestro(tipo)")
+    .select("id_paso, estado")
     .eq("id_paso", pasoIdNum)
     .eq("id_orden", idOrdenNum)
     .single();
 
   if (pasoError || !paso) return apiError("Paso no encontrado", 404);
-
-  const tipoServicio = (paso.servicios_maestro as unknown as { tipo: string })?.tipo;
-  if (tipoServicio !== "tueste") {
-    return apiError("Este endpoint es solo para el paso de tueste", 400);
-  }
-
   if (paso.estado !== "EN_PROCESO") {
     return apiError("El paso debe estar en proceso para confirmarse", 400);
   }
 
-  if (paso.peso_inicial_kg == null) {
-    return apiError("El paso de tueste no tiene peso inicial registrado", 400);
+  // Transacción completa en DB: paso + cierre de orden si no quedan pendientes.
+  const { data, error } = await supabase.rpc("confirmar_tueste_paso", {
+    p_id_paso: pasoIdNum,
+    p_peso_final_kg: parsed.data.peso_final_kg,
+    p_observaciones: parsed.data.observaciones || null,
+  });
+
+  if (error) {
+    const mensaje = error.message || "Error al confirmar el tueste";
+    const status = /no encontrado/i.test(mensaje)
+      ? 404
+      : /permisos|Solo Admin/i.test(mensaje)
+        ? 403
+        : 400;
+    return apiError(mensaje, status);
   }
 
-  const { mermaKg } = calcularMerma(paso.peso_inicial_kg, parsed.data.peso_final_kg);
-
-  const { data: authUser } = await supabase.auth.getUser();
-  const userId = authUser.user?.id;
-
-  const { data: empleado } = await supabase
-    .from("empleados")
-    .select("id_empleado")
-    .eq("auth_user_id", userId)
-    .single();
-
-  const idOperadorCierre = empleado?.id_empleado ?? null;
-
-  const { data: pasoActualizado, error } = await supabase
-    .from("orden_pasos")
-    .update({
-      estado: "COMPLETADO",
-      peso_final_kg: parsed.data.peso_final_kg,
-      merma_kg: mermaKg,
-      id_operador_cierre: idOperadorCierre,
-      fecha_fin: new Date().toISOString(),
-      observaciones: parsed.data.observaciones || null,
-      costo_total_paso: paso.costo_total_paso,
-    })
-    .eq("id_paso", pasoIdNum)
-    .select()
-    .single();
-
-  if (error) return apiError(error.message, 500);
-
-  if (!(await hayPasosPendientes(supabase, idOrdenNum))) {
-    await supabase
-      .from("ordenes_trabajo")
-      .update({ estado_orden: "Completado", updated_at: new Date().toISOString() })
-      .eq("id_orden", idOrdenNum);
-  }
-
-  return apiOk(pasoActualizado);
+  return apiOk(data);
 }
 
 export const POST = withErrorHandler(post);

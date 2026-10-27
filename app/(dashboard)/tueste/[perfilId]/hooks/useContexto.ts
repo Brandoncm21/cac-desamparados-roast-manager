@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
 import type { ContextoUpdate, PerfilTueste } from "../types";
 
 interface UseContextoProps {
@@ -45,7 +44,6 @@ export function useContexto({ perfilId, perfil }: UseContextoProps): UseContexto
   }, [perfil]);
 
   const guardarContexto = async () => {
-    const supabase = createClient();
     const updateData: ContextoUpdate = {
       nombre_cafe: ctxNombreCafe || null,
       id_tostador: ctxIdTostador ? Number(ctxIdTostador) : null,
@@ -53,18 +51,27 @@ export function useContexto({ perfilId, perfil }: UseContextoProps): UseContexto
       humedad_sala: ctxHumSala ? Number(ctxHumSala) : null,
     };
 
-    const { error } = await supabase
-      .from("perfiles_tueste")
-      .update(updateData)
-      .eq("id_perfil", perfilId);
+    try {
+      const res = await fetch(`/api/perfiles-tueste/${perfilId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+      const result = await res.json();
 
-    if (error) {
+      if (!res.ok) {
+        toast.error(
+          "Error al guardar contexto: " +
+            (result.error?.message || "Error desconocido")
+        );
+        return;
+      }
+
+      setEditContext(false);
+      toast.success("Contexto guardado");
+    } catch {
       toast.error("Error al guardar contexto");
-      return;
     }
-
-    setEditContext(false);
-    toast.success("Contexto guardado");
   };
 
   return {

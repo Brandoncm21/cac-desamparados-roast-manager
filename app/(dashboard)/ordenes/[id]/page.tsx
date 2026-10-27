@@ -132,13 +132,17 @@ export default function OrdenDetallePage() {
 
   const cambiarEstado = async (nuevoEstado: string) => {
     if (!orden) return;
-    const { error } = await supabase
-      .from("ordenes_trabajo")
-      .update({ estado_orden: nuevoEstado })
-      .eq("id_orden", orden.id_orden);
+    const res = await fetch(`/api/ordenes/${orden.id_orden}/estado`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado_orden: nuevoEstado }),
+    });
+    const result = await res.json();
 
-    if (error) {
-      toast.error("Error al cambiar estado: " + error.message);
+    if (!res.ok) {
+      toast.error(
+        "Error al cambiar estado: " + (result.error?.message || "Error desconocido")
+      );
       return;
     }
 
@@ -196,22 +200,26 @@ export default function OrdenDetallePage() {
     if (!orden || creandoPerfil) return;
     setCreandoPerfil(true);
     try {
-      const { data, error } = await supabase
-        .from("perfiles_tueste")
-        .insert({
+      const res = await fetch("/api/perfiles-tueste", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           id_orden: orden.id_orden,
-          nombre_cafe: orden.descripcion_producto || orden.clientes?.nombre_completo || "Nuevo lote",
-        })
-        .select()
-        .single();
+          nombre_cafe:
+            orden.descripcion_producto || orden.clientes?.nombre_completo || "Nuevo lote",
+        }),
+      });
+      const result = await res.json();
 
-      if (error) {
-        toast.error("Error al iniciar tueste: " + error.message);
+      if (!res.ok) {
+        toast.error(
+          "Error al iniciar tueste: " + (result.error?.message || "Error desconocido")
+        );
         return;
       }
 
-      if (data?.id_perfil) {
-        router.push(`/tueste/${data.id_perfil}`);
+      if (result.data?.id_perfil) {
+        router.push(`/tueste/${result.data.id_perfil}`);
       } else {
         toast.error("No se pudo obtener el ID del perfil creado");
       }
