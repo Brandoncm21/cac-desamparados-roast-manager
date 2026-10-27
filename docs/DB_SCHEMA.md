@@ -99,6 +99,6 @@ perfiles_tueste 1--* trazabilidad_temperatura / hitos / metricas / ajustes
 ## 8. Historial de cambios (Fases 2 y 4 — Índices, RPCs y constraints)
 
 - **Fecha:** 2026-10-27 · **Rama:** `feat/audit-hardening`
-- **Cambios:** migraciones `0023_indices_performance.sql` (10 índices + pg_trgm), `0024_rpc_transaccionales.sql` (5 RPCs), `0025_tarifas_exclusion.sql` (btree_gist + EXCLUDE numrange + CHECK, drop del trigger anti-solape).
-- **Limitaciones:** migraciones creadas en el repo; aplicar en branch de Supabase y validar EXPLAIN real antes de producción (§RUNBOOK). Sin evidencia de volumen no se implementa particionamiento (`docs/DATA_GROWTH_PLAN.md` §4).
-- **Pendiente:** aplicar y validar en Supabase; retirar índices redundantes según `docs/PERFORMANCE_INDEXES.md` §3.
+- **Cambios:** migraciones `0023_indices_performance.sql` (10 índices + pg_trgm), `0024_rpc_transaccionales.sql` (5 RPCs), `0025_tarifas_exclusion.sql` (btree_gist + EXCLUDE numrange + CHECK, drop del trigger anti-solape). **Las 3 aplicadas y verificadas en producción (nwnldvzoxjjsmfeyouaw) el 2026-10-27:** 10/10 índices en `pg_indexes`; 5 RPCs con EXECUTE solo para `authenticated`; EXCLUDE rechaza traslape (`23P01`) y acepta contiguos; trigger eliminado; 0 filas de conflicto preexistentes.
+- **Limitaciones:** EXPLAIN con volumen actual diminuto (Seq Scan legítimo); repetir con datos reales. Sin evidencia de volumen no se implementa particionamiento (`docs/DATA_GROWTH_PLAN.md` §4).
+- **Pendiente:** EXPLAIN con volumen ≥1k órdenes; retiro de índices redundantes según `docs/PERFORMANCE_INDEXES.md` §3.

@@ -185,5 +185,12 @@ Definir en `CODEOWNERS` o en la descripción del PR quién revisa (actualmente `
 
 - **Fecha:** 2026-10-27 · **Rama:** `feat/audit-hardening` (Fase 3)
 - **Cambios:** §7 nuevo (diagnóstico sync + recuperación DLQ). Flujo real documentado en `docs/ARCHITECTURE.md` §3.2.
-- **Limitaciones:** la lógica server de bulk/fallback está cubierta con DB falsa; la validación contra BD real (upsert idempotente + constraints) se ejecuta en el branch de Supabase `audit-hardening`.
-- **Pendiente:** validar §7.1–§7.3 con datos reales del branch antes del merge a producción.
+- **Limitaciones:** la lógica server de bulk/fallback está cubierta con DB falsa; el upsert idempotente contra BD real se verificó con las UNIQUEs existentes de producción.
+- **Pendiente:** monitorear ratio rejected de `sync.batch` (docs/OBSERVABILITY.md §3) en operación.
+
+## 11. Historial de cambios (Fases 4 y 5 — RPCs, EXCLUDE, observabilidad)
+
+- **Fecha:** 2026-10-27 · **Rama:** `feat/audit-hardening`
+- **Cambios:** migraciones `0024` (5 RPCs transaccionales) y `0025` (EXCLUDE numrange + CHECK; drop trigger traslape) **aplicadas y verificadas en producción el 2026-10-27** (EXCLUDE rechaza traslape `23P01`, acepta contiguos; permisos `EXECUTE` solo `authenticated`). Observabilidad integrada en `withErrorHandler` (correlation ID + logs JSON; ver `docs/OBSERVABILITY.md`).
+- **Limitaciones:** rollback/rotación histórica de credenciales sigue pendiente (§3); EXPLAIN de índices requiere volumen.
+- **Pendiente (manual):** validar los 5 RPC end-to-end con sesión real (login Admin) tras el deploy; monitoreo de logs.

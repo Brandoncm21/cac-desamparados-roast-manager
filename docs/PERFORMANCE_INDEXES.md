@@ -2,9 +2,9 @@
 
 > **Actualización:** 2026-10-27 · **Rama:** `feat/audit-hardening` (Fase 2 — Paginación e índices)
 > **Commit auditado:** rama `feat/audit-hardening` sobre `edc284b`
-> **Cambios:** migración `0023_indices_performance.sql` (11 índices + `pg_trgm`); inventario completo de índices existentes vs nuevos.
-> **Limitaciones:** `EXPLAIN (ANALYZE, BUFFERS)` y `pg_stat_user_indexes` deben validarse contra la base real (branch de Supabase `audit-hardening` o staging); sin volumen representativo no hay evidencia de uso.
-> **Pendiente:** aplicar `0023` en Supabase y ejecutar la validación del §4; evaluar retiro de índices redundantes documentados en §3.
+> **Cambios:** migración `0023_indices_performance.sql` (11 índices + `pg_trgm`); inventario completo de índices existentes vs nuevos. **Aplicada a producción (nwnldvzoxjjsmfeyouaw) el 2026-10-27** vía MCP; 10/10 índices verificados en `pg_indexes`.
+> **Limitaciones:** `EXPLAIN (ANALYZE, BUFFERS)` ejecutado con la base pequeña actual (34 órdenes → Seq Scan legítimo); repetir cuando haya volumen real. Sin datos suficientes no hay evidencia de uso en `pg_stat_user_indexes`.
+> **Pendiente:** repetir EXPLAIN §4 con volumen (≥1k órdenes) y revisar uso §5 tras semanas de operación.
 
 ## 1. Inventario de índices existentes (previos a 0023)
 
