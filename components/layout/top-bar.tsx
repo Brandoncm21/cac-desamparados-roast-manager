@@ -3,8 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Search, Wifi, WifiOff, Bell, User } from "lucide-react";
+import {
+  getDeadLetterCount,
+  reintentarDeadLetter,
+  syncAll,
+} from "@/lib/offline/sync";
+import { Search, Wifi, WifiOff, Bell, User, CloudOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 interface Empleado {
   nombre: string;
@@ -17,10 +23,24 @@ export function TopBar() {
   const pathname = usePathname();
   const [online, setOnline] = useState(true);
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
+  const [dlqCount, setDlqCount] = useState(0);
+
+  const refrescarDlq = async () => {
+    try {
+      setDlqCount(await getDeadLetterCount());
+    } catch {
+      // IndexedDB no disponible (SSR/tests): ignorar
+    }
+  };
 
   useEffect(() => {
     setOnline(navigator.onLine);
-    const handleOnline = () => setOnline(true);
+    refrescarDlq();
+    const handleOnline = () => {
+      setOnline(true);
+      refrescarDlq();
+      syncAll().then(refrescarDlq);
+    };
     const handleOffline = () => setOnline(false);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
@@ -29,6 +49,16 @@ export function TopBar() {
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
+
+  const reintentarPendientes = async () => {
+    const total = await reintentarDeadLetter();
+    await refrescarDlq();
+    if (total > 0) {
+      toast.success(`${total} registro(s) reencolados para sincronizar`);
+    } else {
+      toast.info("No hay registros pendientes de recuperación");
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -90,6 +120,18 @@ export function TopBar() {
             <Bell className="h-5 w-5" />
             <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full" />
           </button>
+          {dlqCount > 0 && (
+            <button
+              onClick={reintentarPendientes}
+              title={`${dlqCount} registro(s) sin sincronizar: clic para reintentar`}
+              className="hover:bg-surface-container-low rounded-full p-2 text-amber-600 transition-colors active:scale-95 relative"
+            >
+              <CloudOff className="h-5 w-5" />
+              <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {dlqCount > 99 ? "99+" : dlqCount}
+              </span>
+            </button>
+          )}
         </div>
 
         <div className="h-8 w-px bg-outline-variant hidden sm:block" />

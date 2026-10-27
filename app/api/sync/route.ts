@@ -1,85 +1,67 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { z } from "zod";
-import { apiOk, apiValidationError, requireRole, withErrorHandler } from "@/lib/api-helpers";
-
-const syncItemSchema = z.object({
-  tempId: z.string(),
-  table: z.enum([
-    "trazabilidad_temperatura", "hitos_termicos", "ajustes_tueste",
-    "metricas_tueste", "servicios_ejecutados",
-  ]),
-  data: z.record(z.string(), z.unknown()),
-});
-
-const syncSchema = z.object({
-  items: z.array(syncItemSchema),
-});
+import {
+  apiOk,
+  apiValidationError,
+  requireRole,
+  withErrorHandler,
+} from "@/lib/api-helpers";
+import { syncBatchSchema } from "@/lib/offline/schemas";
+import {
+  procesarItemsParaSync,
+  type SyncDbLike,
+} from "@/lib/offline/sync-server";
 
 async function post(request: NextRequest) {
   await requireRole(["Admin", "Recepción", "Tostador"]);
   const supabase = await createClient();
-  const body = await request.json();
 
-  const parsed = syncSchema.safeParse(body);
-  if (!parsed.success) return apiValidationError(parsed.error.flatten());
-
-  const idMap: Record<string, number> = {};
-
-  for (const item of parsed.data.items) {
-    if (item.table === "trazabilidad_temperatura") {
-      const { data: existing } = await supabase
-        .from("trazabilidad_temperatura")
-        .select("id_registro")
-        .match({ id_perfil: item.data["id_perfil"], minuto: item.data["minuto"] })
-        .maybeSingle();
-
-      if (existing) {
-        idMap[item.tempId] = existing.id_registro;
-        continue;
-      }
-
-      const { data } = await supabase
-        .from("trazabilidad_temperatura")
-        .insert(item.data as any)
-        .select()
-        .single();
-
-      if (data) idMap[item.tempId] = (data as any).id_registro;
-    } else if (item.table === "hitos_termicos") {
-      const { data: existing } = await supabase
-        .from("hitos_termicos")
-        .select("id_hito")
-        .match({ id_perfil: item.data["id_perfil"], tipo_hito: item.data["tipo_hito"] })
-        .maybeSingle();
-
-      if (existing) {
-        idMap[item.tempId] = existing.id_hito;
-        continue;
-      }
-
-      const { data } = await supabase
-        .from("hitos_termicos")
-        .insert(item.data as any)
-        .select()
-        .single();
-
-      if (data) idMap[item.tempId] = (data as any).id_hito;
-    } else {
-      const { data } = await supabase
-        .from(item.table)
-        .insert(item.data as any)
-        .select()
-        .single();
-
-      if (data) {
-        const [firstKey] = Object.keys(data as Record<string, unknown>);
-        if (firstKey) idMap[item.tempId] = (data as Record<string, unknown>)[firstKey] as number;
-      }
-    }
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return apiValidationError({
+      formErrors: ["Cuerpo JSON inválido"],
+      fieldErrors: {},
+    });
   }
 
-  return apiOk({ idMap });
+  const parsed = syncBatchSchema.safeParse(body);
+  if (!parsed.success) return apiValidationError(parsed.error.flatten());
+
+  // Adaptador mínimo: supabase-js no expone un tipo estable para tablas
+  // dinámicas con upsert tipado, por eso se adapta a SyncDbLike aquí.
+  const db: SyncDbLike = {
+    from: (table: string) => {
+      const base = supabase.from(table as never);
+      return {
+        upsert: (rows, opts) => ({
+          select: (cols: string) =>
+            base
+              .upsert(rows as never, opts)
+              .select(cols) as unknown as Promise<{
+              data: Record<string, unknown>[] | null;
+              error: { code?: string; message: string } | null;
+            }>,
+        }),
+        insert: (row) => ({
+          select: (cols: string) => ({
+            maybeSingle: () =>
+              base
+                .insert(row as never)
+                .select(cols)
+                .maybeSingle() as unknown as Promise<{
+                data: Record<string, unknown> | null;
+                error: { code?: string; message: string } | null;
+              }>,
+          }),
+        }),
+      };
+    },
+  };
+
+  const resultado = await procesarItemsParaSync(db, parsed.data.items);
+  return apiOk(resultado);
 }
 
 export const POST = withErrorHandler(post);

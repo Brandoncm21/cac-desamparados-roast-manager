@@ -138,7 +138,12 @@ GET /api/ordenes?page=2&pageSize=10&estado=Pendiente&search=juan
 
 **`POST /api/perfiles-tueste/[id]/temperaturas`** — bulk upsert con `onConflict: "id_perfil, minuto"` ([`app/api/perfiles-tueste/[id]/temperaturas/route.ts:35-50`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/api/perfiles-tueste/[id]/temperaturas/route.ts#L35-L50)), validado por `bulkTemperaturasSchema` (`temperatura 70-220`).
 
-**`POST /api/sync`** — [`app/api/sync/route.ts:6-84`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/api/sync/route.ts#L6-L84) — cola offline: `POST {items: [{tempId, table, data}]}` con `table` enum (`trazabilidad_temperatura`, `hitos_termicos`, `ajustes_tueste`, `metricas_tueste`, `servicios_ejecutados`). Respuesta `{idMap}`.
+**`POST /api/sync`** — [`app/api/sync/route.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/api/sync/route.ts) — cola offline (Fase 3, rama `feat/audit-hardening`).
+- Auth: `requireRole(["Admin","Recepción","Tostador"])`.
+- Request: `POST {items: [{tempId, table, data}]}` — `items` 1–500; `table` enum de 5 tablas; `data` validado con Zod **específico por tabla** (tipos, IDs, rangos: temperatura 70–220, minuto ≥ 0, etc.). JSON malformado o batch inválido → 422.
+- Flujo server: validación por item → agrupación por tabla → **bulk upsert** con `onConflict` (claves naturales) + dedupe last-write-wins; si el bulk falla, waterfall por item para aislar el error. `servicios_ejecutados` (legacy, sin clave natural) se inserta por item.
+- Response 200: `{data: {accepted: [{tempId, recordId}], rejected: [{tempId, code, message}]}}` con `code` en `VALIDATION_ERROR|CONFLICT|FOREIGN_KEY|CHECK_VIOLATION|NOT_NULL|DB_ERROR`.
+- Idempotencia: reprocesar el mismo batch no duplica (upsert sobre UNIQUEs existentes).
 
 ## 3. Códigos de Error Comunes
 
