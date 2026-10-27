@@ -24,12 +24,17 @@
 | `NEXT_PUBLIC_SUPABASE_URL` | Público (cliente+servidor) | [`lib/env-client.ts:3`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/env-client.ts#L3) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Público | [`lib/env-server.ts:7`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/env-server.ts#L7) |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Server-only** | [`lib/supabase/service-role.ts:12`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/service-role.ts#L12) — nunca `NEXT_PUBLIC_*` |
+| `DATABASE_URL` | **Server-only** (scripts/CLI locales) | `scripts/apply-migration.mjs` — solo vía `process.env`, nunca hardcodeado |
+| `SUPABASE_PROJECT_REF` / `SUPABASE_DB_PASSWORD` | **Server-only** (scripts locales) | `scripts/apply-migration.mjs` — solo vía `process.env` |
+| `SUPABASE_MCP_TOKEN` | **Solo entorno local** (tooling OpenCode, no app) | `opencode.json` lo referencia como `{env:SUPABASE_MCP_TOKEN}` — nunca el valor en el repo |
 
 ### 2.2 Reglas
 
 - **Nunca** exponer `SUPABASE_SERVICE_ROLE_KEY` en props, JSON, logs, headers o variables `NEXT_PUBLIC_*`.
 - **Nunca** importar `service-role.ts` desde `components/` o código `"use client"`.
 - Uso correcto: `import { createAdminClient } from "@/lib/supabase/service-role"` solo en `app/api/**` tras `requireRole(["Admin"])`.
+- **Nunca** hardcodear `DB_PASSWORD`, `PROJECT_REF`, tokens `sbp_*` ni passwords en connection strings dentro de archivos rastreados por git. Todo secreto vive en `.env.local` (ignorado) o en variables del shell (`SUPABASE_MCP_TOKEN` para tooling MCP).
+- El identificador de proyecto en query params (`?project_ref=...` en la config MCP) es un identificador funcional, no un secreto; el scanner lo ignora deliberadamente en ese contexto pero reporta asignaciones y URLs de dashboard con valores reales.
 
 ### 2.3 `check-secrets`
 
@@ -37,7 +42,7 @@
 npm run check-secrets  # también corre como prebuild
 ```
 
-Detecta: `NEXT_PUBLIC_*SERVICE_ROLE` en `.env*` versionados y `process.env`, y literales `eyJ...` hardcodeados en `app/`, `lib/`, `components/`. Falla con exit 1 sin imprimir valores.
+Cobertura (scripts/check-secrets.mjs): `NEXT_PUBLIC_*SERVICE_ROLE` en `.env*` versionados y `process.env`; literales `eyJ...` de service role; tokens `sbp_*`; `DB_PASSWORD`/`DATABASE_URL` con valor real; `PROJECT_REF` con valor real (asignaciones y URLs de dashboard); connection strings postgres con password embebido. Alcance: `app/`, `lib/`, `components/`, `middleware.ts`, `scripts/`, `docs/`, `.specify/`, `README.md`, `CHANGELOG.md`, `opencode.json`, `.env.example`. Excluye `__tests__`/`__fixtures__`, ignora placeholders (`your_*`, `xxxx`, `<...>`, `changeme`) y lecturas `process.env.*`. Falla con exit 1 sin imprimir valores.
 
 ## 3. Cookies y Sesión
 
@@ -52,7 +57,8 @@ Detecta: `NEXT_PUBLIC_*SERVICE_ROLE` en `.env*` versionados y `process.env`, y l
 
 | # | Riesgo | Impacto | Recomendación | Estado |
 |---|--------|---------|---------------|--------|
-| 1 | `scripts/apply-migration.mjs` con `PROJECT_REF` y `DB_PASSWORD` hardcodeados en historial git | **Alto** — acceso a DB si se filtra | Rotar `DB_PASSWORD` en Supabase Dashboard → mover a `DATABASE_URL` en `.env.local` → `git filter-repo` + force-push coordinado. **No imprimir valores en docs/PR** | Pendiente — ver `docs/RUNBOOK.md#rotacion` |
+| 1 | `DB_PASSWORD`/`PROJECT_REF` hardcodeados en `scripts/apply-migration.mjs` (valores vivos en historial git) | **Alto** — acceso a DB si se filtra | Valores eliminados del working tree (script ahora solo lee `process.env`); `check-secrets` cubre `scripts/`/`docs/`. **Pendiente manual:** rotar `DB_PASSWORD` en Dashboard y reescribir historial con `git filter-repo` + force-push coordinado (requiere autorización explícita; aún no ejecutado). **No imprimir valores en docs/PR** | Parcialmente mitigado — ver `docs/RUNBOOK.md#rotacion` |
+| 1b | Token de management API `sbp_*` en `opencode.json` local (archivo gitignorado, nunca rastreado) | **Medio** — el valor existió en texto plano local y en historiales de conversación | Token movido a variable de entorno (`opencode.json` usa `{env:SUPABASE_MCP_TOKEN}`). **Recomendado:** revocar el token anterior en Dashboard → Account → Access Tokens, crear uno nuevo y exportarlo en el shell (`export SUPABASE_MCP_TOKEN=...`) antes de iniciar OpenCode. Sin esta variable, el MCP Supabase falla la autenticación | Parcialmente mitigado |
 | 2 | 2 empleados en `seed.sql` con `id_auth = null` (María, Pedro) | Medio — no pueden loguearse ni resolver rol | Crear usuarios Auth y vincular `id_auth`, o documentar que solo Admin/Tostador están operativos | Documentado en `docs/SETUP_AND_RUN.md` |
 | 3 | 12 vulnerabilidades `npm audit` (postcss, sharp, undici) | Medio | `npm audit fix` cuando `next@16.3.1` sea compatible; CI con `continue-on-error: true` hasta resolver | Tracking en CI |
 | 4 | `middleware` deprecation (`middleware.ts` → `proxy.ts` en Next 16) | Bajo | Migrar a `proxy.ts` según https://nextjs.org/docs/messages/middleware-to-proxy | Backlog |
@@ -60,7 +66,7 @@ Detecta: `NEXT_PUBLIC_*SERVICE_ROLE` en `.env*` versionados y `process.env`, y l
 
 ## 5. Checklist de Verificación
 
-- [ ] `npm run check-secrets` pasa (0 `NEXT_PUBLIC_*SERVICE_ROLE`, 0 literales)
+- [ ] `npm run check-secrets` pasa (0 secretos en código/docs/scripts rastreados)
 - [ ] `npm run typecheck` y `npm run lint` sin errores (warnings documentados)
 - [ ] `npm run test:coverage` ejecutado y % anotado en `docs/TESTS_AND_CI.md`
 - [ ] CI verde: `gitleaks` sin hallazgos, `audit` revisado
@@ -68,9 +74,18 @@ Detecta: `NEXT_PUBLIC_*SERVICE_ROLE` en `.env*` versionados y `process.env`, y l
 - [ ] RLS verificado: `SELECT` como `authenticated` + `deleted_at IS NULL`, escritura por rol
 - [ ] Cookies: `httpOnly` no forzado, `secure` en prod, `sameSite:lax`
 - [ ] Service role solo vía `admin.ts` + `requireRole`
+- [ ] `SUPABASE_MCP_TOKEN` exportada en el shell (tooling MCP); valor nunca en el repo
 
 ## 6. Referencias
 
 - Supabase SSR: https://supabase.com/docs/guides/auth/server-side
 - OWASP Cookie flags: https://owasp.org/www-community/controls/SecureCookieAttribute
 - Gitleaks: https://github.com/gitleaks/gitleaks
+- OpenCode MCP env vars: https://opencode.ai/docs/mcp-servers/
+
+## 7. Historial de cambios (Fase 1 — Seguridad)
+
+- **Fecha:** 2026-10-27 · **Rama:** `feat/audit-hardening` (Fase 1)
+- **Cambios:** `apply-migration.mjs` sin valores hardcodeados (solo `process.env`); `check-secrets.mjs` ampliado a `scripts/`, `docs/`, `.specify/`, `README.md`, `CHANGELOG.md`, `opencode.json`, `.env.example` con patrones `sbp_*`, `DB_PASSWORD`/`DATABASE_URL`, `PROJECT_REF`, URLs de dashboard y connection strings (+12 tests); token MCP movido a `{env:SUPABASE_MCP_TOKEN}`; `.env.example` con placeholders de `DATABASE_URL`/`PROJECT_REF`/`DB_PASSWORD`.
+- **Limitaciones:** el scanner no detecta secretos ya rotados en binarios ni fuera de las extensiones escaneadas; `gitleaks` en CI sigue siendo la segunda línea.
+- **Pendiente (manual):** rotar `DB_PASSWORD` y revocar token `sbp_*` expuesto; reescribir historial con `git filter-repo` solo con autorización explícita del equipo.

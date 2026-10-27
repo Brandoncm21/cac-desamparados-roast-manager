@@ -63,7 +63,7 @@ Para datos: restaurar desde backup de Supabase (Dashboard → Database → Backu
 
 ### 3.1 Caso Histórico Detectado
 
-`scripts/apply-migration.mjs` contenía `PROJECT_REF` y `DB_PASSWORD` hardcodeados en el historial git (ver [`CHANGELOG.md`](../CHANGELOG.md) y [`docs/SECURITY.md`](./SECURITY.md)). **No imprimir valores.**
+`scripts/apply-migration.mjs` contenía `PROJECT_REF` y `DB_PASSWORD` hardcodeados (**siguen vivos en el historial git**). Además, el `opencode.json` local (gitignorado, nunca rastreado) contenía un token `sbp_*` en texto plano. Los valores fueron eliminados del working tree (scripts solo leen `process.env`, MCP usa `{env:SUPABASE_MCP_TOKEN}`). **No imprimir valores.**
 
 ### 3.2 Pasos de Rotación
 
@@ -74,16 +74,21 @@ Para datos: restaurar desde backup de Supabase (Dashboard → Database → Backu
 # 2. Actualizar .env.local y secretos del provider/CI
 #    DATABASE_URL=postgresql://postgres:<NUEVA_PASSWORD>@db.<ref>.supabase.co:5432/postgres
 
-# 3. Mover credenciales de apply-migration.mjs a env
-#    Editar scripts/apply-migration.mjs para leer process.env.DATABASE_URL
-#    (no commitear valores)
+# 3. (Hecho en código) scripts/apply-migration.mjs ya lee process.env
+#    DATABASE_URL (prioridad) o SUPABASE_PROJECT_REF + SUPABASE_DB_PASSWORD
+#    (no commitear valores). Variables documentadas en .env.example.
 
-# 4. Reescribir historial (coordinar con equipo, requiere force-push)
+# 4. Revocar el token sbp_* anterior por higiene (estuvo en texto plano local):
+#    Dashboard → Account → Access Tokens → revocar, crear uno nuevo y exportarlo:
+export SUPABASE_MCP_TOKEN="<nuevo-token>"  # nunca commitear este valor
+#    Sin esta variable, el MCP Supabase falla la autenticación.
+
+# 5. Reescribir historial (coordinar con equipo, requiere autorización explícita)
 git filter-repo --path scripts/apply-migration.mjs --invert-paths  # o --replace-text con regex
 # Alternativa: BFG Repo-Cleaner
 git push --force-with-lease origin main  # ¡avisar al equipo!
 
-# 5. Rotar SUPABASE_SERVICE_ROLE_KEY si estuvo expuesta
+# 6. Rotar SUPABASE_SERVICE_ROLE_KEY si estuvo expuesta
 #    Dashboard → Project Settings → API → Reset service_role key → actualizar envs
 ```
 
@@ -143,3 +148,10 @@ console.log('ordenes count (service_role):', count);
 ## 7. Contacto y Escalamiento
 
 Definir en `CODEOWNERS` o en la descripción del PR quién revisa (actualmente `@owner` / revisión manual).
+
+## 8. Historial de cambios (Fase 1 — Seguridad)
+
+- **Fecha:** 2026-10-27 · **Rama:** `feat/audit-hardening` (Fase 1)
+- **Cambios:** §3 actualizado al estado remediado (script env-only, token MCP por entorno, pasos manuales 1/2/4/5/6 pendientes).
+- **Limitaciones:** la rotación efectiva y la reescritura del historial son manuales y requieren coordinación del equipo.
+- **Pendiente (manual):** rotar `DB_PASSWORD`, revocar token `sbp_*`, `git filter-repo` con autorización explícita.
