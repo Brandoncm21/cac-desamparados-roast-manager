@@ -2,19 +2,35 @@ import { NextRequest } from "next/server";
 import { createAdminClientWithRoleCheck } from "@/lib/supabase/admin";
 import { crearServicioSchema } from "@/lib/schemas/servicios-maestro";
 import { apiOk, apiError, apiValidationError, withErrorHandler } from "@/lib/api-helpers";
+import { apiPaginado, parsePaginacion, sanitizarBusqueda } from "@/lib/pagination";
 
-async function get(_request: NextRequest) {
+async function get(request: NextRequest) {
   const { supabase } = await createAdminClientWithRoleCheck(["Admin"]);
-  const { data, error } = await supabase
-    .from("servicios_maestro")
-    .select(`
-      *,
-      servicio_precios(id_precio, precio_por_kg, min_weight_kg, max_weight_kg, activo, created_at)
-    `)
-    .order("prioridad");
+  const { searchParams } = new URL(request.url);
 
+  const paginacion = parsePaginacion(searchParams);
+  if (!paginacion.success) return apiValidationError(paginacion.error.flatten());
+
+  const { page, pageSize } = paginacion.data;
+  const from = (page - 1) * pageSize;
+  const to = page * pageSize - 1;
+  const busqueda = sanitizarBusqueda(searchParams.get("search"));
+
+  let query = supabase
+    .from("servicios_maestro")
+    .select(
+      `id_servicio_maestro, nombre, descripcion, tipo, prioridad, activo, created_at, updated_at,
+      servicio_precios(id_precio, precio_por_kg, min_weight_kg, max_weight_kg, activo, created_at)`,
+      { count: "exact" }
+    )
+    .order("prioridad")
+    .range(from, to);
+
+  if (busqueda) query = query.ilike("nombre", `%${busqueda}%`);
+
+  const { data, count, error } = await query;
   if (error) return apiError(error.message, 500);
-  return apiOk(data);
+  return apiPaginado(data ?? [], count ?? 0, page, pageSize);
 }
 
 async function post(request: NextRequest) {

@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { Search, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,47 +32,63 @@ function precioVigente(empaque: Empaque): number | null {
 }
 
 export default function AdminEmpaquesPage() {
-  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [empaques, setEmpaques] = useState<Empaque[]>([]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      const { data, error } = await supabase
-        .from("empaques")
-        .select(`
-          *,
-          empaque_precios(precio, valid_from, valid_to)
-        `)
-        .order("nombre");
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-      if (error) {
-        toast.error("Error al cargar empaques: " + error.message);
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+
+      const res = await fetch(`/api/admin/empaques?${params.toString()}`);
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(
+          "Error al cargar empaques: " + (result.error?.message || "Error desconocido")
+        );
       } else {
-        setEmpaques(data as unknown as Empaque[]);
+        setEmpaques(result.data ?? []);
+        setTotalItems(result.pagination?.total ?? 0);
       }
       setLoading(false);
     };
     load();
-  }, [supabase]);
+  }, [debouncedSearch, page, pageSize]);
 
-  const filtrados = empaques.filter((e) => e.nombre.toLowerCase().includes(search.toLowerCase()));
+  const totalPages = Math.ceil(totalItems / pageSize);
 
   const desactivar = async (id: number, nombre: string) => {
     if (!window.confirm(`¿Desactivar el empaque "${nombre}"? Los datos históricos se preservan.`)) return;
-    const { error } = await supabase
-      .from("empaques")
-      .update({ activo: false })
-      .eq("id_empaque", id);
 
-    if (error) {
-      toast.error("Error al desactivar empaque: " + error.message);
+    const res = await fetch(`/api/admin/empaques/${id}`, { method: "DELETE" });
+    const result = await res.json();
+    if (!res.ok) {
+      toast.error(
+        "Error al desactivar empaque: " + (result.error?.message || "Error desconocido")
+      );
       return;
     }
     toast.success("Empaque desactivado");
     setEmpaques((prev) => prev.map((e) => (e.id_empaque === id ? { ...e, activo: false } : e)));
+    setPage(1);
   };
 
   return (
@@ -102,7 +118,7 @@ export default function AdminEmpaquesPage() {
         <CardContent>
           {loading ? (
             <p className="text-muted-foreground">Cargando...</p>
-          ) : filtrados.length === 0 ? (
+          ) : empaques.length === 0 ? (
             <p className="text-muted-foreground">No hay empaques registrados.</p>
           ) : (
             <Table>
@@ -116,7 +132,7 @@ export default function AdminEmpaquesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtrados.map((e) => (
+                {empaques.map((e) => (
                   <TableRow key={e.id_empaque}>
                     <TableCell className="font-medium">{e.nombre}</TableCell>
                     <TableCell>{e.capacidad_kg ?? "—"}</TableCell>
@@ -147,6 +163,15 @@ export default function AdminEmpaquesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Pagination
+        currentPage={page}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={totalItems}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 }

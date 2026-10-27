@@ -2,23 +2,35 @@ import { NextRequest } from "next/server";
 import { createAdminClientWithRoleCheck } from "@/lib/supabase/admin";
 import { crearPrecioEmpaqueSchema } from "@/lib/schemas/servicios-maestro";
 import { apiOk, apiError, apiValidationError, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
+import { apiPaginado, parsePaginacion } from "@/lib/pagination";
 
 async function get(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { supabase } = await createAdminClientWithRoleCheck(["Admin"]);
   const { id } = await params;
   const empaqueId = validateIdParam(id);
+  const { searchParams } = new URL(request.url);
 
-  const { data, error } = await supabase
+  const paginacion = parsePaginacion(searchParams);
+  if (!paginacion.success) return apiValidationError(paginacion.error.flatten());
+
+  const { page, pageSize } = paginacion.data;
+  const from = (page - 1) * pageSize;
+  const to = page * pageSize - 1;
+
+  const { data, count, error } = await supabase
     .from("empaque_precios")
-    .select("id_precio, precio, valid_from, valid_to, creado_por, created_at")
+    .select("id_precio, precio, valid_from, valid_to, creado_por, created_at", {
+      count: "exact",
+    })
     .eq("id_empaque", empaqueId)
-    .order("valid_from", { ascending: false });
+    .order("valid_from", { ascending: false })
+    .range(from, to);
 
   if (error) return apiError(error.message, 500);
-  return apiOk(data);
+  return apiPaginado(data ?? [], count ?? 0, page, pageSize);
 }
 
 async function post(

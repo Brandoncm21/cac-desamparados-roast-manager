@@ -52,6 +52,26 @@ Helpers: [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desampa
 
 ## 2. Detalle por Grupo
 
+### 2.0 Paginación de listados (Fase 2, rama `feat/audit-hardening`)
+
+Todos los listados responden `{ data: [...], pagination: { page, pageSize, total, totalPages } }` vía `apiPaginado` ([`lib/pagination.ts`](../../lib/pagination.ts)).
+
+```http
+GET /api/ordenes?page=2&pageSize=10&estado=Pendiente&search=juan
+```
+```json
+{
+  "data": [{ "id_orden": 12, "numero_factura": "F-0012", "...": "..." }],
+  "pagination": { "page": 2, "pageSize": 10, "total": 95, "totalPages": 10 }
+}
+```
+
+- `page`: entero ≥ 1 (default 1). `pageSize`: entero 1–100 (default 25). Fuera de rango o no numérico → **422** con `{ error: { code, message, issues } }`.
+- `search`: término sanitizado server-side (se eliminan `,%()` que romperían la sintaxis `.or()` de PostgREST).
+- Filtros validados con Zod por endpoint (`estado` enum, `cliente` entero positivo, `desde`/`hasta` `YYYY-MM-DD`, `rol` enum). Inválidos → **422**.
+- Orden determinista en todos los listados (`ORDER BY` + PK de desempate) para páginas estables.
+- Listados paginados: `/api/ordenes`, `/api/clientes`, `/api/empleados`, `/api/admin/servicios`, `/api/admin/empaques`, `/api/admin/empaques/[id]/precios`.
+
 ### 2.1 Zonas y Empleados
 
 **`GET /api/zonas`** — [`app/api/zonas/route.ts:5-15`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/api/zonas/route.ts#L5-L15)
@@ -63,11 +83,14 @@ Helpers: [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desampa
 - Body: `{ nombre: string }` (trim, requerido)
 - Response 201: `{ data: { id_zona, nombre } }`
 
-**`GET /api/empleados?rol=Admin`** — [`app/api/empleados/route.ts:5-21`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/api/empleados/route.ts#L5-L21)
+**`GET /api/empleados?rol=Admin`** — [`app/api/empleados/route.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/api/empleados/route.ts)
 - Auth: `requireRole(["Admin","Recepción"])`
-- Query: `rol` opcional
+- Query: `rol` opcional (enum `Operador|Tostador|Recepción|Admin`; inválido → 422), `page`/`pageSize` (ver §2.0)
+- Proyección explícita: `id_empleado, nombre, rol, activo`; orden `nombre`; respuesta paginada
 
 ### 2.2 Clientes
+
+**`GET /api/clientes?search=juan&page=1&pageSize=10`** — paginado (ver §2.0); `search` sanitizado y aplicado a `nombre_completo` y `telefono` (`ilike`); proyección explícita; orden `nombre_completo`.
 
 **`POST /api/clientes`** — [`app/api/clientes/route.ts:29-45`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/api/clientes/route.ts#L29-L45)
 - Auth: `requireRole(["Admin","Recepción"])`
@@ -87,7 +110,7 @@ Helpers: [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desampa
 - Flujo: inserta en `ordenes_trabajo` → `crearPasosOrden` (obtiene prioridades de `servicios_maestro`, ordena estable) → inserta `especificaciones_orden` si hay datos.
 - Rollback manual si falla `crearPasosOrden`.
 
-**`GET /api/ordenes?estado=Pendiente&cliente=1`** — lista con join `clientes(nombre_completo)`.
+**`GET /api/ordenes?estado=Pendiente&cliente=1&search=F-00`** — paginado (ver §2.0); join `clientes(nombre_completo)`; filtros `estado|cliente|desde|hasta` validados con Zod; `search` sanitizado sobre `numero_factura` y `clientes.nombre_completo`; proyección explícita; orden `fecha_orden DESC, id_orden DESC` (determinista).
 
 **`PUT /api/ordenes/[id]`** — `Recepción, Tostador, Admin` con `actualizarOrdenSchema`.
 
@@ -97,6 +120,12 @@ Helpers: [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desampa
 - Resuelve tarifa con [`lib/services/resolver-tarifa.ts:9`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/services/resolver-tarifa.ts#L9) (`pesoKg >= min && pesoKg < max`)
 
 ### 2.4 Servicios/Empaques Maestros (Admin)
+
+**`GET /api/admin/servicios?page=1&pageSize=10&search=tueste`** — paginado (ver §2.0); `search` opcional (`ilike` en `nombre`); proyección explícita + `servicio_precios(...)`; orden `prioridad`.
+
+**`GET /api/admin/empaques?page=1&pageSize=10&search=bolsa`** — paginado (ver §2.0); `search` opcional; proyección explícita + `empaque_precios(precio, valid_from, valid_to)`; orden `nombre`.
+
+**`GET /api/admin/empaques/[id]/precios`** — historial de precios paginado (ver §2.0); orden `valid_from DESC`.
 
 **`POST /api/admin/servicios`** — [`app/api/admin/servicios/route.ts:20-62`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/api/admin/servicios/route.ts#L20-L62)
 - Auth: `createAdminClientWithRoleCheck(["Admin"])`
