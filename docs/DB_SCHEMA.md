@@ -28,14 +28,27 @@
 - **Soft delete:** `deleted_at TIMESTAMPTZ` en `clientes`, `ordenes_trabajo`, `perfiles_tueste`, `empleados`; políticas RLS filtran `deleted_at IS NULL` ([`0012_update_rls_soft_delete.sql:21`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0012_update_rls_soft_delete.sql#L21)).
 - **Talonario:** `numero_factura` auto-incremental con función `next_numero_factura()` ([`0005_talonario_auto.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0005_talonario_auto.sql)).
 - **Unique constraints:** `servicios_ejecutados(id_orden, tipo_servicio, empaque_id)` permite mismo servicio con distintos empaques ([`0010_add_unique_constraints.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0010_add_unique_constraints.sql)).
-- **Intervalos:** trigger `trg_no_solape_intervalos` valida que `[peso_min, peso_max)` no se solapen por servicio ([`0019_flujo_secuencial_tarifas_intervalo.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0019_flujo_secuencial_tarifas_intervalo.sql) + validación Zod en [`lib/schemas/servicios-maestro.ts:12-64`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/schemas/servicios-maestro.ts#L12-L64)).
+- **Intervalos (Fase 4):** la constraint declarativa `servicio_precios_no_traslape` (`EXCLUDE USING gist` con `numrange(min,max,'[)')`, solo `activo=true`, [`0025_tarifas_exclusion.sql`](../../supabase/migrations/0025_tarifas_exclusion.sql)) reemplazó al trigger check-then-insert, que tenía race condition bajo concurrencia. Semántica preservada: min inclusivo, max exclusivo, `NULL` = sin límite. CHECK `servicio_precios_rango_valido` (`min >= 0` y `max > min` o NULL). La validación Zod previa se mantiene ([`lib/schemas/servicios-maestro.ts:12-64`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/schemas/servicios-maestro.ts#L12-L64)).
+- **Índices de performance (Fase 2):** 10 índices nuevos en [`0023_indices_performance.sql`](../../supabase/migrations/0023_indices_performance.sql) — listado activo de órdenes por fecha, filtros estado/cliente, trigram `pg_trgm` para búsquedas `ilike` de clientes, catálogos activos por nombre, primer paso pendiente parcial y FKs de `orden_pasos`. Motivo y validación `EXPLAIN`: [`docs/PERFORMANCE_INDEXES.md`](./PERFORMANCE_INDEXES.md).
 
 ## 3. Triggers
 
 | Trigger | Tabla | Función |
 |---------|-------|---------|
-| `trg_no_solape_intervalos` | `servicio_precios` | Rechaza `INSERT/UPDATE` si `peso_min < max_existente && max > min_existente` |
+| ~~`trg_no_solape_intervalos`~~ | `servicio_precios` | **Eliminado en 0025** — reemplazado por la constraint EXCLUDE declarativa |
 | `trg_orden_pasos_prioridad` | `orden_pasos` | Valida secuencia por `prioridad` |
+
+## 3bis. RPCs transaccionales (Fase 4, [`0024_rpc_transaccionales.sql`](../../supabase/migrations/0024_rpc_transaccionales.sql))
+
+| RPC | Firma | Atomicidad | Permisos |
+|---|---|---|---|
+| `crear_orden_completa` | `(p_orden jsonb, p_servicios jsonb, p_especificaciones jsonb) → jsonb` | orden + orden_pasos + especificaciones_orden | INVOKER; rol `Admin/Recepción` interno; `GRANT EXECUTE TO authenticated` (revocado de PUBLIC/anon) |
+| `crear_servicio_con_precios` | `(p_servicio jsonb, p_intervalos jsonb) → jsonb` | servicios_maestro + servicio_precios | INVOKER; rol `Admin` interno |
+| `actualizar_servicio_con_precios` | `(p_id_servicio int, p_datos jsonb, p_intervalos jsonb) → jsonb` | maestro + desactivación/reemplazo atómico de intervalos | ídem |
+| `cerrar_paso_orden` | `(p_id_paso int, p_peso_final_kg numeric, p_empaque_id int, p_observaciones text) → jsonb` | paso + cierre de orden si no quedan pendientes; `SELECT ... FOR UPDATE` | INVOKER; `Admin/Recepción/Tostador` |
+| `confirmar_tueste_paso` | `(p_id_paso int, p_peso_final_kg numeric, p_observaciones text) → jsonb` | ídem (rama tueste) | ídem |
+
+Notas: corrige el bug de código que consultaba `empleados.auth_user_id` (columna real: `id_auth`); RLS se mantiene (SECURITY INVOKER); sin tabla de recibos de sync — idempotencia por claves naturales + UNIQUEs; la dead-letter queue vive en IndexedDB del cliente (sin tabla server).
 
 ## 4. Row Level Security (RLS)
 
@@ -82,3 +95,10 @@ orden_pasos *--1 servicio_precios (tarifa_id)
 empaques 1--* empaque_precios (valid_from/valid_to)
 perfiles_tueste 1--* trazabilidad_temperatura / hitos / metricas / ajustes
 ```
+
+## 8. Historial de cambios (Fases 2 y 4 — Índices, RPCs y constraints)
+
+- **Fecha:** 2026-10-27 · **Rama:** `feat/audit-hardening`
+- **Cambios:** migraciones `0023_indices_performance.sql` (10 índices + pg_trgm), `0024_rpc_transaccionales.sql` (5 RPCs), `0025_tarifas_exclusion.sql` (btree_gist + EXCLUDE numrange + CHECK, drop del trigger anti-solape).
+- **Limitaciones:** migraciones creadas en el repo; aplicar en branch de Supabase y validar EXPLAIN real antes de producción (§RUNBOOK). Sin evidencia de volumen no se implementa particionamiento (`docs/DATA_GROWTH_PLAN.md` §4).
+- **Pendiente:** aplicar y validar en Supabase; retirar índices redundantes según `docs/PERFORMANCE_INDEXES.md` §3.

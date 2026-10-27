@@ -14,6 +14,7 @@
 | **Cookies** | `applySecureCookies` preserva `httpOnly` del upstream (Supabase SSR requiere JS-legible), `secure` en prod, `sameSite:lax`, `Cache-Control: private, no-store` | [`lib/cookies.ts:24-70`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/cookies.ts#L24-L70) |
 | **Secret Scanning** | `scripts/check-secrets.mjs` (pre-build) + `gitleaks` en CI | [`scripts/check-secrets.mjs`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/scripts/check-secrets.mjs), [`.github/workflows/ci.yml:36,65`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/.github/workflows/ci.yml#L36) |
 | **Hidratación** | Strip de `bis_skin_checked` (Bitdefender) con `MutationObserver({attributes:true})` | [`app/layout.tsx:50-71`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/layout.tsx#L50-L71) |
+| **RPCs transaccionales** | Escrituras multi-tabla atómicas SECURITY INVOKER con rol interno y EXECUTE solo `authenticated` (revocado de PUBLIC/anon) | [`supabase/migrations/0024_rpc_transaccionales.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0024_rpc_transaccionales.sql) (Fase 4) |
 
 ## 2. Gestión de Secretos
 
@@ -89,3 +90,9 @@ Cobertura (scripts/check-secrets.mjs): `NEXT_PUBLIC_*SERVICE_ROLE` en `.env*` ve
 - **Cambios:** `apply-migration.mjs` sin valores hardcodeados (solo `process.env`); `check-secrets.mjs` ampliado a `scripts/`, `docs/`, `.specify/`, `README.md`, `CHANGELOG.md`, `opencode.json`, `.env.example` con patrones `sbp_*`, `DB_PASSWORD`/`DATABASE_URL`, `PROJECT_REF`, URLs de dashboard y connection strings (+12 tests); token MCP movido a `{env:SUPABASE_MCP_TOKEN}`; `.env.example` con placeholders de `DATABASE_URL`/`PROJECT_REF`/`DB_PASSWORD`.
 - **Limitaciones:** el scanner no detecta secretos ya rotados en binarios ni fuera de las extensiones escaneadas; `gitleaks` en CI sigue siendo la segunda línea.
 - **Pendiente (manual):** rotar `DB_PASSWORD` y revocar token `sbp_*` expuesto; reescribir historial con `git filter-repo` solo con autorización explícita del equipo.
+
+## 8. Acceso directo desde cliente: estado (Fase 4)
+
+- Las escrituras del navegador se migraron a API (PATCH estado de orden, POST perfiles de tueste, PUT contexto de perfil, POST hitos bulk; sync vía `POST /api/sync`).
+- Lecturas directas **conservadas intencionalmente** (documentadas en `docs/ARCHITECTURE.md` §3.2 y `docs/LEGACY_MIGRATION_PLAN.md`): auth (`getUser/signOut`), cargas de formularios (catálogos pequeños), lecturas del módulo de tueste con fallback offline (IndexedDB), dashboard stats y select-orden-dialog. RLS limita todo acceso directo a filas visibles por rol.
+- Riesgo residual: un atacante autenticado puede escribir directamente vía PostgREST lo que sus políticas RLS permitan; `requireRole` añade la capa de negocio en la API, pero RLS es el límite duro real. Mitigación activa: políticas con `WITH CHECK` revisadas (0014/0016).

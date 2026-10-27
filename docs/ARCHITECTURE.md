@@ -93,6 +93,13 @@ Respuesta {data: {accepted: [{tempId, recordId}], rejected: [{tempId, code, mess
 ### 4.3 Manejo de Errores
 `AppError` tipado con `code` y `status` ([`lib/error-handler.ts:1-60`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/error-handler.ts#L1-L60)), `handleApiError` centraliza 401/403/422/500, `withErrorHandler` envuelve handlers.
 
+### 4.3bis Transacciones (Fase 4, rama `feat/audit-hardening`)
+- Las escrituras multi-tabla son **funciones SQL atómicas** (`supabase/migrations/0024_rpc_transaccionales.sql`): `crear_orden_completa`, `crear_servicio_con_precios`, `actualizar_servicio_con_precios`, `cerrar_paso_orden`, `confirmar_tueste_paso`.
+- `SECURITY INVOKER` (RLS intacto) + verificación de rol interna vía `get_empleado_rol()` + `EXECUTE` solo para `authenticated`.
+- Los Route Handlers validan con Zod en la frontera y llaman a la RPC — **sin rollbacks manuales** ni estados parciales.
+- El anti-solape de tarifas es la constraint declarativa `servicio_precios_no_traslape` (`EXCLUDE USING gist` + `numrange`, `0025`) — sin race condition.
+- Orquestador TS eliminado (lo suplantaron las RPCs); `resolver_tarifa_por_peso()` SQL existe pero la resolución en TS (iniciar) se mantiene por ahora (documento: divergencia aceptada, revisar en E4 de `docs/LEGACY_MIGRATION_PLAN.md`).
+
 ### 4.4 Hidratación y Cookies
 - **Hidratación:** script inline en [`app/layout.tsx:50-72`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/layout.tsx#L50-L72) elimina `bis_skin_checked` (extensión Bitdefender) con `MutationObserver({attributes:true, attributeFilter:["bis_skin_checked"]})`.
 - **Cookies:** [`lib/cookies.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/cookies.ts) preserva `httpOnly` del upstream (Supabase SSR requiere cookies legibles por JS para `createBrowserClient`).

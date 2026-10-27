@@ -6,6 +6,7 @@ import {
   requireRole,
   withErrorHandler,
 } from "@/lib/api-helpers";
+import { logEvent } from "@/lib/observability";
 import { syncBatchSchema } from "@/lib/offline/schemas";
 import {
   procesarItemsParaSync,
@@ -61,7 +62,21 @@ async function post(request: NextRequest) {
   };
 
   const resultado = await procesarItemsParaSync(db, parsed.data.items);
+  logEvent("info", "sync.batch", {
+    batchSize: parsed.data.items.length,
+    tablas: [...porTablaCount(parsed.data.items)],
+    accepted: resultado.accepted.length,
+    rejected: resultado.rejected.length,
+  });
   return apiOk(resultado);
+}
+
+function porTablaCount(items: { table: string }[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const item of items) {
+    out.set(item.table, (out.get(item.table) ?? 0) + 1);
+  }
+  return out;
 }
 
 export const POST = withErrorHandler(post);
