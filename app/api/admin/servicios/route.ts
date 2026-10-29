@@ -1,24 +1,42 @@
 import { NextRequest } from "next/server";
-import { createAdminClientWithRoleCheck } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { crearServicioSchema } from "@/lib/schemas/servicios-maestro";
-import { apiOk, apiError, apiValidationError, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, withErrorHandler } from "@/lib/api-helpers";
+import { apiPaginado, parsePaginacion, sanitizarBusqueda } from "@/lib/pagination";
 
-async function get(_request: NextRequest) {
-  const { supabase } = await createAdminClientWithRoleCheck(["Admin"]);
-  const { data, error } = await supabase
+async function get(request: NextRequest) {
+  await requireRole(["Admin"]);
+  const supabase = await createClient();
+  const { searchParams } = new URL(request.url);
+
+  const paginacion = parsePaginacion(searchParams);
+  if (!paginacion.success) return apiValidationError(paginacion.error.flatten());
+
+  const { page, pageSize } = paginacion.data;
+  const from = (page - 1) * pageSize;
+  const to = page * pageSize - 1;
+  const busqueda = sanitizarBusqueda(searchParams.get("search"));
+
+  let query = supabase
     .from("servicios_maestro")
-    .select(`
-      *,
-      servicio_precios(id_precio, precio_por_kg, min_weight_kg, max_weight_kg, activo, created_at)
-    `)
-    .order("prioridad");
+    .select(
+      `id_servicio_maestro, nombre, descripcion, tipo, prioridad, activo, created_at, updated_at,
+      servicio_precios(id_precio, precio_por_kg, min_weight_kg, max_weight_kg, activo, created_at)`,
+      { count: "exact" }
+    )
+    .order("prioridad")
+    .range(from, to);
 
+  if (busqueda) query = query.ilike("nombre", `%${busqueda}%`);
+
+  const { data, count, error } = await query;
   if (error) return apiError(error.message, 500);
-  return apiOk(data);
+  return apiPaginado(data ?? [], count ?? 0, page, pageSize);
 }
 
 async function post(request: NextRequest) {
-  const { supabase } = await createAdminClientWithRoleCheck(["Admin"]);
+  await requireRole(["Admin"]);
+  const supabase = await createClient();
   const body = await request.json();
 
   const parsed = crearServicioSchema.safeParse(body);
@@ -29,37 +47,30 @@ async function post(request: NextRequest) {
   // Normalizar descripcion vacía a null para consistencia en BD
   if (datosServicio.descripcion === "") datosServicio.descripcion = null;
 
-  // 1. Crear el maestro de servicio
-  const { data: servicio, error: servError } = await supabase
-    .from("servicios_maestro")
-    .insert(datosServicio)
-    .select()
-    .single();
+  // Transacción completa en DB: servicios_maestro + servicio_precios.
+  // La constraint EXCLUDE (0025) / trigger rechaza solapes atómicamente.
+  const { data, error } = await supabase.rpc("crear_servicio_con_precios", {
+    p_servicio: datosServicio as unknown as object,
+    p_intervalos: intervalos.map((i) => ({
+      min_weight_kg: i.peso_min_kg,
+      max_weight_kg: i.peso_max_kg ?? null,
+      precio_por_kg: i.precio_por_kg,
+    })) as unknown as object,
+  });
 
-  if (servError) {
-    console.error("POST /api/admin/servicios - insert maestro:", servError);
-    return apiError(servError.message, servError.code === "23505" ? 409 : 500);
+  if (error) {
+    const mensaje = error.message || "Error al crear el servicio";
+    const status = /traslapa/i.test(mensaje)
+      ? 409
+      : /Solo Admin/i.test(mensaje)
+        ? 403
+        : /23505/.test(mensaje)
+          ? 409
+          : 500;
+    return apiError(mensaje, status);
   }
 
-  // 2. Insertar intervalos (el trigger de BD rechaza solapes)
-  const intervalosData = intervalos.map((i) => ({
-    id_servicio: servicio.id_servicio_maestro,
-    min_weight_kg: i.peso_min_kg,
-    max_weight_kg: i.peso_max_kg ?? null,
-    precio_por_kg: i.precio_por_kg,
-    activo: true,
-  }));
-
-  const { error: intError } = await supabase.from("servicio_precios").insert(intervalosData);
-
-  if (intError) {
-    // Rollback manual: eliminar servicio recién creado
-    await supabase.from("servicios_maestro").delete().eq("id_servicio_maestro", servicio.id_servicio_maestro);
-    console.error("POST /api/admin/servicios - insert intervalos:", intError);
-    return apiError(intError.message, 500);
-  }
-
-  return apiOk(servicio, 201);
+  return apiOk(data, 201);
 }
 
 export const GET = withErrorHandler(get);

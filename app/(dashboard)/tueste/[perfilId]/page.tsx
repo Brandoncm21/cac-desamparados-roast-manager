@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ContextHeader } from "./components/ContextHeader";
-import { RendimientosTable } from "./components/RendimientosTable";
+import { RendimientosDialog } from "./components/RendimientosDialog";
+import { RegistroConfirmadoDialog } from "./components/RegistroConfirmadoDialog";
 import { TemperatureInput } from "./components/TemperatureInput";
 import { QuickMilestones } from "./components/QuickMilestones";
 
@@ -37,7 +38,11 @@ export default function CapturaTuestePage() {
   const router = useRouter();
   const perfilId = Number(params.perfilId);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [timeStep, setTimeStep] = useState<1 | 0.5>(1);
+  const [timeStep, setTimeStep] = useState<number>(1);
+  const [intervaloPersonalizado, setIntervaloPersonalizado] = useState<string>("");
+  const [ultimoRegistro, setUltimoRegistro] = useState<{ minuto: number; temperatura: number } | null>(null);
+  const [rendimientosOpen, setRendimientosOpen] = useState(false);
+  const [finalizacionSubmitting, setFinalizacionSubmitting] = useState(false);
 
   if (!Number.isFinite(perfilId) || perfilId <= 0) {
     toast.error("Perfil de tueste inválido");
@@ -139,6 +144,50 @@ export default function CapturaTuestePage() {
     nombreTostador: perfil?.empleados?.nombre,
   });
 
+  const cerrarUltimoRegistro = useCallback(() => setUltimoRegistro(null), []);
+
+  const handleRegistrar = useCallback(async () => {
+    const resultado = await registrarTemperatura();
+    if (resultado) {
+      setUltimoRegistro(resultado);
+      inputRef.current?.focus();
+    }
+  }, [registrarTemperatura]);
+
+  const humedadInicialOrden = perfil?.ordenes_trabajo?.porcentaje_humedad_entrada ?? null;
+
+  useEffect(() => {
+    if (!rendimientosOpen) return;
+    setMetricas((prev) =>
+      prev.map((m) =>
+        m.tipo_metrica === "Humedad" && !m.valor_antes && humedadInicialOrden != null
+          ? { ...m, valor_antes: String(humedadInicialOrden) }
+          : m
+      )
+    );
+  }, [rendimientosOpen, humedadInicialOrden, setMetricas]);
+
+  const confirmarFinalizacion = useCallback(async () => {
+    if (!isOnline) {
+      toast.error("Conéctese a internet para finalizar el tueste");
+      return;
+    }
+    setFinalizacionSubmitting(true);
+    try {
+      for (const m of metricas) {
+        await guardarMetrica(m.tipo_metrica, m.valor_antes, m.valor_despues);
+      }
+      await finalizarTueste(true);
+    } finally {
+      setFinalizacionSubmitting(false);
+    }
+  }, [isOnline, metricas, guardarMetrica, finalizarTueste]);
+
+  const irAOrden = useCallback(() => {
+    const idOrden = perfil?.id_orden;
+    router.push(idOrden ? `/ordenes/${idOrden}` : "/tueste");
+  }, [perfil?.id_orden, router]);
+
   if (isLoading) {
     return (
       <div className="max-w-4xl mx-auto pt-12 lg:pt-0">
@@ -175,13 +224,6 @@ export default function CapturaTuestePage() {
         onGuardar={guardarContexto}
       />
 
-      <RendimientosTable
-        metricas={metricas}
-        setMetricas={setMetricas}
-        calcularDiferencia={calcularDiferencia}
-        onGuardarMetrica={guardarMetrica}
-      />
-
       <TemperatureInput
         temperatura={temperatura}
         setTemperatura={setTemperatura}
@@ -189,9 +231,11 @@ export default function CapturaTuestePage() {
         setMinutoManual={setMinutoManual}
         timeStep={timeStep}
         setTimeStep={setTimeStep}
+        intervaloPersonalizado={intervaloPersonalizado}
+        setIntervaloPersonalizado={setIntervaloPersonalizado}
         currentMinute={currentMinute}
         inputRef={inputRef}
-        onRegistrar={registrarTemperatura}
+        onRegistrar={handleRegistrar}
       />
 
       <QuickMilestones
@@ -228,8 +272,23 @@ export default function CapturaTuestePage() {
 
       <FinalizeButton
         showResumen={showResumen}
-        onFinalizar={() => finalizarTueste(isOnline)}
+        onAbrirRendimientos={() => setRendimientosOpen(true)}
+        onIrAOrden={irAOrden}
       />
+
+      <RendimientosDialog
+        open={rendimientosOpen}
+        onOpenChange={setRendimientosOpen}
+        metricas={metricas}
+        setMetricas={setMetricas}
+        calcularDiferencia={calcularDiferencia}
+        onConfirmar={confirmarFinalizacion}
+        onIrAOrden={irAOrden}
+        resumen={resumen}
+        submitting={finalizacionSubmitting}
+      />
+
+      <RegistroConfirmadoDialog registro={ultimoRegistro} onClose={cerrarUltimoRegistro} />
     </div>
   );
 }

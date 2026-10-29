@@ -1,7 +1,7 @@
 import { openDB, type IDBPDatabase } from "idb";
 
 const DB_NAME = "scacr-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
 
@@ -23,6 +23,13 @@ function getDb() {
         }
         if (!db.objectStoreNames.contains("pending_sync")) {
           const store = db.createObjectStore("pending_sync", {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+          store.createIndex("id_perfil", "id_perfil");
+        }
+        if (!db.objectStoreNames.contains("dead_letter")) {
+          const store = db.createObjectStore("dead_letter", {
             keyPath: "id",
             autoIncrement: true,
           });
@@ -51,12 +58,32 @@ export interface HitoRecord {
 
 export interface SyncQueueItem {
   id?: number;
+  tempId: string;
   table: string;
   data: Record<string, unknown> | TemperaturaRecord | HitoRecord;
   id_perfil: number;
   retries?: number;
+  next_attempt_at?: number;
   last_error?: string;
   created_at?: number;
+}
+
+export interface DeadLetterItem {
+  id?: number;
+  tempId: string;
+  table: string;
+  data: Record<string, unknown> | TemperaturaRecord | HitoRecord;
+  id_perfil: number;
+  retries: number;
+  last_error: string;
+  failed_at: number;
+}
+
+export function nuevoTempId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `temp-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
 }
 
 // Temperaturas
@@ -104,11 +131,15 @@ export async function markHitoSynced(perfilId: number, tipoHito: string) {
 }
 
 // Cola de sincronización
-export async function addToSyncQueue(item: Omit<SyncQueueItem, "id" | "retries" | "created_at">) {
+export async function addToSyncQueue(
+  item: Omit<SyncQueueItem, "id" | "tempId" | "retries" | "next_attempt_at" | "created_at">
+) {
   const db = await getDb();
   await db.add("pending_sync", {
     ...item,
+    tempId: nuevoTempId(),
     retries: 0,
+    next_attempt_at: 0,
     created_at: Date.now(),
   });
 }
@@ -123,12 +154,60 @@ export async function removeFromSyncQueue(id: number) {
   await db.delete("pending_sync", id);
 }
 
-export async function incrementSyncQueueRetry(id: number, errorMessage: string) {
+export async function incrementSyncQueueRetry(id: number, errorMessage: string, delayMs = 0) {
   const db = await getDb();
   const item = await db.get("pending_sync", id);
   if (item) {
     item.retries = (item.retries || 0) + 1;
     item.last_error = errorMessage;
+    item.next_attempt_at = Date.now() + Math.max(delayMs, 0);
     await db.put("pending_sync", item);
   }
+}
+
+// Dead-letter queue: registros que agotaron reintentos. Nunca se borran solos;
+// requieren reintento o descarte manual.
+export async function moveToDeadLetter(
+  item: SyncQueueItem,
+  errorMessage: string
+) {
+  const db = await getDb();
+  const { id: _id, next_attempt_at: _next, ...resto } = item;
+  await db.add("dead_letter", {
+    ...resto,
+    retries: item.retries || 0,
+    last_error: errorMessage,
+    failed_at: Date.now(),
+  } as DeadLetterItem);
+  if (item.id !== undefined) {
+    await db.delete("pending_sync", item.id);
+  }
+}
+
+export async function getDeadLetter(): Promise<DeadLetterItem[]> {
+  const db = await getDb();
+  return db.getAll("dead_letter") as Promise<DeadLetterItem[]>;
+}
+
+export async function removeFromDeadLetter(id: number) {
+  const db = await getDb();
+  await db.delete("dead_letter", id);
+}
+
+export async function requeueDeadLetter(id: number): Promise<boolean> {
+  const db = await getDb();
+  const item = await db.get("dead_letter", id);
+  if (!item) return false;
+  await db.add("pending_sync", {
+    tempId: (item as DeadLetterItem).tempId,
+    table: (item as DeadLetterItem).table,
+    data: (item as DeadLetterItem).data,
+    id_perfil: (item as DeadLetterItem).id_perfil,
+    retries: 0,
+    next_attempt_at: 0,
+    last_error: undefined,
+    created_at: Date.now(),
+  });
+  await db.delete("dead_letter", id);
+  return true;
 }

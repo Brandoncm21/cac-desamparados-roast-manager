@@ -41,7 +41,7 @@ The application is a PWA. Core flows SHOULD work with reasonable degradation whe
 
 - **Language**: TypeScript in strict mode.
 - **Framework**: Next.js 16 with the App Router.
-- **Database**: PostgreSQL through Supabase (project `nwnldvzoxjjsmfeyouaw`).
+- **Database**: PostgreSQL through Supabase (project ref configurado por entorno, nunca hardcodeado).
 - **Authentication**: `@supabase/ssr` and Supabase Auth; roles stored in the `empleados` table.
 - **Styling/UI**: Tailwind CSS v4, shadcn/ui components, Recharts for dashboards.
 - **Validation**: Zod, react-hook-form, `@hookform/resolvers`.

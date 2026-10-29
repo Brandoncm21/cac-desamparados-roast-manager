@@ -2,7 +2,8 @@
 
 ## 1. Ejecutar migración
 
-1. Ve a: https://supabase.com/dashboard/project/nwnldvzoxjjsmfeyouaw/sql/new
+1. Ve a: https://supabase.com/dashboard/project/<PROJECT_REF>/sql/new
+   (reemplaza `<PROJECT_REF>` con el ref de tu proyecto Supabase)
 2. Abre el archivo `supabase/migrations/0001_schema_inicial.sql`
 3. Copia TODO el contenido y pégalo en el SQL Editor
 4. Haz clic en **Run** o presiona `Ctrl+Enter`
@@ -19,7 +20,8 @@
 
 Después de la migración, crea usuarios en Supabase Auth:
 
-1. Ve a: https://supabase.com/dashboard/project/nwnldvzoxjjsmfeyouaw/auth/users
+1. Ve a: https://supabase.com/dashboard/project/<PROJECT_REF>/auth/users
+   (reemplaza `<PROJECT_REF>` con el ref de tu proyecto Supabase)
 2. Haz clic en **Add User**
 3. Crea 4 usuarios (uno por rol):
 

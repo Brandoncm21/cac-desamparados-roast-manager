@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { createAdminClientWithRoleCheck } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { actualizarServicioSchema, intervalosServicioSchema } from "@/lib/schemas/servicios-maestro";
-import { apiOk, apiError, apiValidationError, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 import { z } from "zod";
 
 // PUT permite actualizar datos del servicio y/o la lista completa de intervalos
@@ -22,7 +22,8 @@ async function get(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { supabase } = await createAdminClientWithRoleCheck(["Admin"]);
+  await requireRole(["Admin"]);
+  const supabase = await createClient();
   const { id } = await params;
   const servicioId = validateIdParam(id);
 
@@ -45,7 +46,8 @@ async function put(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { supabase } = await createAdminClientWithRoleCheck(["Admin"]);
+  await requireRole(["Admin"]);
+  const supabase = await createClient();
   const { id } = await params;
   const servicioId = validateIdParam(id);
   const body = await request.json();
@@ -58,31 +60,9 @@ async function put(
   // Normalizar descripcion vacía a null para consistencia en BD
   if (datosServicio.descripcion === "") datosServicio.descripcion = null;
 
-  // Verificar que el servicio existe
-  const { data: existente } = await supabase
-    .from("servicios_maestro")
-    .select("id_servicio_maestro")
-    .eq("id_servicio_maestro", servicioId)
-    .maybeSingle();
-
-  if (!existente) return apiError("Servicio no encontrado", 404);
-
-  // 1. Actualizar datos del servicio
-  if (Object.keys(datosServicio).length > 0) {
-    const { error: updError } = await supabase
-      .from("servicios_maestro")
-      .update(datosServicio)
-      .eq("id_servicio_maestro", servicioId);
-
-    if (updError) {
-      console.error("PUT /api/admin/servicios - update maestro:", updError);
-      return apiError(updError.message, 500);
-    }
-  }
-
-  // 2. Sincronizar intervalos si vienen en el payload
+  // Validar solapes antes de tocar BD (primera línea; la DB revalida con
+  // la constraint EXCLUDE declarativa de 0025).
   if (intervalos) {
-    // Validar solapes antes de tocar BD
     const overlapCheck = intervalosServicioSchema.safeParse(
       intervalos.map((i) => ({
         peso_min_kg: i.peso_min_kg,
@@ -91,74 +71,44 @@ async function put(
       }))
     );
     if (!overlapCheck.success) return apiValidationError(overlapCheck.error);
-
-    // Desactivar todos los intervalos activos primero para evitar solapes
-    // transitorios (el trigger solo valida contra intervalos activos).
-    const { error: deactError } = await supabase
-      .from("servicio_precios")
-      .update({ activo: false })
-      .eq("id_servicio", servicioId)
-      .eq("activo", true);
-
-    if (deactError) {
-      console.error("PUT /api/admin/servicios - deactivar intervalos:", deactError);
-      return apiError(deactError.message, 500);
-    }
-
-    // Upsert secuencial: reactivar/insertar los intervalos del payload en orden.
-    // El conjunto final ya está validado como no-solapado, así que reactivarlos
-    // uno a uno nunca genera un solape intermedio.
-    for (const i of intervalos) {
-      const payload = {
-        min_weight_kg: i.peso_min_kg,
-        max_weight_kg: i.peso_max_kg ?? null,
-        precio_por_kg: i.precio_por_kg,
-        activo: true,
-      };
-
-      if (i.id_precio) {
-        const { error } = await supabase
-          .from("servicio_precios")
-          .update(payload)
-          .eq("id_precio", i.id_precio)
-          .eq("id_servicio", servicioId);
-        if (error) {
-          console.error("PUT /api/admin/servicios - update intervalo:", error);
-          return apiError(error.message, 500);
-        }
-      } else {
-        const { error } = await supabase
-          .from("servicio_precios")
-          .insert({ id_servicio: servicioId, ...payload });
-        if (error) {
-          console.error("PUT /api/admin/servicios - insert intervalo:", error);
-          return apiError(error.message, 500);
-        }
-      }
-    }
   }
 
-  // Retornar estado completo actualizado
-  const { data: resultado, error: resError } = await supabase
-    .from("servicios_maestro")
-    .select(`
-      *,
-      servicio_precios(id_precio, precio_por_kg, min_weight_kg, max_weight_kg, activo, created_at)
-    `)
-    .eq("id_servicio_maestro", servicioId)
-    .eq("servicio_precios.activo", true)
-    .order("min_weight_kg", { foreignTable: "servicio_precios", ascending: true })
-    .single();
+  // Transacción completa en DB: maestro + desactivación y reemplazo atómico
+  // de intervalos. Sin estados intermedios visibles y sin rollbacks manuales.
+  const { data, error } = await supabase.rpc("actualizar_servicio_con_precios", {
+    p_id_servicio: servicioId,
+    p_datos: datosServicio as unknown as object,
+    p_intervalos: intervalos
+      ? (intervalos.map((i) => ({
+          id_precio: i.id_precio ?? null,
+          min_weight_kg: i.peso_min_kg,
+          max_weight_kg: i.peso_max_kg ?? null,
+          precio_por_kg: i.precio_por_kg,
+        })) as unknown as object)
+      : null,
+  });
 
-  if (resError) return apiError("Servicio no encontrado", 404);
-  return apiOk(resultado);
+  if (error) {
+    const mensaje = error.message || "Error al actualizar el servicio";
+    const status = /no encontrado/i.test(mensaje)
+      ? 404
+      : /traslapa/i.test(mensaje)
+        ? 409
+        : /Solo Admin/i.test(mensaje)
+          ? 403
+          : 500;
+    return apiError(mensaje, status);
+  }
+
+  return apiOk(data);
 }
 
 async function del(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { supabase } = await createAdminClientWithRoleCheck(["Admin"]);
+  await requireRole(["Admin"]);
+  const supabase = await createClient();
   const { id } = await params;
   const servicioId = validateIdParam(id);
 

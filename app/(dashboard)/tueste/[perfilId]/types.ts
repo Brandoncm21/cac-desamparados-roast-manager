@@ -21,6 +21,7 @@ export interface Empleado {
 
 export interface OrdenTrabajoResumen {
   numero_factura: string;
+  porcentaje_humedad_entrada: number | null;
 }
 
 export interface EmpleadoRelacionado {

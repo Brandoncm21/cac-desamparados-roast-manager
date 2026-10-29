@@ -5,6 +5,7 @@ import type { ZodError } from "zod";
 import { AppError, ERROR_CODES, handleApiError } from "./error-handler";
 import { createClient } from "./supabase/server";
 import type { UserRole } from "./auth-helpers";
+import { logRequest, newCorrelationId } from "./observability";
 
 export function apiOk<T>(data: T, status = 200) {
   return NextResponse.json({ data }, { status });
@@ -40,11 +41,40 @@ export function withErrorHandler<
   H extends (req: NextRequest, ...args: any[]) => Promise<NextResponse>
 >(handler: H): H {
   return (async (req: NextRequest, ...args: any[]) => {
+    const inicio = Date.now();
+    const correlationId = newCorrelationId();
+    let status = 500;
+    let pgError: { code?: string; message?: string } | undefined;
     try {
-      return await handler(req, ...args);
+      const response = await handler(req, ...args);
+      status = response.status;
+      response.headers.set("x-correlation-id", correlationId);
+      logRequest({
+        correlationId,
+        endpoint: req.nextUrl.pathname,
+        method: req.method,
+        status,
+        durationMs: Date.now() - inicio,
+      });
+      return response;
     } catch (error) {
-      const { error: errorObj, status } = handleApiError(error);
-      return NextResponse.json({ error: errorObj }, { status });
+      const { error: errorObj, status: errorStatus } = handleApiError(error);
+      status = errorStatus;
+      pgError = (errorObj as { pg?: { code?: string; message?: string } }).pg;
+      logRequest({
+        correlationId,
+        endpoint: req.nextUrl.pathname,
+        method: req.method,
+        status,
+        durationMs: Date.now() - inicio,
+        pgError,
+      });
+      const response = NextResponse.json(
+        { error: { ...errorObj, correlationId } },
+        { status }
+      );
+      response.headers.set("x-correlation-id", correlationId);
+      return response;
     }
   }) as H;
 }

@@ -54,16 +54,26 @@ Fuente editable: [`docs/diagrams/system_arch.mmd`](./diagrams/system_arch.mmd) �
 
 Evidencia del flujo: [`middleware.ts:8-40`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/middleware.ts#L8-L40) + [`lib/api-helpers.ts:68-87`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/api-helpers.ts#L68-L87) + [`app/api/ordenes/route.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/api/ordenes/route.ts).
 
-### 3.2 Flujo Offline
+### 3.2 Flujo Offline (Fase 3, rama `feat/audit-hardening`)
+
 ```text
-Browser offline → lib/offline/db.ts (IndexedDB) encola {table, data, retries}
-    ↓ (cuando vuelve online)
-lib/offline/sync.ts → POST /api/sync {items: [{tempId, table, data}]}
-    ↓
-API valida con Zod → upsert con onConflict (id_perfil, minuto / tipo_hito)
-    ↓
-Respuesta {idMap} → removeFromSyncQueue / incrementSyncQueueRetry (máx 3)
+Browser offline → lib/offline/db.ts (IndexedDB) encola {tempId, table, data, retries, next_attempt_at}
+    ↓ (vuelve online: evento 'online' en TopBar, o próxima acción del usuario)
+lib/offline/sync.ts → single-flight (sin syncAll concurrentes) → chunks ≤200
+    ↓ POST /api/sync {items: [{tempId, table, data}]} (máx 500, Zod por tabla)
+API: valida cada item → agrupa por tabla → bulk upsert con onConflict
+     (claves naturales: (id_perfil,minuto), (id_perfil,tipo_hito),
+      (id_perfil,orden_secuencia), (id_perfil,tipo_metrica))
+    ↓ fallback por item si el bulk falla (waterfall para aislar el error)
+Respuesta {data: {accepted: [{tempId, recordId}], rejected: [{tempId, code, message}]}}
+    ↓ accepted → marca synced local + removeFromSyncQueue
+      rejected → retry con backoff exponencial (5s·2^n, cap 5min); a los 3 fallos → dead_letter
 ```
+
+- **Idempotencia:** server = upsert sobre constraints UNIQUE existentes; reprocesar el mismo batch no duplica (dedupe last-write-wins por clave natural antes del bulk).
+- **Nada se pierde:** agotados los reintentos el item va a `dead_letter` (IndexedDB, con `last_error`) — nunca se borra silenciosamente. Recuperación manual: badge en TopBar → "Reintentar" reencola todo y dispara `syncAll()`; ver `docs/RUNBOOK.md` (diagnóstico sync/DLQ).
+- **Sin secretos en errores:** el servidor trunca mensajes de PG a 200 chars; el cliente guarda `last_error` sin tokens.
+- **Limitación conocida:** `procesarItemsParaSync` no tiene test contra BD real; la lógica (bulk/fallback/mapeo) está cubierta con DB falsa (`sync-server.test.ts`) y el upsert idempotente se valida en el branch de Supabase. `servicios_ejecutados` (legacy, sin clave natural) se inserta por item.
 
 ## 4. Módulos y Clases Clave
 
@@ -82,6 +92,13 @@ Respuesta {idMap} → removeFromSyncQueue / incrementSyncQueueRetry (máx 3)
 
 ### 4.3 Manejo de Errores
 `AppError` tipado con `code` y `status` ([`lib/error-handler.ts:1-60`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/error-handler.ts#L1-L60)), `handleApiError` centraliza 401/403/422/500, `withErrorHandler` envuelve handlers.
+
+### 4.3bis Transacciones (Fase 4, rama `feat/audit-hardening`)
+- Las escrituras multi-tabla son **funciones SQL atómicas** (`supabase/migrations/0024_rpc_transaccionales.sql`): `crear_orden_completa`, `crear_servicio_con_precios`, `actualizar_servicio_con_precios`, `cerrar_paso_orden`, `confirmar_tueste_paso`.
+- `SECURITY INVOKER` (RLS intacto) + verificación de rol interna vía `get_empleado_rol()` + `EXECUTE` solo para `authenticated`.
+- Los Route Handlers validan con Zod en la frontera y llaman a la RPC — **sin rollbacks manuales** ni estados parciales.
+- El anti-solape de tarifas es la constraint declarativa `servicio_precios_no_traslape` (`EXCLUDE USING gist` + `numrange`, `0025`) — sin race condition.
+- Orquestador TS eliminado (lo suplantaron las RPCs); `resolver_tarifa_por_peso()` SQL existe pero la resolución en TS (iniciar) se mantiene por ahora (documento: divergencia aceptada, revisar en E4 de `docs/LEGACY_MIGRATION_PLAN.md`).
 
 ### 4.4 Hidratación y Cookies
 - **Hidratación:** script inline en [`app/layout.tsx:50-72`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/layout.tsx#L50-L72) elimina `bis_skin_checked` (extensión Bitdefender) con `MutationObserver({attributes:true, attributeFilter:["bis_skin_checked"]})`.

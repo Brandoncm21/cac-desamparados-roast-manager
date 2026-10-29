@@ -17,14 +17,28 @@ export const bulkTemperaturasSchema = z.object({
   })).min(1),
 });
 
+export const bulkHitosSchema = z.object({
+  hitos: z.array(z.object({
+    tipo_hito: z.enum([
+      "Turning Point", "Amarillo", "Marrón", "Crack Inicial",
+      "Crack Final", "Segundo Crack", "Final", "Tiempo Enfriamiento",
+    ]),
+    tiempo_min: z.number().min(0).optional().nullable(),
+    temperatura: z.number().min(70).max(220).optional().nullable(),
+  })).min(1),
+});
+
 export const upsertHitoSchema = z.object({
   tiempo_min: z.number().optional().nullable(),
   temperatura: z.number().optional().nullable(),
 });
 
-export const actualizarPerfilSchema = crearPerfilSchema.partial();
+export const actualizarPerfilSchema = crearPerfilSchema.partial().extend({
+  estado: z.enum(["Pendiente", "Completado"]).optional(),
+});
 
 export type CrearPerfilInput = z.infer<typeof crearPerfilSchema>;
 export type BulkTemperaturasInput = z.infer<typeof bulkTemperaturasSchema>;
+export type BulkHitosInput = z.infer<typeof bulkHitosSchema>;
 export type UpsertHitoInput = z.infer<typeof upsertHitoSchema>;
 export type ActualizarPerfilInput = z.infer<typeof actualizarPerfilSchema>;

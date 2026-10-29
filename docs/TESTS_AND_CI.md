@@ -37,9 +37,17 @@ Statements : 66.07% (111/168)  Branches : 61.53%  Functions : 55.81%  Lines : 68
 
 Reporte HTML: `coverage/index.html` (generado tras `test:coverage`, ignorado en `.gitignore`, subido como artifact en CI).
 
-**Objetivo:** >70% en módulos críticos (`lib/schemas/*` ya 100%, `lib/services/*` necesita ampliar `orquestador.ts` y `resolver-tarifa.ts`).
+**Cobertura final verificada (rama `feat/audit-hardening`, Fase 5, 2026-10-27):**
 
-## 3. Suites Existentes (10 suites, 90 tests)
+```
+Statements : 79.86% (365/457)  Branches : 69.3%  Functions : 77.31%  Lines : 81.58%
+```
+
+Progresión: 66.07% (docs base) → 68.15% (Fase 0 flujo) → 77.14% (Fase 3 sync) → 79.86% (Fase 4-5: orquestador muerto eliminado; observability/pagination/sync/visibilidad cubiertos). El módulo `orquestador.ts` fue eliminado en Fase 4 (suplantado por RPCs de 0024).
+
+**Objetivo:** >70% en módulos críticos — cumplido a nivel global; `lib/schemas/*` 100%.
+
+## 3. Suites Existentes (17 suites, 160 tests)
 
 | Archivo | Qué cubre | Evidencia |
 |---------|-----------|-----------|

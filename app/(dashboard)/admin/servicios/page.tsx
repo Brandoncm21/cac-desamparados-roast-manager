@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { Search, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,36 +43,48 @@ function formatearIntervalo(i: Intervalo): string {
 }
 
 export default function AdminServiciosPage() {
-  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [servicios, setServicios] = useState<ServicioMaestro[]>([]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const load = async () => {
-      const { data, error } = await supabase
-        .from("servicios_maestro")
-        .select(`
-          *,
-          servicio_precios(id_precio, precio_por_kg, min_weight_kg, max_weight_kg, activo)
-        `)
-        .eq("servicio_precios.activo", true)
-        .order("prioridad");
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-      if (error) {
-        toast.error("Error al cargar servicios: " + error.message);
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+
+      const res = await fetch(`/api/admin/servicios?${params.toString()}`);
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(
+          "Error al cargar servicios: " + (result.error?.message || "Error desconocido")
+        );
       } else {
-        setServicios(data as unknown as ServicioMaestro[]);
+        setServicios(result.data ?? []);
+        setTotalItems(result.pagination?.total ?? 0);
       }
       setLoading(false);
     };
     load();
-  }, [supabase]);
+  }, [debouncedSearch, page, pageSize]);
 
-  const filtrados = servicios.filter((s) =>
-    s.nombre.toLowerCase().includes(search.toLowerCase())
-  );
+  const totalPages = Math.ceil(totalItems / pageSize);
 
   return (
     <div className="space-y-6">
@@ -101,7 +113,7 @@ export default function AdminServiciosPage() {
         <CardContent>
           {loading ? (
             <p className="text-muted-foreground">Cargando...</p>
-          ) : filtrados.length === 0 ? (
+          ) : servicios.length === 0 ? (
             <p className="text-muted-foreground">No hay servicios registrados.</p>
           ) : (
             <Table>
@@ -116,7 +128,7 @@ export default function AdminServiciosPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtrados.map((s) => (
+                {servicios.map((s) => (
                   <TableRow key={s.id_servicio_maestro}>
                     <TableCell className="font-mono text-xs">{s.prioridad}</TableCell>
                     <TableCell className="font-medium">
@@ -130,12 +142,15 @@ export default function AdminServiciosPage() {
                     </TableCell>
                     <TableCell>
                       <div className="space-y-0.5">
-                        {(s.servicio_precios || []).map((i) => (
-                          <p key={i.id_precio} className="text-xs text-muted-foreground">
-                            {formatearIntervalo(i)}
-                          </p>
-                        ))}
-                        {(!s.servicio_precios || s.servicio_precios.length === 0) && (
+                        {(s.servicio_precios || [])
+                          .filter((i) => i.activo)
+                          .map((i) => (
+                            <p key={i.id_precio} className="text-xs text-muted-foreground">
+                              {formatearIntervalo(i)}
+                            </p>
+                          ))}
+                        {(!s.servicio_precios ||
+                          s.servicio_precios.filter((i) => i.activo).length === 0) && (
                           <Badge variant="cancelado">Sin intervalos</Badge>
                         )}
                       </div>
@@ -163,6 +178,15 @@ export default function AdminServiciosPage() {
           )}
         </CardContent>
       </Card>
+
+      <Pagination
+        currentPage={page}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={totalItems}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
     </div>
   );
 }

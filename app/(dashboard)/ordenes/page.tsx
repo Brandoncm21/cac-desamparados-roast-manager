@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo, use } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserRole, canEditOrder, canDeleteOrder } from "@/lib/auth-helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +29,6 @@ export default function OrdenesPage({
 }) {
   const { estado: estadoParam } = use(searchParams);
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
 
   const [ordenes, setOrdenes] = useState<Orden[]>([]);
   const [estado, setEstado] = useState(estadoParam || "");
@@ -57,34 +55,25 @@ export default function OrdenesPage({
 
   const loadOrdenes = useMemo(() => {
     return async () => {
-      const from = (page - 1) * pageSize;
-      const to = page * pageSize - 1;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      if (estado) params.set("estado", estado);
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
 
-      let query = supabase
-        .from("ordenes_trabajo")
-        .select("*, clientes(nombre_completo)", { count: "exact" })
-        .is("deleted_at", null)
-        .order("fecha_orden", { ascending: false })
-        .range(from, to);
-
-      if (estado) {
-        query = query.eq("estado_orden", estado);
-      }
-
-      if (debouncedSearch) {
-        const term = debouncedSearch.trim();
-        query = query.or(
-          `numero_factura.ilike.%${term}%,clientes.nombre_completo.ilike.%${term}%`
+      const res = await fetch(`/api/ordenes?${params.toString()}`);
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(
+          "Error al cargar órdenes: " + (result.error?.message || "Error desconocido")
         );
+        return;
       }
-
-      const { data, count } = await query;
-      if (data) {
-        setOrdenes(data as unknown as Orden[]);
-      }
-      setTotalItems(count || 0);
+      setOrdenes(result.data ?? []);
+      setTotalItems(result.pagination?.total ?? 0);
     };
-  }, [estado, debouncedSearch, page, pageSize, supabase]);
+  }, [estado, debouncedSearch, page, pageSize]);
 
   useEffect(() => {
     loadOrdenes();
@@ -97,13 +86,17 @@ export default function OrdenesPage({
   const totalPages = Math.ceil(totalItems / pageSize);
 
   const cambiarEstado = async (id: number, nuevoEstado: string) => {
-    const { error } = await supabase
-      .from("ordenes_trabajo")
-      .update({ estado_orden: nuevoEstado })
-      .eq("id_orden", id);
+    const res = await fetch(`/api/ordenes/${id}/estado`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado_orden: nuevoEstado }),
+    });
+    const result = await res.json();
 
-    if (error) {
-      toast.error("Error al cambiar estado: " + error.message);
+    if (!res.ok) {
+      toast.error(
+        "Error al cambiar estado: " + (result.error?.message || "Error desconocido")
+      );
       return;
     }
 

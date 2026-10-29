@@ -77,7 +77,7 @@ async function post(request: NextRequest, { params }: Params) {
   const { data: empleado } = await supabase
     .from("empleados")
     .select("id_empleado")
-    .eq("auth_user_id", userId)
+    .eq("id_auth", userId)
     .single();
 
   const idOperadorInicio = empleado?.id_empleado ?? null;

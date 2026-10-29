@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
 import { saveHitoLocal, addToSyncQueue, type HitoRecord } from "@/lib/offline/db";
 import { syncAll } from "@/lib/offline/sync";
 import { HITOS_RAPIDOS, type HitoEditData, type PuntoTemperatura } from "../types";
@@ -82,28 +81,36 @@ export function useMilestones({
   );
 
   const guardarTodosHitos = useCallback(async () => {
-    const supabase = createClient();
+    const hitosPayload = Object.entries(editHitosData).map(([tipoHito, data]) => ({
+      tipo_hito: tipoHito,
+      tiempo_min: data.tiempo_min ? Number(data.tiempo_min) : null,
+      temperatura: data.temperatura ? Number(data.temperatura) : null,
+    }));
 
-    for (const [tipoHito, data] of Object.entries(editHitosData)) {
-      await supabase.from("hitos_termicos").upsert(
-        {
-          id_perfil: perfilId,
-          tipo_hito: tipoHito,
-          tiempo_min: data.tiempo_min ? Number(data.tiempo_min) : null,
-          temperatura: data.temperatura ? Number(data.temperatura) : null,
-        },
-        { onConflict: "id_perfil, tipo_hito" }
+    try {
+      const res = await fetch(`/api/perfiles-tueste/${perfilId}/hitos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hitos: hitosPayload }),
+      });
+      const result = await res.json();
+
+      if (!res.ok) {
+        toast.error(
+          "Error al guardar hitos: " +
+            (result.error?.message || "Error desconocido")
+        );
+        return;
+      }
+
+      setHitos(
+        (result.data as HitoRecord[] | null)?.map((h) => ({ ...h, synced: true })) ?? []
       );
+      setEditHitosOpen(false);
+      toast.success("Hitos actualizados");
+    } catch {
+      toast.error("Error al guardar hitos");
     }
-
-    const { data: updatedHitos } = await supabase
-      .from("hitos_termicos")
-      .select("*")
-      .eq("id_perfil", perfilId);
-
-    if (updatedHitos) setHitos(updatedHitos.map((h) => ({ ...h, synced: true })));
-    setEditHitosOpen(false);
-    toast.success("Hitos actualizados");
   }, [editHitosData, perfilId]);
 
   return {

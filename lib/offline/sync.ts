@@ -1,90 +1,192 @@
-import { createClient } from "@/lib/supabase/client";
-import { getSyncQueue, removeFromSyncQueue, markTemperaturaSynced, markHitoSynced, incrementSyncQueueRetry } from "./db";
+import {
+  getDeadLetter,
+  getSyncQueue,
+  incrementSyncQueueRetry,
+  markHitoSynced,
+  markTemperaturaSynced,
+  moveToDeadLetter,
+  removeFromDeadLetter,
+  removeFromSyncQueue,
+  requeueDeadLetter,
+  type SyncQueueItem,
+} from "./db";
+import { BATCH_SIZE, MAX_RETRIES, backoffMs, chunk } from "./sync-utils";
 
-const MAX_RETRIES = 3;
+export interface SyncResult {
+  synced: number;
+  failed: number;
+  deadLettered: number;
+  pending: number;
+}
 
-export async function syncAll() {
-  const supabase = createClient();
-  const queue = await getSyncQueue();
+interface RespuestaSync {
+  data?: {
+    accepted?: { tempId: string; recordId: number | null }[];
+    rejected?: { tempId: string; code: string; message: string }[];
+  };
+  error?: { message?: string };
+}
 
-  if (queue.length === 0) return { synced: 0, failed: 0, dropped: 0 };
+let vuelo: Promise<SyncResult> | null = null;
 
-  let synced = 0;
-  let failed = 0;
-  let dropped = 0;
+export async function syncAll(): Promise<SyncResult> {
+  if (vuelo) return vuelo;
+  vuelo = ejecutarSync()
+    .catch(() => ({ synced: 0, failed: 0, deadLettered: 0, pending: 0 }))
+    .finally(() => {
+      vuelo = null;
+    });
+  return vuelo;
+}
 
-  for (const item of queue) {
+function itemParaServidor(item: SyncQueueItem) {
+  const d = item.data as Record<string, unknown>;
+  if (item.table === "trazabilidad_temperatura") {
+    return {
+      tempId: item.tempId,
+      table: item.table,
+      data: {
+        id_perfil: item.id_perfil,
+        minuto: d["minuto"],
+        temperatura_registrada: d["temperatura_registrada"],
+      },
+    };
+  }
+  if (item.table === "hitos_termicos") {
+    return {
+      tempId: item.tempId,
+      table: item.table,
+      data: {
+        id_perfil: item.id_perfil,
+        tipo_hito: d["tipo_hito"],
+        tiempo_min: d["tiempo_min"] ?? null,
+        temperatura: d["temperatura"] ?? null,
+      },
+    };
+  }
+  return { tempId: item.tempId, table: item.table, data: d };
+}
+
+async function marcarSincronizadoLocal(item: SyncQueueItem) {
+  if (item.table === "trazabilidad_temperatura") {
+    await markTemperaturaSynced(
+      item.id_perfil,
+      (item.data as Record<string, unknown>)["minuto"] as number
+    );
+  } else if (item.table === "hitos_termicos") {
+    await markHitoSynced(
+      item.id_perfil,
+      (item.data as Record<string, unknown>)["tipo_hito"] as string
+    );
+  }
+}
+
+async function registrarFallo(
+  item: SyncQueueItem,
+  mensaje: string,
+  contadores: { failed: number; deadLettered: number }
+) {
+  const reintentos = (item.retries || 0) + 1;
+  if (item.id === undefined) return;
+  if (reintentos >= MAX_RETRIES) {
+    await moveToDeadLetter({ ...item, retries: reintentos }, mensaje);
+    contadores.deadLettered += 1;
+  } else {
+    await incrementSyncQueueRetry(
+      item.id,
+      mensaje,
+      backoffMs(reintentos)
+    );
+    contadores.failed += 1;
+  }
+}
+
+async function ejecutarSync(): Promise<SyncResult> {
+  const cola = await getSyncQueue();
+  const ahora = Date.now();
+  const debidos = cola.filter(
+    (item) => !item.next_attempt_at || item.next_attempt_at <= ahora
+  );
+  const pendientes = cola.length - debidos.length;
+
+  const resultado: SyncResult = {
+    synced: 0,
+    failed: 0,
+    deadLettered: 0,
+    pending: pendientes,
+  };
+  if (debidos.length === 0) return resultado;
+
+  for (const lote of chunk(debidos, BATCH_SIZE)) {
+    let respuesta: RespuestaSync | null = null;
     try {
-      const d = item.data as Record<string, unknown>;
-      let error: Error | null = null;
-
-      if (item.table === "trazabilidad_temperatura") {
-        const { synced: _syncedT, id_registro: _idReg, ...dbData } = d;
-        const result = await supabase
-          .from("trazabilidad_temperatura")
-          .upsert(dbData, { onConflict: "id_perfil, minuto" });
-        error = result.error;
-        if (!error) {
-          await markTemperaturaSynced(d["id_perfil"] as number, d["minuto"] as number);
-        }
-      } else if (item.table === "hitos_termicos") {
-        const { synced: _syncedH, id_hito: _idHito, ...dbData } = d;
-        const result = await supabase
-          .from("hitos_termicos")
-          .upsert(dbData, { onConflict: "id_perfil, tipo_hito" });
-        error = result.error;
-        if (!error) {
-          await markHitoSynced(d["id_perfil"] as number, d["tipo_hito"] as string);
-        }
-      } else {
-        console.warn("syncAll: tabla desconocida", item.table);
-        await removeFromSyncQueue(item.id as number);
-        dropped++;
-        continue;
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: lote.map(itemParaServidor) }),
+      });
+      respuesta = (await res.json()) as RespuestaSync;
+      if (!res.ok) {
+        throw new Error(
+          respuesta?.error?.message || `Error HTTP ${res.status}`
+        );
       }
-
-      if (error) {
-        const errorDetails = {
-          code: (error as any).code,
-          message: error.message,
-          details: (error as any).details,
-          hint: (error as any).hint,
-          item: { table: item.table, data: d },
-        };
-        console.error("syncAll error:", errorDetails);
-        const retries = (item.retries || 0) + 1;
-        if (retries >= MAX_RETRIES) {
-          console.warn(`syncAll: descartando item ${item.id} después de ${MAX_RETRIES} intentos`);
-          await removeFromSyncQueue(item.id as number);
-          dropped++;
-        } else {
-          await incrementSyncQueueRetry(item.id as number, error.message);
-          failed++;
-        }
-        continue;
-      }
-
-      await removeFromSyncQueue(item.id as number);
-      synced++;
     } catch (e) {
-      console.error("syncAll exception:", e);
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      const retries = (item.retries || 0) + 1;
-      if (retries >= MAX_RETRIES) {
-        console.warn(`syncAll: descartando item ${item.id} después de ${MAX_RETRIES} intentos`);
-        await removeFromSyncQueue(item.id as number);
-        dropped++;
+      const mensaje = e instanceof Error ? e.message : String(e);
+      for (const item of lote) {
+        await registrarFallo(item, mensaje, resultado);
+      }
+      continue;
+    }
+
+    const aceptados = new Map(
+      (respuesta?.data?.accepted ?? []).map((a) => [a.tempId, a.recordId])
+    );
+    const rechazados = new Map(
+      (respuesta?.data?.rejected ?? []).map((r) => [r.tempId, r.message])
+    );
+
+    for (const item of lote) {
+      if (item.id === undefined) continue;
+      if (aceptados.has(item.tempId)) {
+        await marcarSincronizadoLocal(item);
+        await removeFromSyncQueue(item.id);
+        resultado.synced += 1;
       } else {
-        await incrementSyncQueueRetry(item.id as number, errorMessage);
-        failed++;
+        await registrarFallo(
+          item,
+          rechazados.get(item.tempId) ?? "Rechazado por el servidor",
+          resultado
+        );
       }
     }
   }
 
-  return { synced, failed, dropped };
+  return resultado;
 }
 
 export function getSyncStatus() {
   if (typeof navigator === "undefined") return "offline";
   return navigator.onLine ? "online" : "offline";
+}
+
+export async function getDeadLetterCount(): Promise<number> {
+  const items = await getDeadLetter();
+  return items.length;
+}
+
+export async function reintentarDeadLetter(): Promise<number> {
+  const items = await getDeadLetter();
+  let reencolados = 0;
+  for (const item of items) {
+    if (item.id !== undefined && (await requeueDeadLetter(item.id))) {
+      reencolados += 1;
+    }
+  }
+  if (reencolados > 0) await syncAll();
+  return reencolados;
+}
+
+export async function descartarDeadLetter(id: number) {
+  await removeFromDeadLetter(id);
 }

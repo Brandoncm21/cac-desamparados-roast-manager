@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { Search, Plus } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 interface Cliente {
   id_cliente: number;
@@ -17,7 +17,6 @@ interface Cliente {
 }
 
 export default function ClientesPage() {
-  const supabase = useMemo(() => createClient(), []);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -36,27 +35,25 @@ export default function ClientesPage() {
 
   useEffect(() => {
     const load = async () => {
-      const from = (page - 1) * pageSize;
-      const to = page * pageSize - 1;
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
 
-      let query = supabase
-        .from("clientes")
-        .select("*", { count: "exact" })
-        .is("deleted_at", null)
-        .order("nombre_completo")
-        .range(from, to);
-
-      if (debouncedSearch) {
-        const term = debouncedSearch.trim();
-        query = query.or(`nombre_completo.ilike.%${term}%,telefono.ilike.%${term}%`);
+      const res = await fetch(`/api/clientes?${params.toString()}`);
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(
+          "Error al cargar clientes: " + (result.error?.message || "Error desconocido")
+        );
+        return;
       }
-
-      const { data, count } = await query;
-      if (data) setClientes(data);
-      setTotalItems(count || 0);
+      setClientes(result.data ?? []);
+      setTotalItems(result.pagination?.total ?? 0);
     };
     load();
-  }, [debouncedSearch, page, pageSize, supabase]);
+  }, [debouncedSearch, page, pageSize]);
 
   const totalPages = Math.ceil(totalItems / pageSize);
 

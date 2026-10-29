@@ -63,7 +63,7 @@ Para datos: restaurar desde backup de Supabase (Dashboard → Database → Backu
 
 ### 3.1 Caso Histórico Detectado
 
-`scripts/apply-migration.mjs` contenía `PROJECT_REF` y `DB_PASSWORD` hardcodeados en el historial git (ver [`CHANGELOG.md`](../CHANGELOG.md) y [`docs/SECURITY.md`](./SECURITY.md)). **No imprimir valores.**
+`scripts/apply-migration.mjs` contenía `PROJECT_REF` y `DB_PASSWORD` hardcodeados (**siguen vivos en el historial git**). Además, el `opencode.json` local (gitignorado, nunca rastreado) contenía un token `sbp_*` en texto plano. Los valores fueron eliminados del working tree (scripts solo leen `process.env`, MCP usa `{env:SUPABASE_MCP_TOKEN}`). **No imprimir valores.**
 
 ### 3.2 Pasos de Rotación
 
@@ -74,16 +74,21 @@ Para datos: restaurar desde backup de Supabase (Dashboard → Database → Backu
 # 2. Actualizar .env.local y secretos del provider/CI
 #    DATABASE_URL=postgresql://postgres:<NUEVA_PASSWORD>@db.<ref>.supabase.co:5432/postgres
 
-# 3. Mover credenciales de apply-migration.mjs a env
-#    Editar scripts/apply-migration.mjs para leer process.env.DATABASE_URL
-#    (no commitear valores)
+# 3. (Hecho en código) scripts/apply-migration.mjs ya lee process.env
+#    DATABASE_URL (prioridad) o SUPABASE_PROJECT_REF + SUPABASE_DB_PASSWORD
+#    (no commitear valores). Variables documentadas en .env.example.
 
-# 4. Reescribir historial (coordinar con equipo, requiere force-push)
+# 4. Revocar el token sbp_* anterior por higiene (estuvo en texto plano local):
+#    Dashboard → Account → Access Tokens → revocar, crear uno nuevo y exportarlo:
+export SUPABASE_MCP_TOKEN="<nuevo-token>"  # nunca commitear este valor
+#    Sin esta variable, el MCP Supabase falla la autenticación.
+
+# 5. Reescribir historial (coordinar con equipo, requiere autorización explícita)
 git filter-repo --path scripts/apply-migration.mjs --invert-paths  # o --replace-text con regex
 # Alternativa: BFG Repo-Cleaner
 git push --force-with-lease origin main  # ¡avisar al equipo!
 
-# 5. Rotar SUPABASE_SERVICE_ROLE_KEY si estuvo expuesta
+# 6. Rotar SUPABASE_SERVICE_ROLE_KEY si estuvo expuesta
 #    Dashboard → Project Settings → API → Reset service_role key → actualizar envs
 ```
 
@@ -140,6 +145,52 @@ console.log('ordenes count (service_role):', count);
 - **Logs de app:** `handleApiError` loguea en `development` ([`lib/error-handler.ts:27`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/error-handler.ts#L27)).
 - **Supabase:** Dashboard → Logs (Postgres, Auth, API).
 
-## 7. Contacto y Escalamiento
+## 7. Diagnóstico de sincronización offline y dead-letter queue (Fase 3)
+
+### 7.1 Síntomas y causas
+
+| Síntoma | Causa probable | Verificación |
+|---------|---------------|--------------|
+| Badge ámbar con contador en TopBar | Items en `dead_letter` (agotaron 3 reintentos) | DevTools → Application → IndexedDB → `scacr-offline` → store `dead_letter`; campo `last_error` + `failed_at` por item |
+| Temperaturas/hitos visibles en curva pero no en servidor | Cola `pending_sync` con `next_attempt_at` futuro (backoff) o sin conexión | Inspeccionar `pending_sync`: `retries`, `last_error`, `next_attempt_at` (epoch ms); verificar `navigator.onLine` |
+| `POST /api/sync` 422 | Batch > 500 items, item sin `tempId`, tabla fuera del enum o `data` inválida | Respuesta incluye `error.issues`; validar contra `lib/offline/schemas.ts` |
+| `accepted` vacío + `rejected` con `FOREIGN_KEY` | `id_perfil` inexistente (perfil borrado) o `id_orden` inválido | Verificar que el perfil/orden exista y no esté soft-deleted |
+| `rejected` con `CONFLICT` persistente | Condición de carrera o dato corrupto que el waterfall no puede resolver | Revisar `data` del item en DLQ; corregir manualmente y reintentar |
+
+### 7.2 Recuperación de dead-letter items
+
+1. **Vía UI (recomendado):** clic en el badge ámbar del TopBar → reencola todos los items (`retries: 0`) y dispara `syncAll()`. Toast confirma cuántos se reencolaron.
+2. **Inspección manual:** DevTools → Application → IndexedDB → `scacr-offline` → `dead_letter`. Cada registro tiene `tempId`, `table`, `data`, `retries`, `last_error`, `failed_at`. **Nunca contiene secretos** (solo IDs, minutos, temperaturas, tipos de hito).
+3. **Descarte individual:** `removeFromDeadLetter(id)` desde consola con la DB abierta, o implementar acción en UI si el volumen lo justifica. Solo descartar tras confirmar que el dato ya existe en el servidor (upsert idempotente: reintentar es seguro, duplica nada).
+4. **Limpieza masiva (solo desarrollo):** borrar el store `dead_letter` desde DevTools. En producción, preferir reintento: el upsert por clave natural no crea duplicados.
+
+### 7.3 Backoff y reintentos
+
+- Base 5s, factor ×2 por reintento, cap 5 min (`lib/offline/sync-utils.ts`: `backoffMs`). Tras el 3er fallo el item pasa a DLQ.
+- `syncAll()` es single-flight: llamadas concurrentes comparten el mismo vuelo (sin doble procesamiento).
+- Al recuperar conexión (`online`), TopBar dispara `syncAll()` automáticamente.
+
+## 8. Contacto y Escalamiento
 
 Definir en `CODEOWNERS` o en la descripción del PR quién revisa (actualmente `@owner` / revisión manual).
+
+## 9. Historial de cambios (Fase 1 — Seguridad)
+
+- **Fecha:** 2026-10-27 · **Rama:** `feat/audit-hardening` (Fase 1)
+- **Cambios:** §3 actualizado al estado remediado (script env-only, token MCP por entorno, pasos manuales 1/2/4/5/6 pendientes).
+- **Limitaciones:** la rotación efectiva y la reescritura del historial son manuales y requieren coordinación del equipo.
+- **Pendiente (manual):** rotar `DB_PASSWORD`, revocar token `sbp_*`, `git filter-repo` con autorización explícita.
+
+## 10. Historial de cambios (Fase 3 — Sync offline)
+
+- **Fecha:** 2026-10-27 · **Rama:** `feat/audit-hardening` (Fase 3)
+- **Cambios:** §7 nuevo (diagnóstico sync + recuperación DLQ). Flujo real documentado en `docs/ARCHITECTURE.md` §3.2.
+- **Limitaciones:** la lógica server de bulk/fallback está cubierta con DB falsa; el upsert idempotente contra BD real se verificó con las UNIQUEs existentes de producción.
+- **Pendiente:** monitorear ratio rejected de `sync.batch` (docs/OBSERVABILITY.md §3) en operación.
+
+## 11. Historial de cambios (Fases 4 y 5 — RPCs, EXCLUDE, observabilidad)
+
+- **Fecha:** 2026-10-27 · **Rama:** `feat/audit-hardening`
+- **Cambios:** migraciones `0024` (5 RPCs transaccionales) y `0025` (EXCLUDE numrange + CHECK; drop trigger traslape) **aplicadas y verificadas en producción el 2026-10-27** (EXCLUDE rechaza traslape `23P01`, acepta contiguos; permisos `EXECUTE` solo `authenticated`). Observabilidad integrada en `withErrorHandler` (correlation ID + logs JSON; ver `docs/OBSERVABILITY.md`).
+- **Limitaciones:** rollback/rotación histórica de credenciales sigue pendiente (§3); EXPLAIN de índices requiere volumen.
+- **Pendiente (manual):** validar los 5 RPC end-to-end con sesión real (login Admin) tras el deploy; monitoreo de logs.
