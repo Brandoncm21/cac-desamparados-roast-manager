@@ -15,7 +15,12 @@ Documentación técnica completa en [`docs/`](./docs/):
 | [API Reference](./docs/API_REFERENCE.md) | 28+ endpoints con auth, params y ejemplos |
 | [DB Schema](./docs/DB_SCHEMA.md) | Tablas, `NUMERIC(10,2)`, triggers, RLS y seed |
 | [Security](./docs/SECURITY.md) | Prácticas, riesgos y checklist |
-| [Tests & CI](./docs/TESTS_AND_CI.md) | Vitest, coverage (66.07% stmts) y workflow CI |
+| [Tests & CI](./docs/TESTS_AND_CI.md) | Vitest, coverage (79.86% stmts) y workflow CI |
+| [Observability](./docs/OBSERVABILITY.md) | Logs estructurados, correlation ID y redacción de secretos |
+| [Performance Testing](./docs/PERFORMANCE_TESTING.md) | Escenarios k6, líneas base y cómo ejecutarlos |
+| [Performance Indexes](./docs/PERFORMANCE_INDEXES.md) | Índices aplicados (0023), EXPLAIN y criterios de retiro |
+| [Data Growth](./docs/DATA_GROWTH_PLAN.md) | Proyecciones de crecimiento y monitoreo mensual |
+| [Legacy Migration Plan](./docs/LEGACY_MIGRATION_PLAN.md) | Plan de retiro de `servicios_ejecutados` (etapas E1-E5) |
 | [Contributing](./docs/CONTRIBUTING.md) | Ramas, estilo y validaciones pre-PR |
 | [Runbook](./docs/RUNBOOK.md) | Despliegue, rollback y diagnóstico |
 | [Changelog Guide](./docs/CHANGELOG_GUIDE.md) | Política de versiones y plantilla de PR |
@@ -43,8 +48,8 @@ npm install
 cp .env.example .env.local
 # Editar .env.local con tus credenciales de Supabase
 
-# Ejecutar migrations (si aplica)
-npx supabase db push
+# Ejecutar migrations (si aplica; requiere DATABASE_URL en .env.local)
+node scripts/apply-migration.mjs
 
 # Iniciar servidor de desarrollo
 npm run dev
@@ -91,10 +96,12 @@ lib/
   ├── supabase/        # Clientes Supabase
   ├── services/        # Lógica de negocio
   ├── schemas/         # Validaciones Zod
-  ├── offline/         # IndexedDB + sync offline
+  ├── offline/         # IndexedDB + sync offline (DLQ, backoff, single-flight)
+  ├── pagination.ts    # Paginación server-side (Zod, pageSize ≤ 100)
+  ├── observability.ts # Logs estructurados, correlation ID, redacción
   ├── env.ts           # Validación de variables de entorno
   ├── error-handler.ts # Manejo de errores tipados
-  └── api-helpers.ts   # Helpers para APIs
+  └── api-helpers.ts   # Helpers para APIs (auth, rol, withErrorHandler)
 
 components/
   ├── ui/              # Componentes Shadcn/ui
@@ -147,13 +154,19 @@ Todas las rutas `/api/*` requieren autenticación mediante Supabase Auth.
 - `GET /api/perfiles-tueste/[id]/temperaturas` - Obtener temperaturas
 - `POST /api/perfiles-tueste/[id]/temperaturas` - Registrar temperaturas
 - `PUT /api/perfiles-tueste/[id]/hitos/[tipoHito]` - Registrar hito
+- `POST /api/perfiles-tueste/[id]/hitos` - Registrar hitos en lote (offline sync)
 - `PUT /api/perfiles-tueste/[id]/metricas/[tipoMetrica]` - Registrar métrica
 - `POST /api/perfiles-tueste/[id]/ajustes` - Registrar ajuste
 
 ### Otros
 - `GET /api/empleados` - Listar empleados
 - `GET /api/zonas` - Listar zonas de finca
-- `POST /api/sync` - Sincronizar datos offline
+- `POST /api/sync` - Sincronizar datos offline (bulk idempotente; respuesta con `accepted`/`rejected`)
+
+> Listados paginados devuelven `{ data, pagination: { page, pageSize, total, totalPages } }`.
+> Escrituras multi-tabla usan RPCs transaccionales (`crear_orden_completa`,
+> `crear_servicio_con_precios`, `actualizar_servicio_con_precios`,
+> `cerrar_paso_orden`, `confirmar_tueste_paso`). Detalle en [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md).
 
 ### Administración (solo Admin)
 - `GET/POST /api/admin/servicios` - Listar/crear servicios (con intervalos de precio)
@@ -182,7 +195,7 @@ El módulo permite al Admin gestionar un catálogo maestro de servicios con **ta
 ### Cómo funcionan los intervalos de precio
 - El precio se aplica por **rango de peso**: `peso_min_kg <= peso < peso_max_kg`.
 - Al iniciar un paso de la orden, el sistema busca la tarifa que corresponda al peso inicial.
-- Los intervalos no pueden solaparse (validado en frontend, API y base de datos con un trigger).
+- Los intervalos no pueden solaparse (validado en frontend, API y base de datos con un constraint `EXCLUDE` sobre `numrange(peso_min_kg, peso_max_kg, '[)')`).
 - Los intervalos inactivos no se consideran al cotizar ni al resolver la tarifa.
 
 ### Flujo de creación de órdenes
@@ -235,18 +248,19 @@ cacheen respuestas con tokens de sesión. Detalle completo en [`docs/SECURITY.md
     rastreado.
 
 ### Rotación de credenciales históricas
-> ⚠️ `scripts/apply-migration.mjs` contiene credenciales de Supabase
-> (`PROJECT_REF`, `DB_PASSWORD`) **hardcodeadas en el historial de git**.
-> Como tarea separada de este PR, se recomienda:
+> ⚠️ **Estado (post PR #37):** `scripts/apply-migration.mjs` ya **no contiene**
+> credenciales (lee sólo `process.env`, con `DATABASE_URL` prioritaria), pero
+> las credenciales antiguas (`PROJECT_REF`, `DB_PASSWORD`) **permanecen en el
+> historial de git** de commits anteriores. Pendiente manual:
 >
-> 1. Rotar la `DB_PASSWORD` del proyecto Supabase.
-> 2. Mover las credenciales a variables de entorno (por ejemplo
->    `.env.local`, no versionado) o a un secret manager.
-> 3. Reescribir el historial con `git filter-repo` o crear una rama sin
->    la credencial y reemplazar `main` con `force-push` coordinado con el
->    equipo.
+> 1. Rotar la `DB_PASSWORD` del proyecto Supabase (neutraliza el riesgo).
+> 2. Revocar el token de acceso personal (`sbp_*`) que estuvo versionado en
+>    `opencode.json` y usar la variable `SUPABASE_MCP_TOKEN`.
+> 3. Opcional (requiere coordinación con el equipo): reescribir el historial
+>    con `git filter-repo` y `force-push`.
 >
-> No se imprimen ni se exponen valores de secretos en logs del PR.
+> Detalle operativo en [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) y
+> [`docs/SECURITY.md`](./docs/SECURITY.md). No se imprimen valores de secretos en logs.
 
 ## ✅ CI / Seguridad
 
