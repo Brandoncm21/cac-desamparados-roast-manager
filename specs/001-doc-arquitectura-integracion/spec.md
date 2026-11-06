@@ -71,7 +71,7 @@ Un desarrollador consulta los anexos para trabajo diario: glosario de enums, ín
 - **FR-002**: §2 DEBE catalogar las 16 tablas columna a columna (tipo, NULL, default, PK/FK/UNIQUE/CHECK, índices), con trazabilidad por **número de migración** (p. ej. `0017`, `0025`); citar líneas donde aplique.
 - **FR-003**: §2 DEBE incluir `erDiagram` Mermaid con cardinalidades y ON DELETE reales.
 - **FR-004**: §4 DEBE incluir la contraparte CBF con **ER compacto Mermaid (19 tablas)** y matriz de mapeo semántico.
-- **FR-004b**: §4 DEBE incluir el **inventario de los endpoints CBF por controller** (conteo real verificado fila a fila; el checklist de la spec externa afirma 63) y la tabla de las **16 discrepancias conocidas de CBF**.
+- **FR-004b**: §4 DEBE incluir el **inventario de los endpoints CBF por controller** (conteo real verificado fila a fila; el checklist de la spec externa afirma "63" pero su propia tabla contiene **62** filas — error del resumen, registrada como discrepancia #17) y la tabla de las **17 discrepancias** de CBF (16 originales + #17 de conteo).
 - **FR-005**: Todo diagrama Mermaid DEBE ser sintácticamente renderizable (GitHub).
 - **FR-006**: El documento NO DEBE contener secretos ni credenciales (ver README §"Rotación de credenciales históricas").
 - **FR-007**: Idioma: español (consistente con `docs/` existente).
@@ -92,9 +92,9 @@ Un desarrollador consulta los anexos para trabajo diario: glosario de enums, ín
 ### Measurable Outcomes
 
 - **SC-001**: 16/16 tablas CafeTrack documentadas con todas sus columnas y cascadas, trazables a número de migración.
-- **SC-002**: 19/19 tablas CBF en ER compacto + inventario de endpoints CBF (conteo real fila a fila) + 16 discrepancias listadas.
+- **SC-002**: 19/19 tablas CBF en ER compacto + inventario de endpoints CBF **62** (conteo real fila a fila) + **17** discrepancias listadas.
 - **SC-003**: ≥5 diagramas Mermaid renderizables (capas, ER CafeTrack, ER CBF compacto, secuencia crear orden, pipeline unificado bidireccional).
-- **SC-004**: Conteos verificados contra código real: 24 migraciones (sin 0008), 47 handlers en 29 archivos `route.ts`, 9 enums (3 huérfanos), 5 RPCs transaccionales.
+- **SC-004**: Conteos verificados contra código real: 24 migraciones (sin 0008), 47 handlers en 29 archivos `route.ts`, 9 enums (4 huérfanos), 5 RPCs transaccionales.
 - **SC-005**: Mapeo semántico completo; `numero_lote` explícitamente descartado como clave compartida (K1 puente como alternativa).
 - **SC-006**: §4.8 de prerrequisitos de seguridad presente; 0 secretos; 0 discrepancias silenciadas; tabla de funciones expuestas con privilegios `anon`/`authenticated` verificados.
 - **SC-007**: `npx tsc --noEmit` y `npm run lint` siguen pasando (no se tocó código).

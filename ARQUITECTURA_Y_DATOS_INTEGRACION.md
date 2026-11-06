@@ -107,7 +107,7 @@ En la fusión, CBF introduce actos de **Recepción de finca** (acopio) naturalme
 | DTR | Development Time Ratio — ratio de desarrollo del tueste, recalculado por trigger al cambiar hitos | `0001`, `trg_hitos_dtr` |
 | Zaranda | Tamiz de granulometría (13–20) en catación | CBF §2.15 |
 | Agtron | Tonalidad del tueste medida en 8 niveles (25–95) | CBF §2.15 |
-| Beche | Término de dominio mencionado en contexto de negocio; **no aparece en la spec CBF como campo de BD** (hipótesis: registro de pesaje/humedad en acopio) (confirmar con responsable) | — |
+| Beche | **Bache (batch) de tostadora** — denominación local de la planta para la hornada de un tueste; confirma al responsable que NO es el lote de café verde (decisión 2026-11-06). 0 apariciones del término en CBF y CafeTrack (verificado por grep). *(Por confirmar con la planta: redacción exacta del término local, quién lo asigna y el formato)* | Responsable de planta |
 | Peso facturable | Peso con el que se cobra un paso (`orden_pasos.peso_facturable_kg`, `0022`) | `0022` |
 | Merma | `peso_inicial − peso_final` (kg y %) | RPC `0024`, `lib/services/resolver-tarifa.ts` |
 
@@ -820,14 +820,14 @@ Tablas (177 columnas en total, verificado contra el checklist de la spec): `area
 
 Patrones CBF a corregir en la fusión: PUT replace-all (discrepancia 16), 404-vs-lista-vacía inconsistente en `GET .../lote/{nlote}` (discrepancia 12), errores por `message` plano sin código.
 
-### 4.1.4 Las 16 discrepancias de CBF y su destino en la fusión
+### 4.1.4 Las 17 discrepancias de CBF y su destino en la fusión
 
 | # | Discrepancia (CBF) | Destino en la fusión |
 |---|---|---|
 | 1 | UI `nproductor` maxLength 100 vs BD varchar(50) | Portar con varchar(100) en la nueva tabla y Zod ≤100 |
 | 2 | `catacion.c2cortado` en BD/modelo sin campo UI | Decidir: campo UI o DROP de columna (confirmar con responsable) |
 | 3 | `formulario_caracterizacion.l_asignado` sin campo UI | Exponer en UI o drop; hoy solo persistible vía API |
-| 4 | `catacion.pfinales`/`calidad` leídos pero sin columna | Definir cálculo (promedio de `rondas`) o columna materializada |
+| 4 | `catacion.calidad` leído por métricas de trazabilidad pero sin columna | Definir cálculo (promedio de `rondas`) o columna materializada. **Corrección (2026-11-06, contra el proyecto real):** `pfinales` **SÍ existe** y el seed lo llena (`llenar_base_datos.bat:111`) — el único campo fantasma es **`calidad`** |
 | 5 | `TrillaService` declara `POST|DELETE /Trilla/{id}/peso-verde` inexistentes | Código muerto: no portar |
 | 6 | `enviar_muestras.ffinal_reposo` numeric con nombre de fecha | Portar como timestamptz (nombre honesto) o numeric documentada |
 | 7 | `TrazabilidadService.fechaInicio` lee `acopio.facopio` inexistente | Añadir columna de fecha de acopio al portar |
@@ -840,6 +840,10 @@ Patrones CBF a corregir en la fusión: PUT replace-all (discrepancia 16), 404-vs
 | 14 | `catacion.nlote` sin FK física | Materializar FK a `area_acopio` (o a la tabla puente K1) |
 | 15 | Serialización inconsistente en Caracterización | Nombres snake_case alineados desde el primer port |
 | 16 | `PUT` Secado reemplaza colecciones (pierde ids) | RPC transaccional con upsert (no delete-all+insert-all) |
+| 17 | El checklist de la spec CBF afirma "63 endpoints inventariados (+ health)" pero su propia tabla §4.1 contiene **62 filas** (61 de controllers + 1 health; verificado por conteo mecánico) | Usar **62** como cifra oficial del port; el "63" es un error del propio resumen de la spec |
+| 18 | El resumen CBF dice "8 migraciones EF" pero el proyecto real contiene **9** (`UpdateCatacionFieldsV2`, 2025-12-17: agrega `c2negrop`/`c2agriop` y recrea `ffreposo` timestamptz) — el esquema de 48 columnas del resumen ya las captura | Cifra oficial para el port: **9 migraciones**; esquema de catación tomado del snapshot real |
+
+> **Fuente de implementación descubierta (2026-11-06):** el proyecto CoffeeBeanFlow real existe descomprimido en `C:\Users\malum\OneDrive\Escritorio\CoffeeBeanFlow-Project-Noemi-Ajustes\` (10 controllers, 19 entidades EF, **9 migraciones**, Frontend Angular, seed `llenar_base_datos.bat` con datos de ejemplo: 2 lotes, 2 cataciones, 6 rondas 83–86.5). El plan de implementación puede **citar el código real como referencia** (entidades/DbContext/migraciones EF) — actualiza el supuesto inicial del feature spec de que no existía código CBF.
 
 ## 4.2 Mapeo semántico entidad↔entidad
 
@@ -850,8 +854,8 @@ Patrones CBF a corregir en la fusión: PUT replace-all (discrepancia 16), 404-vs
 | Zona geográfica | `area_acopio.zona` varchar(100) | `zonas_finca` (catálogo) + texto libre en `ordenes.zona_finca` | Texto libre en ambos; opcional: normalizar contra `zonas_finca` |
 | Proceso de despulpado | 5 booleans (`lavado`, `natural`, `miel`, `semilavado`, `anaerobico`) + `otro` texto | enum `proceso_cafe` ('Lavado','Honey','Natural','Otro') | Miel↔Honey; `semilavado`/`anaerobico`/multi-selección ⇒ 'Otro' — **pérdida de granularidad documentada** |
 | Estado del proceso | `enproceso` ('No','En Secado','En Trilla','En Bodega','Vendido') + `vendido` bool | `estado_orden_enum` + `orden_pasos.estado` | Traducción explícita por etapa en K1/pipeline (§4.7) |
-| Trillado | `trilla` (20 col) + `peso_verde` (1:1) | paso `Trillado` en `orden_pasos` (tarifa, pesos, snapshots) | **T8**: solapamiento funcional — la trilla existe en ambos sistemas con distinto nivel de detalle; definir fuente de verdad por dato (rendimientos CBF ↔ pesos/caja CafeTrack) |
-| Tueste (resultado) | `catacion.rtostado`, `dfueste` (rendimiento/densidad) | `perfiles_tueste` (DTR, desarrollo, series) | Conectar vía K3; **confirmar convención de signo** (pérdida % vs DTR) y unidades de densidad (g/ml) **(confirmar con responsable)** |
+| Trillado | `trilla` (20 col) + `peso_verde` (1:1) | paso `Trillado` en `orden_pasos` (tarifa, pesos, snapshots) | **T8 RESUELTO (2026-11-06) — fuente de verdad por tipo de dato**: peso facturado → CafeTrack (`orden_pasos`); rendimiento/clasificación → módulo portado de CBF; enlace por `nlote` vía K1. Respaldado por el diseño: **CBF no factura** (0 campos de precio/facturación en sus 19 tablas, verificado por grep del resumen). *(Por confirmar con la planta: quién pesa, quién factura, si se factura sobre entrada o salida)* |
+| Tueste (resultado) | `catacion.rtostado`, `dfueste` | `perfiles_tueste` (DTR, desarrollo, series) | **Decidido (2026-11-06)**: `rtostado` = **rendimiento** — evidencia: etiqueta UI real "Rendimiento Tueste (%)" (`catacion-form.html`, resumen §3) con `min(0)/max(100)`; la vía min/max es **inviable** (el seed no inserta rtostado). Conversión consistente: `rtostado = 100 − porcentaje_diferencia` (merma positiva en CafeTrack). `dfueste` = **g/ml canónico** — evidencia: `DocuProyectoBase/FRONTEND_DOCUMENTATION.md:548` ("Densidad de Tueste (g/ml)") + ayuda de bodega "0.65–0.75 g/ml" con `max(1)` (escala <1 ⇒ g/ml); campo en catación ⇒ café **tostado**; conversión explícita si la planta midió g/L (`g/ml = g/L ÷ 1000`) — *(por confirmar: instrumento y volumen)*. Conectar vía K3 |
 | Humedad medida | `humedad.humedad` (serie durante secado), `bodega.hinicial/hfinal`, `trilla.hinicial/hfinal` | `ordenes_trabajo.porcentaje_humedad_entrada`, `metricas_tueste` (Humedad) | Definir en qué punto del proceso se mide cada una (entrada CafeTrack ≠ serie de secado CBF) |
 | Temperaturas | `temperatura_secado` (serie de secado) | `trazabilidad_temperatura` (serie de tueste, 70–220 °C) | Distintas fases; no confundir series al migrar |
 | Caracterización | `formulario_caracterizacion` + 3 RC 1:1 | — | Tabla nueva en la fusión (sin equivalente) |
@@ -896,7 +900,7 @@ Portar las 6 etapas de CBF (acopio, caracterización, secado, bodega, trilla, ca
 
 ### Contexto
 
-CBF cubre acopio→trilla→catación con datos ricos (48 columnas de catación, series de secado) pero sin auth, sin paginación, sin auditoría y con 16 discrepancias documentadas. CafeTrack cubre el procesamiento posterior (chancado→tueste→empacado) con seguridad y calidad de datos superiores. La operación real del CAC es un solo flujo de lote: **el café entra en acopio y sale tostado/vendido** — dos sistemas significa doble captura y sin trazabilidad end-to-end.
+CBF cubre acopio→trilla→catación con datos ricos (48 columnas de catación, series de secado) pero sin auth, sin paginación, sin auditoría y con 17 discrepancias documentadas. CafeTrack cubre el procesamiento posterior (chancado→tueste→empacado) con seguridad y calidad de datos superiores. La operación real del CAC es un solo flujo de lote: **el café entra en acopio y sale tostado/vendido** — dos sistemas significa doble captura y sin trazabilidad end-to-end.
 
 ### Alternativas rechazadas (Apéndice G las detalla)
 
@@ -908,7 +912,7 @@ CBF cubre acopio→trilla→catación con datos ricos (48 columnas de catación,
 
 - **Positivas**: trazabilidad end-to-end por lote; una sola auth (Supabase JWT) y un solo modelo de roles; catálogos y tarifas unificados; los 47 handlers y RPCs existentes no cambian de contrato.
 - **Negativas**: migración de esquema grande (19 tablas → ~12-15 tablas fusionadas/adaptadas); requiere conciliación manual inicial de productores (K4); el pipeline CBF pierde su API abierta (todos los clientes pasan a JWT).
-- **Seguimiento**: E1–E5 de `docs/LEGACY_MIGRATION_PLAN.md` (retiro de `servicios_ejecutados`); corrección consciente de las 16 discrepancias (§4.1.4); normalización de estados y zonas horarias (T6).
+- **Seguimiento**: E1–E5 de `docs/LEGACY_MIGRATION_PLAN.md` (retiro de `servicios_ejecutados`); corrección consciente de las 17 discrepancias (§4.1.4); normalización de estados y zonas horarias (T6).
 
 ### Reglas de porteo (no negociables por constitución)
 
@@ -918,7 +922,7 @@ CBF cubre acopio→trilla→catación con datos ricos (48 columnas de catación,
 4. **Auditoría añadida**: `created_at/updated_at` (trigger `update_updated_at`) y soft-delete o `activo` según naturaleza de la tabla (catálogos→`activo`; registros→soft-delete).
 5. **JWT Supabase sustituye la API abierta**: ningún endpoint nuevo sin `requireAuth`/`requireRole`.
 6. **Paginación** `apiPaginado` (pageSize ≤ 100) en todos los listados nuevos.
-7. Corrección consciente de las 16 discrepancias del §4.1.4 (cada una con su destino).
+7. Corrección consciente de las 17 discrepancias del §4.1.4 (cada una con su destino).
 
 ### 4.4.1 Tabla de porteo por módulo
 
@@ -992,7 +996,7 @@ Forma estándar (verificada): handlers `export const METHOD = withErrorHandler(a
 | **T5** | **Heurística `capacidad_kg >= 100 → /1000`** en `cerrar_paso_orden` (`0024`): asume que capacidades ≥100 están en gramos | **Integridad**: si otro sistema (o un Admin) introduce capacidades en kg ≥ 100 (ej. 250 kg), se divide erróneamente entre 1000 → 0.25 kg → sobre-empaque x1000 | Normalizar la unidad en `empaques` (columna `unidad_peso` o migración de datos) y eliminar la heurística; mientras tanto, validar en Zod `capacidad_kg <= 50` |
 | **T6** | **Zona horaria**: `fecha_orden`/`fecha_tueste` DATE con default `CURRENT_DATE` (UTC del servidor). En Costa Rica (UTC−6) una orden creada después de las 18:00 recibe la fecha del **día siguiente**; CBF usa timestamptz en todo | Fechas de negocio erróneas (facturación, vencimientos) | Normalizar a `timestamptz` con `AT TIME ZONE 'America/Costa_Rica'` al mostrar; evaluar migración de `date`→`timestamptz` o defaults con offset |
 | T7 | Borrados: físico (CBF, RESTRICT/CASCADE) vs soft-delete/activo (CafeTrack) | Pérdida de historial si se copia el comportamiento | Portar con soft-delete; RESTRICT solo donde el negocio lo exija |
-| **T8** | **Solapamiento funcional de trilla**: CBF modela trilla+peso_verde con rendimientos (20+3 col); CafeTrack tiene paso 'Trillado' con tarifa/pesos/snapshots | Doble captura del mismo proceso | Definir fuente de verdad por dato: rendimientos/clasificación → CBF-port; pesos facturados → orden_pasos; el paso Trillado de CafeTrack referencia la trilla portada (K1) |
+| **T8** | **Solapamiento funcional de trilla**: CBF modela trilla+peso_verde con rendimientos (20+3 col); CafeTrack tiene paso 'Trillado' con tarifa/pesos/snapshots | Doble captura del mismo proceso | **T8 RESUELTO (2026-11-06) — fuente de verdad por tipo de dato**: rendimientos/clasificación → módulo portado de CBF; **pesos facturados → orden_pasos**; el paso Trillado de CafeTrack referencia la trilla portada (K1). Respaldado por el diseño: CBF no factura. *(Pendiente de planta: quién pesa, quién factura, y si se factura sobre entrada o salida)* |
 | T9 | N:M de CBF sin UI (guardar_cafe, suministra, enviar_muestras) | Vínculos huérfanos operativamente | Portar como tablas con FK + endpoints; agregar UI mínima (detalle de Bodega/Trilla) |
 | T10 | PK de negocio mutable: `formulario_caracterizacion.tiempo` (timestamptz) es PK y viaja en la URL | Re-cargas y comparaciones frágiles | Surrogate id + UNIQUE(tiempo, nlote) en la tabla portada |
 | T11 | `catacion` con 48 columnas planas (zarandas 8, Agtron 8, defectos C1/C2) | Esquema rígido; difícil evolución | Portar 1:1 al inicio (fidelidad); evaluar JSONB agrupado como deuda técnica marcada |
@@ -1040,6 +1044,7 @@ Eventos de enlace exactos:
 - **e1 (CBF→CafeTrack)**: una trilla con `wverde_final` registrado crea una orden CafeTrack (RPC `crear_orden_completa`) cuyo primer paso (Chancado) recibe `peso_inicial_kg = wverde_final`; la fila `orden_lotes_externos` (K1) vincula la orden con el/los `nlote` y guarda `origen='CBF'` (idempotencia K5).
 - **e2 (CafeTrack→CBF)**: un perfil de tueste en estado `'Completado'` queda disponible para catación; la catación nueva referencia `perfil_tueste_ref` = `perfiles_tueste.public_id` (K3) y opcionalmente registra `rtostado/dfueste` de vuelta para comparar con el DTR del perfil (bucle de calidad).
 - **Cierre**: `catacion` de la última ronda o decisión comercial marca `area_acopio.enproceso='Vendido'`/`vendido=true` en CBF y `ordenes_trabajo.estado_orden='Completado'` con `numero_factura` (K6) en CafeTrack.
+- **Fuente de verdad de la trilla (RESUELTO 2026-11-06)**: por tipo de dato — rendimientos/clasificación → módulo portado de CBF; **pesos facturados → CafeTrack (`orden_pasos`)**; enlace por `nlote` (K1). Respaldado por el diseño de CBF: no hay campos de precio/facturación en sus 19 tablas (verificado por grep del resumen). *(Pendiente de planta: quién pesa, quién factura, y si se factura sobre entrada o salida)*.
 
 ## 4.8 Prerrequisitos de seguridad pre-integración (obligatorio)
 
@@ -1109,6 +1114,18 @@ Antes de crear usuarios, roles de integración o mover datos entre sistemas, res
 | Traslape de tarifas | `400/500` + **`pg.code=23P01`** (EXCLUDE) | n/a |
 | Error de DB | `500 DB_ERROR` (+ `pg.code` en log) | 500 + logger |
 | Interno | `500 INTERNAL_ERROR` (+ correlationId) | 500 |
+
+**Propuesta de contrato unificado de errores `(propuesta)`** — para los módulos portados de CBF y cualquier endpoint nuevo de la fusión, tomando CafeTrack como base:
+
+| Regla | Decisión propuesta |
+|---|---|
+| Envoltorio | Éxito `{ "data": ... }` · error `{ "error": { "code", "message", "details?", "correlationId" } }` + header `x-correlation-id` |
+| Validación de payload | `422 VALIDATION_ERROR` con `issues[]` por campo (reemplaza el `400` de CBF) |
+| Referencia inexistente (FK/ID) | `400 INVALID_INPUT` con el campo culpable en `details` (reemplaza el `400` con `message` de CBF) |
+| Duplicado (PK/UNIQUE) | `409 CONFLICT` + recurso en `details` (uniforma "El lote ya existe") |
+| Autenticación/rol | `401 UNAUTHORIZED` / `403 FORBIDDEN` JSON en `/api/*` (nuevo para los módulos CBF portados, que hoy no autentican) |
+| Errores de BD | Mapeo estable: `23505→409`, `23503→400`, `23514→422`, `23P01→409` |
+| Serialización | `snake_case` (CafeTrack) + omisión de nulos en respuestas (criterio CBF, reduce payload) — **(por confirmar)** |
 
 ## Anexo D — Referencias principales (migración · archivo:línea)
 
