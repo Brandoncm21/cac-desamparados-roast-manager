@@ -24,8 +24,8 @@
 - [x] **T8. Verificación Fase 2** (2026-11-06): MCP **18 tablas / 50 políticas / 29 cols / 4 índices / trigger / migración registrada** · `tsc`=0 · `lint`=0 err (39 warns: 36 preexistentes + 3 del patrón set-state-in-effect idéntico al resto de la app) · **172/172 tests** suite completa (18 archivos) · `curl` flujo en dev: pendiente verificación manual del propietario (dev server no levantado en sesión)
 
 ## Fase 2.5 — Retrofit cosmético según Stitch (zip local, lógica intacta)
-- [ ] **T8.5a. Títulos de secciones** del `LoteForm` según pantalla "Acopio" del zip (sin cambio de lógica)
-- [ ] **T8.5b. "Lotes Recientes"** en `/lotes/nueva` via `GET /api/lotes?pageSize=5` (UI aditiva)
+- [x] **T8.5a. Títulos de secciones** del `LoteForm` según pantalla "Acopio" del zip (sin cambio de lógica): "Información Principal del Lote Raíz" · "Estado y Disponibilidad en Planta" · "Tipo de Beneficio y Despulpado" · "Pruebas Físicas en Húmedo & Análisis de Densidad" + h1 "Acopio y Entrada de Cosecha"
+- [x] **T8.5b. "Lotes Recientes"** en `/lotes/nueva` via `GET /api/lotes?pageSize=5` (UI aditiva, GET existente) + badges de estado — verificado tsc=0/lint=0 err
 
 ## Fase 3 — P2 Etapas del lote (subdivisible 3a–3d)
 - [ ] **T9 (3a). `0028_caracterizacion.sql` + RPC `guardar_caracterizacion`** — `caracterizacion_lote(id_lote FK, tiempo timestamptz NOT NULL, proceso, l_asignado, 21 campos físico-químicos, created/updated/deleted)` UNIQUE `(id_lote, tiempo)` + 3 RC en `caracterizacion_rc(tipo_rc CHECK ('maduras','inmaduras','sobremaduras'), gbx, promedio, observaciones)` UNIQUE `(caracterizacion_id, tipo_rc)` — cierra disp. 3 (exponer `l_asignado`), 10 (NOT NULL consciente), 15 (nombres snake_case), 16 (upsert)

@@ -153,7 +153,7 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Información Principal</CardTitle>
+          <CardTitle>Información Principal del Lote Raíz</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -214,7 +214,7 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Estado y Disponibilidad</CardTitle>
+          <CardTitle>Estado y Disponibilidad en Planta</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2">
@@ -250,7 +250,7 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Tipo de Despulpado</CardTitle>
+          <CardTitle>Tipo de Beneficio y Despulpado</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {DESPULPADO.map(([campo, etiqueta]) => (
@@ -272,7 +272,7 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Pruebas Físicas y Densidad</CardTitle>
+          <CardTitle>Pruebas Físicas en Húmedo &amp; Análisis de Densidad</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {PRUEBAS.map(([campo, etiqueta]) => (
