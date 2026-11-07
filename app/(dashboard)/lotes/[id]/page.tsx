@@ -10,6 +10,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { CaracterizacionPanel } from "@/components/lotes/caracterizacion-panel";
+import { SecadoPanel } from "@/components/lotes/secado-panel";
+import { BodegaPanel } from "@/components/lotes/bodega-panel";
+import { TrillaPanel } from "@/components/lotes/trilla-panel";
 
 interface LoteDetalle {
   id_lote: number;
@@ -48,6 +52,8 @@ interface LoteDetalle {
 const DESPULPADO: string[] = [];
 void DESPULPADO;
 
+const TABS = ["Caracterización", "Secado", "Bodega", "Trilla"] as const;
+
 export default function LoteDetallePage() {
   const params = useParams();
   const router = useRouter();
@@ -56,6 +62,7 @@ export default function LoteDetallePage() {
   const [lote, setLote] = useState<LoteDetalle | null>(null);
   const [cargando, setCargando] = useState(true);
   const [userRole, setUserRole] = useState<"Admin" | "Tostador" | "Recepción" | "Operador" | null>(null);
+  const [tab, setTab] = useState<(typeof TABS)[number]>("Caracterización");
 
   useEffect(() => {
     getCurrentUserRole().then(setUserRole);
@@ -173,7 +180,7 @@ export default function LoteDetallePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Pruebas Físicas y Densidad</CardTitle>
+          <CardTitle>Pruebas Físicas en Húmedo &amp; Análisis de Densidad</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
           <div><span className="text-muted-foreground block">Pulpa/Pergamino (%)</span>{finfo(lote.pf_pulpa_pergamino)}</div>
@@ -225,17 +232,19 @@ export default function LoteDetallePage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Etapas del lote</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            Caracterización, Secado, Bodega y Trilla estarán disponibles en la Fase 3 de la fusión
-            (pestañas del detalle).
-          </p>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap gap-2 border-b border-outline-variant pb-2">
+        {TABS.map((t) => (
+          <Button key={t} variant={tab === t ? "secondary" : "ghost"} size="sm"
+            onClick={() => setTab(t)}>
+            {t}
+          </Button>
+        ))}
+      </div>
+
+      {tab === "Caracterización" && <CaracterizacionPanel loteId={loteId} editable />}
+      {tab === "Secado" && <SecadoPanel loteId={loteId} editable />}
+      {tab === "Bodega" && <BodegaPanel loteId={loteId} editable />}
+      {tab === "Trilla" && <TrillaPanel loteId={loteId} editable />}
     </div>
   );
 }
