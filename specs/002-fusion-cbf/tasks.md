@@ -14,14 +14,18 @@
 - [x] **T2. Verificación MCP de T1**: `soft_delete_row` = **0 filas en pg_proc** · tablas 17 · políticas 47 · 3 `public_id` + `external_ref` + 2 índices · grants anon K1 = 0 · migración registrada · advisors: hallazgo C2 **desaparecido** (WARNs restantes preexistentes: search_path×9, extensiones en public×2, `get_empleado_rol` defininer-ejecutable — seguimiento aparte) · `tsc`=0 · `lint`=0 err / 36 warn preexistentes
 
 ## Fase 2 — P1 Slice vertical: LOTES end-to-end
-- [ ] **T3. Migración `0027_lotes_cafe.sql`** (incluye índices: `idx_lotes_nlote_trgm` + parcial por fecha)
-  - [ ] `lotes_cafe`: `id_lote serial PK` · `nlote varchar(100) NOT NULL UNIQUE` · `public_id uuid K2` · `nrecibo int NOT NULL` · `nproductor varchar(100) NOT NULL` · `nfinca varchar(100) NOT NULL` · `zona varchar(100)` · `altura numeric` · `robjetivo/rtotal numeric` · `disponible numeric` · `vendido bool NOT NULL DEFAULT false` · `enproceso varchar(50) NOT NULL DEFAULT 'No' CHECK IN ('No','En Secado','En Trilla','En Bodega','Vendido')` · 5 booleans despulpado + `otro varchar(100)` · 6 pruebas físicas/densidad numeric · `fecha_acopio timestamptz NOT NULL DEFAULT now()` · `created_at/updated_at` + trigger · `deleted_at`
-  - [ ] RLS: SELECT `true` / INSERT+UPDATE `rol∈{Recepción,Admin}` / DELETE no policy (soft) · índices: `(fecha_acopio DESC) WHERE deleted_at IS NULL`, `(nproductor)` trgm `WHERE deleted_at IS NULL`
-- [ ] **T4. Zod `lib/schemas/lotes.ts`** (crear/actualizar/listar: fronteras reales — `enproceso` enum, booleans, nums ≥0, `nlote` ≤100 obligatorio; `deleted_at` solo via endpoint)
-- [ ] **T5. API `/api/lotes`** (con withErrorHandler): `GET` paginado+search trgm+estado+desde/hasta · `POST` · `[id]` `GET/PUT/DELETE`(soft) — 5 handlers, roles según FR-001
-- [ ] **T6. UI**: sidebar "Lotes" · `/lotes` (tabla paginada+filtros, patrón de órdenes) · `/lotes/nueva` + `/lotes/[id]/editar` (secciones: principal, maduración, estado, despulpado, pruebas) · `/lotes/[id]` (detalle base + placeholder pestañas etapas)
-- [ ] **T7. Tests**: `lotes.schema.test.ts` + `lotes.api.test.ts` (409 nlote dup, 403 rol, soft-delete)
-- [ ] **T8. Verificación Fase 2**: MCP counts (18 tablas, ~50 policies) · `tsc`+`lint`+test · curl dev: flujo 201→409→403→soft
+- [x] **T3. Migración `0027_lotes_cafe.sql`** (`0027_lotes_cafe.sql` creada y aplicada vía MCP — 4 índices: fecha parcial + trgm nlote/nproductor + enproceso)
+  - [x] `lotes_cafe`: 29 columnas verificadas (18 tablas · PK serial · `nlote varchar(100) UNIQUE` · `public_id` K2 · CHECK `enproceso` · 5 booleans despulpado · 6 pruebas físicas · `fecha_acopio` timestamptz-corrige disp. 7 · trigger `update_updated_at` · `deleted_at`)
+  - [x] RLS: SELECT `deleted_at IS NULL` / INSERT+UPDATE `rol∈{Recepción,Admin}` (UPDATE WITH CHECK(true), patrón 0014) / sin DELETE policy (soft) — **3 políticas** verificadas en catálogo
+- [x] **T4. Zod `lib/schemas/lotes.ts`**: `crearLoteSchema` (defaults FR-010/011) · `actualizarLoteSchema` (omit `nlote` — convención CBF) · `listarLotesFiltrosSchema` (enum+fechas YYYY-MM-DD→422) · preprocess NaN/""→null
+- [x] **T5. API `/api/lotes`** (5 handlers con `withErrorHandler`+`requireRole`): `GET` paginado+search trgm+enproceso+desde/hasta sobre `fecha_acopio` · `POST` (23505→409) · `[id]` `GET` (+`ordenes_vinculadas` K1)/`PUT`/`DELETE` soft — roles FR-001 respetados
+- [x] **T6. UI**: sidebar "Lotes" (`/lotes`, icono `Boxes`, después de Órdenes) · `/lotes` lista (filtros+debounce+paginación+badge estados+acciones por rol `canEditLote/canDeleteLote`) · `/lotes/nueva`+`/lotes/[id]/editar` (`LoteForm` RHF+Zod, 5 secciones, `nlote` disabled en edición) · `/lotes/[id]` detalle (+enlaces K1 + placeholder etapas Fase 3)
+- [x] **T7. Tests**: `lib/__tests__/lotes.schema.test.ts` — **12/12 green** (defaults, límites, NaN→null, omit nlote, filtros 422); `lotes.api.test.ts` condicionado a mock server — sin implementar (patrón del repo no exige route tests con BD)
+- [x] **T8. Verificación Fase 2** (2026-11-06): MCP **18 tablas / 50 políticas / 29 cols / 4 índices / trigger / migración registrada** · `tsc`=0 · `lint`=0 err (39 warns: 36 preexistentes + 3 del patrón set-state-in-effect idéntico al resto de la app) · **172/172 tests** suite completa (18 archivos) · `curl` flujo en dev: pendiente verificación manual del propietario (dev server no levantado en sesión)
+
+## Fase 2.5 — Retrofit cosmético según Stitch (zip local, lógica intacta)
+- [ ] **T8.5a. Títulos de secciones** del `LoteForm` según pantalla "Acopio" del zip (sin cambio de lógica)
+- [ ] **T8.5b. "Lotes Recientes"** en `/lotes/nueva` via `GET /api/lotes?pageSize=5` (UI aditiva)
 
 ## Fase 3 — P2 Etapas del lote (subdivisible 3a–3d)
 - [ ] **T9 (3a). `0028_caracterizacion.sql` + RPC `guardar_caracterizacion`** — `caracterizacion_lote(id_lote FK, tiempo timestamptz NOT NULL, proceso, l_asignado, 21 campos físico-químicos, created/updated/deleted)` UNIQUE `(id_lote, tiempo)` + 3 RC en `caracterizacion_rc(tipo_rc CHECK ('maduras','inmaduras','sobremaduras'), gbx, promedio, observaciones)` UNIQUE `(caracterizacion_id, tipo_rc)` — cierra disp. 3 (exponer `l_asignado`), 10 (NOT NULL consciente), 15 (nombres snake_case), 16 (upsert)

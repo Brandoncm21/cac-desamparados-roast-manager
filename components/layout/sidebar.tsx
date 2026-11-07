@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Users, FileText, Flame, BarChart3, LogOut, Coffee, Menu, X, Plus,
-  Package, Box,
+  Package, Box, Boxes,
 } from "lucide-react";
 import { getCurrentUserRole, type UserRole } from "@/lib/auth-helpers";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/ordenes", label: "Órdenes", icon: FileText },
+  { href: "/lotes", label: "Lotes", icon: Boxes },
   { href: "/tueste", label: "Tueste", icon: Flame },
   { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
