@@ -705,6 +705,21 @@ sequenceDiagram
 5. **Prerrequisitos de seguridad (§4.8) completados** antes de migrar datos reales.
 6. **Paridad de capacidades**: lo que CBF capturaba (series, N:M, caracterización) sigue siendo capturable tras la fusión.
 
+### 4.0.1 Verificación del cierre (2026-11-07, rama `002-fusion-cbf`)
+
+| Criterio | Estado | Evidencia |
+|---|---|---|
+| 1. Cero API abierta | ✅ | 8 tablas nuevas con RLS (3 policies c/u, REVOKE a `anon`); RPCs `guardar_*`/e1 solo `authenticated`; API routes con `requireRole`: lotes (Administración/Recepción), etapas (Recepción/Superv), catación/e1-supervisées (Tostador/Admin, e1 Recepción/Admin) |
+| 2. Cero replace-all | ✅ | 7 RPCs transaccionales (upsert por id + soft-delete de no-enviados; **NNN ninguna escritura reemplaza colecciones** — inclusive el fix del patrón `<> ALL` del pase de ids nuevos) |
+| 3. Trazabilidad e2e | ✅ | Demo SC-003 persistente: `LT-E2E-001` → K1 (645 kg/fusion) → orden **#43 / F-0043** → 7 pasos → perfil **#27 TQ-E2E-01 Completado** → catación **#2** (pfinales 85.25, rtostado 88, dfueste 0.68 g/ml, rondas 87.0) — una sola SQL con JOIN de 6 tablas |
+| 4. Sin discrepancias heredadas | ✅ | Las 17 de §4.1.4 + la 18: 11 implementadas en el port, 4 "no portar/irrelevante" (5/8/9/17), 1 decidida con el responsable (2: `c2cortado` **campo UI existente**), 1 corregida con evidencia real (4: `pfinales` sí existe), 1 errata de conteo del propio resumen CBF (18). Ninguna queda abierta |
+| 5. Prerrequisitos §4.8 | ⏳ con condición | C2 (DROP `soft_delete_row`, 0 usos) ✅ · C1 **rotación manual pendiente del propietario** — requisito ANTES de migrar datos reales CBF (decisión diferida) · Advisors: FK `catacion_tueste_nlote_fkey` indexada + `get_empleado_rol` ya no ejecutable por anon (fixes aplicados) |
+| 6. Paridad de capacidades | ✅ | Series de secado (4 débiles + RPC sync), N:M bodega↔secado con `{cantidad_sacos}`, caracterización + 3 RC comparativos, catación 48 col + rondas: todo capturable desde la UI y RPC — demo SC-003 congela la cadena |
+
+**Estado del port**: Fases 0–4 de `specs/002-fusion-cbf/tasks.md` (T1–T18) implementadas y verificadas (tsc 0 · lint 0 err · 189/189 tests · cobertura 81.56% global / 100% schemas · check-secrets limpio · MCP: 31 tablas, 89 policies, 7 RPCs del pipeline).
+
+**Dependencias del cierre faltantes (no bloquean el merge, sí bloquean la migración de datos reales CBF)**: C1 (rotación manual, propietario) y la decisión de migrar/arrancar vacío (propietario).
+
 ## 4.1 Contraparte CoffeeBeanFlow (CBF)
 
 **Fuente única**: `ESPECIFICACION_RECONSTRUCCION.md` (835 líneas; análisis del código real CBF del 06/10/2026). No existe código CBF en este workspace.

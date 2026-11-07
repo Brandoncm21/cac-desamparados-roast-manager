@@ -67,3 +67,7 @@ CREATE POLICY ole_delete ON orden_lotes_externos
 -- DELETE + reinsert, misma política del pasillo de canción pivotante).
 REVOKE ALL ON orden_lotes_externos FROM anon;
 GRANT SELECT, INSERT, DELETE ON orden_lotes_externos TO authenticated;
+
+-- Endurecimiento advisory (2026-11-06): las funciones SECURITY DEFINER no deben
+-- ser ejecutables por anon (linter 0028). get_empleado_rol vive en 0001/0007.
+REVOKE EXECUTE ON FUNCTION get_empleado_rol() FROM anon;

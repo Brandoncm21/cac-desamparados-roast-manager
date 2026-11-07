@@ -4,6 +4,24 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Added — Fusión CoffeeBeanFlow (002-fusion-cbf, Fases 0–4)
+- **Módulo Lotes end-to-end** (0027): `lotes_cafe` (29 columnas, RLS 3 policies, índices incl. `idx_lotes_nlote_trgm`), API `/api/lotes` (GET paginado + búsqueda trgm + filtros, POST→RPC, 23505→409) y `/api/lotes/[id]` (GET con órdenes enlazadas K1, PUT, DELETE soft), UI completa (lista con debounce/estados/badges, nueva, detalle, editar) con RHF+Zod.
+- **Etapas del lote** (0028–0031): `caracterizacion_lote`+3 RC (upsert por id de lote+tiempo), `secado_lote`+4 series débiles con RPCs de upsert dif sync, `bodega_lote`+N:M `secado_bodega` (sync con validación de pertenencia), `trilla_lote`+`peso_verde_trilla` 1:1 (toggle off → soft-delete). UI de 4 pestañas en `/lotes/[id]`.
+- **Catación pipeline** (0032): `catacion_tueste` (48 atributos del snapshot real de CBF incl. `c2cortado`, `dfueste` g/ml) + `catacion_rondas` (solo `valor_calidad`) con K3 materializada (`perfil_tueste_ref` FK a `public_id`), FK `id_lote` y FK `nlote` materializadas; RPC `guardar_catacion` (autoderiva `nlote` vía K1; perfil no-Completado rechazado); API `/api/cataciones` GET/POST/PUT + UI completa (6 secciones, rondas FormArray, selector de perfiles `Completado`).
+- **e1 `crear_orden_desde_trilla`**: RPC que convierte una trilla completada (requiere `wverde_final>0`) en orden de CafeTrack — idempotente por lote (K5), K4 concilia productor→cliente o 400 con pedido de conciliación, 7 `orden_pasos` de la planta, puente K1 con peso verde; botón "Enviar a proceso" en Trilla Panel.
+- **e2 flujo de catación**: selector de perfiles `Completado` (FR-014) + `Puntaje Final` + trazabilidad.
+- **Pestaña "Trazabilidad Integral"** en `/lotes/[id]`: timeline de 9 etapas (Acopio→…→Vendido) con estados reales, resumen por etapa y enlaces directos a la orden (e1) y cataciones (e2).
+- **Conectores** (0026): K1 `orden_lotes_externos` (RLS 3 policies, PK compuesta), K2 `public_id` en orden/perfiles/clientes, K4 `clientes.external_ref`; índice `idx_catacion_nlote`; `REVOKE EXECUTE` de `get_empleado_rol` a `anon` (linter 0028).
+- **RPCs transaccionales de la fusión** (todas INVOKER, EXECUTE solo `authenticated`): `guardar_lote`, `guardar_caracterizacion`, `guardar_secado` (+2 helpers de serie), `guardar_bodega`, `guardar_trilla`, `guardar_catacion`, `crear_orden_desde_trilla`.
+- **Demo SC-003 persistente** (datos de demostración para aceptación): lote `LT-E2E-001` (Finca San Luis) con caracterización → secado (dsecado=2, 3 humedades) → bodega (10 sacos) → trilla (wverde_final 645) → e1 orden **#43 / F-0043** → perfil **#27 "TQ-E2E-01"** Completado → catación **#2** (pfinales 85.25, rtostado 88, dfueste 0.68 g/ml, promedio rondas 87.0). Consultable con la SQL de trazabilidad del doc raíz §5.
+
+### Changed — Fusión CB
+- `crear_orden_completa` (0024): cast de `proceso_cafe` al enum y `hora_cierre` a `time` (dos bugs de casting latentes, solo eran invisibles con proceso NULL).
+- Helpers de serie (`upsert_serie_secado`, `upsert_serie_camas`, `guardar_catacion`): el soft-delete de "no-enviados" ahora preserva los ids recién insertados sin id (`v_nuevos int[]` + `NOT IN (SELECT unnest(...))`); el patrón viejo `<> ALL (subquery)` mataba ítems nuevos del mismo pase.
+
+### Security — Fusión CB
+- Todos los endpoints nuevos con JWT + `requireRole` (regla 5 de porteo): `guardar_*`/`crear_orden_desde_trilla` solo `authenticated`; RLS en las 8 tablas nuevas (3 policies c/u) con REVOKE a `anon`.
+
 ### Added
 - Módulo maestro de Servicios (`servicios_maestro` + `servicio_precios`) con CRUD administrable por Admin.
 - Módulo maestro de Empaques (`empaques` + `empaque_precios`) con CRUD administrable por Admin.

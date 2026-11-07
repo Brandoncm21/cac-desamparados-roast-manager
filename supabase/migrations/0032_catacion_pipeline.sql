@@ -117,6 +117,7 @@ CREATE TRIGGER trg_catacion_rondas_updated_at BEFORE UPDATE ON catacion_rondas
 
 CREATE INDEX idx_catacion_ref ON catacion_tueste (perfil_tueste_ref) WHERE deleted_at IS NULL;
 CREATE INDEX idx_catacion_lote ON catacion_tueste (id_lote) WHERE deleted_at IS NULL;
+CREATE INDEX idx_catacion_nlote ON catacion_tueste (nlote) WHERE deleted_at IS NULL;
 CREATE INDEX idx_catacion_rondas_idx ON catacion_rondas (catacion_id) WHERE deleted_at IS NULL;
 
 -- ── RLS ──────────────────────────────────────────────────────────────────────
