@@ -63,6 +63,7 @@ export function TrillaPanel({ loteId, editable }: { loteId: string; editable: bo
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [pvOn, setPvOn] = useState(false);
+  const [enviando, setEnviando] = useState(false);
   const [pv, setPv] = useState({ wfinal: "" as string | number, winferiores: "" as string | number, wfinal_inferiores: "" as string | number });
 
   useEffect(() => {
@@ -128,6 +129,34 @@ export function TrillaPanel({ loteId, editable }: { loteId: string; editable: bo
       setIndice(0);
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const enviarProceso = async () => {
+    if (!activo.id_trilla) return;
+    if (!window.confirm("Se creará una orden de CafeTrack desde esta trilla (idempotente). ¿Continuar?")) return;
+    setEnviando(true);
+    try {
+      const res = await fetch(`/api/lotes/${loteId}/trilla/enviar-proceso`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_trilla: activo.id_trilla }),
+      });
+      const result = (await res.json()) as {
+        data?: { id_orden?: number; reused?: boolean };
+        error?: { message?: string };
+      };
+      if (!res.ok) {
+        toast.error("Error al enviar a proceso: " + (result.error?.message || "Error desconocido"));
+        return;
+      }
+      if (result.data?.reused) {
+        toast.info(`Orden ya existente: #${result.data.id_orden}`);
+      } else {
+        toast.success(`Orden creada: #${result.data?.id_orden}`);
+      }
+    } finally {
+      setEnviando(false);
     }
   };
 
@@ -202,6 +231,23 @@ export function TrillaPanel({ loteId, editable }: { loteId: string; editable: bo
           {SECC_CLASIF.map(([k, l]) => <NumeroInput key={k} k={k} l={l} />)}
         </CardContent>
       </Card>
+
+      {editable && (activo.id_trilla ? (activo.wverde_final ?? 0) > 0 : false) && (
+        <Card className="border-emerald-600/40 bg-emerald-500/5">
+          <CardHeader>
+            <CardTitle className="text-sm">Siguiente etapa del pipeline (e1)</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              Con la trilla completa y el peso verde final registrado, genera la orden de CafeTrack
+              con el puente K1 (idempotente por lote).
+            </p>
+            <Button onClick={enviarProceso} disabled={enviando}>
+              {enviando ? "Creando orden…" : "Enviar a proceso"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex gap-2 justify-end">
         {editable && (

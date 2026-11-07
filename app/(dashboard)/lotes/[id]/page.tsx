@@ -14,6 +14,7 @@ import { CaracterizacionPanel } from "@/components/lotes/caracterizacion-panel";
 import { SecadoPanel } from "@/components/lotes/secado-panel";
 import { BodegaPanel } from "@/components/lotes/bodega-panel";
 import { TrillaPanel } from "@/components/lotes/trilla-panel";
+import { TrazabilidadPanel } from "@/components/lotes/trazabilidad-panel";
 
 interface LoteDetalle {
   id_lote: number;
@@ -52,7 +53,7 @@ interface LoteDetalle {
 const DESPULPADO: string[] = [];
 void DESPULPADO;
 
-const TABS = ["Caracterización", "Secado", "Bodega", "Trilla"] as const;
+const TABS = ["Caracterización", "Secado", "Bodega", "Trilla", "Trazabilidad Integral"] as const;
 
 export default function LoteDetallePage() {
   const params = useParams();
@@ -245,6 +246,7 @@ export default function LoteDetallePage() {
       {tab === "Secado" && <SecadoPanel loteId={loteId} editable />}
       {tab === "Bodega" && <BodegaPanel loteId={loteId} editable />}
       {tab === "Trilla" && <TrillaPanel loteId={loteId} editable />}
+      {tab === "Trazabilidad Integral" && <TrazabilidadPanel loteId={loteId} />}
     </div>
   );
 }

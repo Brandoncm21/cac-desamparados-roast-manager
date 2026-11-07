@@ -28,7 +28,7 @@
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.crear_orden_completa(
   p_orden jsonb,
-  p_servicios jsonb,
+  p_servicios jsonb DEFAULT '[]'::jsonb,
   p_especificaciones jsonb DEFAULT NULL
 )
 RETURNS jsonb
@@ -74,11 +74,11 @@ BEGIN
     NULLIF(p_orden->>'id_empleado_entrega', '')::int,
     NULLIF(p_orden->>'zona_finca', ''),
     NULLIF(p_orden->>'descripcion_producto', ''),
-    NULLIF(p_orden->>'proceso_cafe', ''),
+    (NULLIF(p_orden->>'proceso_cafe', ''))::proceso_cafe_enum,
     NULLIF(p_orden->>'porcentaje_humedad_entrada', '')::numeric,
     COALESCE((p_orden->>'firma_aprobacion_cliente')::boolean, false),
     CURRENT_DATE,
-    to_char(now(), 'HH24:MI'),
+    now()::time,
     'Pendiente'
   ) RETURNING id_orden INTO v_orden_id;
 

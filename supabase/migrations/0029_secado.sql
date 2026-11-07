@@ -206,6 +206,8 @@ DECLARE
   v_hay_ids boolean := EXISTS (
     SELECT 1 FROM jsonb_array_elements(p_items) j WHERE j->>'id' IS NOT NULL
   );
+  v_nuevos int[] := '{}';
+  v_nuevo_id integer;
 BEGIN
   IF NOT (p_tabla IN ('secado_humedad', 'secado_ambiente', 'secado_temperatura')) THEN
     RAISE EXCEPTION 'tabla de serie inválida';
@@ -227,7 +229,9 @@ BEGIN
         WHERE id_secado_humedad = v_id AND id_secado = p_id_secado;
         IF NOT FOUND THEN RAISE EXCEPTION 'medición % no pertenece al secado', v_id; END IF;
       ELSE
-        INSERT INTO secado_humedad (id_secado, fecha, humedad) VALUES (p_id_secado, v_fecha, v_humedad);
+        INSERT INTO secado_humedad (id_secado, fecha, humedad) VALUES (p_id_secado, v_fecha, v_humedad)
+        RETURNING id_secado_humedad INTO v_nuevo_id;
+        v_nuevos := v_nuevos || v_nuevo_id;
       END IF;
     ELSIF p_tabla = 'secado_ambiente' THEN
       IF v_id IS NOT NULL THEN
@@ -240,7 +244,9 @@ BEGIN
         IF NOT FOUND THEN RAISE EXCEPTION 'medición % no pertenece al secado', v_id; END IF;
       ELSE
         INSERT INTO secado_ambiente (id_secado, fecha, temperatura_ambiente, humedad_ambiente)
-        VALUES (p_id_secado, v_fecha, v_temp, v_hum_ambiente);
+        VALUES (p_id_secado, v_fecha, v_temp, v_hum_ambiente)
+        RETURNING id_secado_ambiente INTO v_nuevo_id;
+        v_nuevos := v_nuevos || v_nuevo_id;
       END IF;
     ELSE
       IF v_id IS NOT NULL THEN
@@ -251,26 +257,32 @@ BEGIN
         WHERE id_secado_temperatura = v_id AND id_secado = p_id_secado;
         IF NOT FOUND THEN RAISE EXCEPTION 'medición % no pertenece al secado', v_id; END IF;
       ELSE
-        INSERT INTO secado_temperatura (id_secado, fecha, temperatura) VALUES (p_id_secado, v_fecha, v_temp);
+        INSERT INTO secado_temperatura (id_secado, fecha, temperatura) VALUES (p_id_secado, v_fecha, v_temp)
+        RETURNING id_secado_temperatura INTO v_nuevo_id;
+        v_nuevos := v_nuevos || v_nuevo_id;
       END IF;
     END IF;
   END LOOP;
 
   -- Soft-delete de ids activos que NO vinieron (solo si el payload trae ids:
-  -- payload solo-de-altas no debe vaciar la serie)
+  -- payload solo-de-altas no debe vaciar la serie). Se preservan los ids
+  -- recién creados en este pase (v_nuevos) — btn 0029 fix smoke Fase 4.
   IF v_hay_ids THEN
     IF p_tabla = 'secado_humedad' THEN
       UPDATE secado_humedad SET deleted_at = now()
         WHERE id_secado = p_id_secado AND deleted_at IS NULL
-          AND id_secado_humedad <> ALL (SELECT (j->>'id')::int FROM jsonb_array_elements(p_items) j WHERE j->>'id' IS NOT NULL);
+          AND id_secado_humedad NOT IN (SELECT unnest(v_nuevos))
+          AND id_secado_humedad NOT IN (SELECT (j->>'id')::int FROM jsonb_array_elements(p_items) j WHERE j->>'id' IS NOT NULL);
     ELSIF p_tabla = 'secado_ambiente' THEN
       UPDATE secado_ambiente SET deleted_at = now()
         WHERE id_secado = p_id_secado AND deleted_at IS NULL
-          AND id_secado_ambiente <> ALL (SELECT (j->>'id')::int FROM jsonb_array_elements(p_items) j WHERE j->>'id' IS NOT NULL);
+          AND id_secado_ambiente NOT IN (SELECT unnest(v_nuevos))
+          AND id_secado_ambiente NOT IN (SELECT (j->>'id')::int FROM jsonb_array_elements(p_items) j WHERE j->>'id' IS NOT NULL);
     ELSE
       UPDATE secado_temperatura SET deleted_at = now()
         WHERE id_secado = p_id_secado AND deleted_at IS NULL
-          AND id_secado_temperatura <> ALL (SELECT (j->>'id')::int FROM jsonb_array_elements(p_items) j WHERE j->>'id' IS NOT NULL);
+          AND id_secado_temperatura NOT IN (SELECT unnest(v_nuevos))
+          AND id_secado_temperatura NOT IN (SELECT (j->>'id')::int FROM jsonb_array_elements(p_items) j WHERE j->>'id' IS NOT NULL);
     END IF;
   END IF;
 END;
@@ -289,6 +301,8 @@ DECLARE
   v_hay_ids boolean := EXISTS (
     SELECT 1 FROM jsonb_array_elements(p_items) j WHERE j->>'id' IS NOT NULL
   );
+  v_nuevos int[] := '{}';
+  v_nuevo_id integer;
 BEGIN
   FOR v_it IN SELECT * FROM jsonb_array_elements(p_items) LOOP
     v_id := (v_it->>'id')::integer;
@@ -299,14 +313,17 @@ BEGIN
       WHERE id_secado_cama = v_id AND id_secado = p_id_secado;
       IF NOT FOUND THEN RAISE EXCEPTION 'cama % no pertenece al secado', v_id; END IF;
     ELSE
-      INSERT INTO secado_camas (id_secado, numero_cama) VALUES (p_id_secado, v_it->>'numero_cama');
+      INSERT INTO secado_camas (id_secado, numero_cama) VALUES (p_id_secado, v_it->>'numero_cama')
+      RETURNING id_secado_cama INTO v_nuevo_id;
+      v_nuevos := v_nuevos || v_nuevo_id;
     END IF;
   END LOOP;
 
   IF v_hay_ids THEN
     UPDATE secado_camas SET deleted_at = now()
       WHERE id_secado = p_id_secado AND deleted_at IS NULL
-        AND id_secado_cama <> ALL (SELECT (j->>'id')::int FROM jsonb_array_elements(p_items) j WHERE j->>'id' IS NOT NULL);
+        AND id_secado_cama NOT IN (SELECT unnest(v_nuevos))
+        AND id_secado_cama NOT IN (SELECT (j->>'id')::int FROM jsonb_array_elements(p_items) j WHERE j->>'id' IS NOT NULL);
   END IF;
 END;
 $$;
