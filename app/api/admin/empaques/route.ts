@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
-import { createAdminClientWithRoleCheck } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { crearEmpaqueSchema } from "@/lib/schemas/servicios-maestro";
-import { apiOk, apiError, apiValidationError, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, withErrorHandler } from "@/lib/api-helpers";
 import { apiPaginado, parsePaginacion, sanitizarBusqueda } from "@/lib/pagination";
 
 async function get(request: NextRequest) {
-  const { supabase } = await createAdminClientWithRoleCheck(["Admin"]);
+  await requireRole(["Admin"]);
+  const supabase = await createClient();
   const { searchParams } = new URL(request.url);
 
   const paginacion = parsePaginacion(searchParams);
@@ -34,7 +35,8 @@ async function get(request: NextRequest) {
 }
 
 async function post(request: NextRequest) {
-  const { supabase } = await createAdminClientWithRoleCheck(["Admin"]);
+  await requireRole(["Admin"]);
+  const supabase = await createClient();
   const body = await request.json();
 
   const parsed = crearEmpaqueSchema.safeParse(body);

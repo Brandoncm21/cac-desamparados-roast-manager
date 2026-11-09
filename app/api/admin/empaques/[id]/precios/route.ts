@@ -1,14 +1,15 @@
 import { NextRequest } from "next/server";
-import { createAdminClientWithRoleCheck } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { crearPrecioEmpaqueSchema } from "@/lib/schemas/servicios-maestro";
-import { apiOk, apiError, apiValidationError, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
+import { apiOk, apiError, apiValidationError, requireRole, validateIdParam, withErrorHandler } from "@/lib/api-helpers";
 import { apiPaginado, parsePaginacion } from "@/lib/pagination";
 
 async function get(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { supabase } = await createAdminClientWithRoleCheck(["Admin"]);
+  await requireRole(["Admin"]);
+  const supabase = await createClient();
   const { id } = await params;
   const empaqueId = validateIdParam(id);
   const { searchParams } = new URL(request.url);
@@ -37,7 +38,8 @@ async function post(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { supabase, user } = await createAdminClientWithRoleCheck(["Admin"]);
+  const { user } = await requireRole(["Admin"]);
+  const supabase = await createClient();
   const { id } = await params;
   const empaqueId = validateIdParam(id);
   const body = await request.json();
