@@ -170,6 +170,42 @@ console.log('ordenes count (service_role):', count);
 - `syncAll()` es single-flight: llamadas concurrentes comparten el mismo vuelo (sin doble procesamiento).
 - Al recuperar conexión (`online`), TopBar dispara `syncAll()` automáticamente.
 
+## 7bis. Operación y diagnóstico de la fusión CBF (0026–0032)
+
+### 7bis.1 Verificar la trazabilidad end-to-end de un lote
+
+```sql
+-- Cadena lote → K1 → orden → perfil → catación (una sola consulta)
+SELECT l.nlote, ole.peso_kg, o.numero_factura, p.id_perfil, p.estado, c.id_catacion_tueste, c.pfinales
+FROM lotes_cafe l
+JOIN orden_lotes_externos ole ON ole.nlote = l.nlote
+JOIN ordenes_trabajo o ON o.id_orden = ole.id_orden
+LEFT JOIN perfiles_tueste p ON p.id_orden = o.id_orden
+LEFT JOIN catacion_tueste c ON c.perfil_tueste_ref = p.public_id
+WHERE l.nlote = 'LT-E2E-001' AND l.deleted_at IS NULL;
+```
+
+Esperado para la demo SC-003: `ole.peso_kg = 645`, `numero_factura = 'F-0043'`, `p.estado = 'Completado'`, `c.pfinales = 85.25`.
+
+### 7bis.2 Limpiar datos de demostración SC-003
+
+Los datos de aceptación viven en `lotes_cafe` (`nlote = 'LT-E2E-001'`), orden `#43` (`F-0043`), perfil `#27` (`TQ-E2E-01`) y catación `#2`. Se eliminan con soft-delete (`deleted_at = now()`), nunca con `DELETE` físico; el lote demo es el único con `nlote` `LT-E2E-001`, por lo que es seguro filtrar por esa clave.
+
+### 7bis.3 Síntomas conocidos de la fusión
+
+| Síntoma | Causa probable | Verificación |
+|---|---|---|
+| e1 responde **400** "conciliar cliente" | `lotes_cafe.nproductor` no coincide con `clientes.external_ref` (K4) | Conciliar productor→cliente o registrar `external_ref` |
+| e1 responde **409/`reused:true`** | La trilla ya generó orden (K5 idempotente) | Consultar `orden_lotes_externos` por `nlote` |
+| Catación rechazada (**422**) | El perfil no está `Completado` (FR-014) | Cambiar estado del perfil antes de catarlo |
+| `nlote` no autoderivado | El perfil no tiene puente K1 en `orden_lotes_externos` | Crear la orden vía e1 (no manualmente) |
+| 403 en catación | Rol distinto de `Tostador/Admin` | `requireRole(["Tostador","Admin"])` |
+| Advisors: `function_search_path_mutable` | Deuda pre-existente (9 funciones legacy) | Ver `docs/SECURITY.md` §4 fila 6 |
+
+### 7bis.4 Prerrequisito para migrar datos reales CBF
+
+**C1 debe completarse antes** (§3): rotar `DB_PASSWORD`, revocar el token `sbp_*` y, con autorización del equipo, reescribir el historial. La decisión de migrar datos CBF o arrancar vacío queda documentada en `ARQUITECTURA_Y_DATOS_INTEGRACION.md` §4.0.1.
+
 ## 8. Contacto y Escalamiento
 
 Definir en `CODEOWNERS` o en la descripción del PR quién revisa (actualmente `@owner` / revisión manual).
@@ -194,3 +230,10 @@ Definir en `CODEOWNERS` o en la descripción del PR quién revisa (actualmente `
 - **Cambios:** migraciones `0024` (5 RPCs transaccionales) y `0025` (EXCLUDE numrange + CHECK; drop trigger traslape) **aplicadas y verificadas en producción el 2026-10-27** (EXCLUDE rechaza traslape `23P01`, acepta contiguos; permisos `EXECUTE` solo `authenticated`). Observabilidad integrada en `withErrorHandler` (correlation ID + logs JSON; ver `docs/OBSERVABILITY.md`).
 - **Limitaciones:** rollback/rotación histórica de credenciales sigue pendiente (§3); EXPLAIN de índices requiere volumen.
 - **Pendiente (manual):** validar los 5 RPC end-to-end con sesión real (login Admin) tras el deploy; monitoreo de logs.
+
+## 12. Historial de cambios (Fusión CoffeeBeanFlow — `002-fusion-cbf`)
+
+- **Fecha:** 2026-11-07 · **Rama:** `002-fusion-cbf` · **Merge:** `97c0023`.
+- **Cambios:** §7bis nuevo (verificación de trazabilidad, limpieza de la demo SC-003, síntomas de e1/K3/K4 y prerrequisito C1). Migraciones `0026`–`0032` aplicadas y verificadas en producción (31 tablas, 89 políticas, 8 funciones del pipeline incl. 2 helpers).
+- **Limitaciones:** la migración de datos reales de CBF no se ha ejecutado (decisión diferida); la demo SC-003 permanece como evidencia de aceptación hasta que se decida limpiarla.
+- **Pendiente (manual):** C1 rotación de credenciales; activar leaked-password protection en el Dashboard.

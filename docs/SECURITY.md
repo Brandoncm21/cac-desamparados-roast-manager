@@ -8,13 +8,14 @@
 |------|----------------|-----------|
 | **Auth** | Supabase Auth (JWT en cookies). Middleware verifica con `getUser()` (no `getSession`). | [`middleware.ts:25-32`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/middleware.ts#L25-L32) |
 | **Autorización** | `requireRole(roles)` server-side con validación de `roles` no vacío y mensaje 403 genérico (no filtra roles) | [`lib/api-helpers.ts:68-87`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/api-helpers.ts#L68-L87) |
-| **RLS** | `ENABLE ROW LEVEL SECURITY` en 12+ tablas; `TO authenticated USING (deleted_at IS NULL)` para lectura; escritura con `get_empleado_rol()` | [`supabase/migrations/0012_update_rls_soft_delete.sql:21`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0012_update_rls_soft_delete.sql#L21) |
+| **RLS** | `ENABLE ROW LEVEL SECURITY` en las **31 tablas de dominio** (las 15 de la fusión con 3 políticas c/u); `TO authenticated USING (deleted_at IS NULL)` para lectura; escritura con `get_empleado_rol()` | [`supabase/migrations/0012_update_rls_soft_delete.sql:21`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0012_update_rls_soft_delete.sql#L21), [`docs/DB_SCHEMA.md`](./DB_SCHEMA.md) §3ter |
 | **Service Role** | Aislada en `server-only` module (`import "server-only"`), solo vía `createAdminClientWithRoleCheck` | [`lib/supabase/service-role.ts:1-12`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/service-role.ts#L1-L12), [`lib/supabase/admin.ts:19`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/admin.ts#L19) |
 | **Validación** | Zod en API (`safeParse` → 422) y en DB (constraints + trigger anti-solape) | [`lib/schemas/servicios-maestro.ts:30-64`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/schemas/servicios-maestro.ts#L30-L64) |
 | **Cookies** | `applySecureCookies` preserva `httpOnly` del upstream (Supabase SSR requiere JS-legible), `secure` en prod, `sameSite:lax`, `Cache-Control: private, no-store` | [`lib/cookies.ts:24-70`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/cookies.ts#L24-L70) |
 | **Secret Scanning** | `scripts/check-secrets.mjs` (pre-build) + `gitleaks` en CI | [`scripts/check-secrets.mjs`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/scripts/check-secrets.mjs), [`.github/workflows/ci.yml:36,65`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/.github/workflows/ci.yml#L36) |
 | **Hidratación** | Strip de `bis_skin_checked` (Bitdefender) con `MutationObserver({attributes:true})` | [`app/layout.tsx:50-71`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/layout.tsx#L50-L71) |
 | **RPCs transaccionales** | Escrituras multi-tabla atómicas SECURITY INVOKER con rol interno y EXECUTE solo `authenticated` (revocado de PUBLIC/anon) | [`supabase/migrations/0024_rpc_transaccionales.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0024_rpc_transaccionales.sql) (Fase 4) |
+| **RPCs de la fusión CBF** | `guardar_caracterizacion|secado|bodega|trilla|catacion` + `crear_orden_desde_trilla`: SECURITY INVOKER, rol interno, `EXECUTE` solo `authenticated`; `REVOKE EXECUTE ON FUNCTION get_empleado_rol() FROM anon` (linter 0028) | [`supabase/migrations/0028–0032`](../supabase/migrations/), [`docs/DB_SCHEMA.md`](./DB_SCHEMA.md) §3ter |
 
 ## 2. Gestión de Secretos
 
@@ -64,6 +65,9 @@ Cobertura (scripts/check-secrets.mjs): `NEXT_PUBLIC_*SERVICE_ROLE` en `.env*` ve
 | 3 | 12 vulnerabilidades `npm audit` (postcss, sharp, undici) | Medio | `npm audit fix` cuando `next@16.3.1` sea compatible; CI con `continue-on-error: true` hasta resolver | Tracking en CI |
 | 4 | `middleware` deprecation (`middleware.ts` → `proxy.ts` en Next 16) | Bajo | Migrar a `proxy.ts` según https://nextjs.org/docs/messages/middleware-to-proxy | Backlog |
 | 5 | `SUPABASE_SERVICE_ROLE_KEY` podría filtrarse si se importa en cliente | Alto | `server-only` ya lo previene; `check-secrets` lo detecta pre-build | Mitigado |
+| 6 | 9 funciones legacy con `search_path` mutable (advisor `function_search_path_mutable`) | Medio — riesgo de hijacking de resolución de objetos | Fijar `SET search_path = public, pg_temp` por función; deuda pre-existente, no introducida por la fusión | Backlog |
+| 7 | Protección de contraseñas filtradas deshabilitada (advisor Auth) | Medio — no se bloquean contraseñas comprometidas | Activar en Dashboard → Authentication → Policies | Acción del propietario |
+| 8 | Advisors de performance pre-existentes (`empaque_precios`/`orden_pasos` FKs sin índice, índices sin uso, políticas permisivas múltiples) | Bajo | Revisar caso a caso; los índices de la fusión ya están aplicados | Backlog |
 
 ## 5. Checklist de Verificación
 
@@ -75,6 +79,7 @@ Cobertura (scripts/check-secrets.mjs): `NEXT_PUBLIC_*SERVICE_ROLE` en `.env*` ve
 - [ ] RLS verificado: `SELECT` como `authenticated` + `deleted_at IS NULL`, escritura por rol
 - [ ] Cookies: `httpOnly` no forzado, `secure` en prod, `sameSite:lax`
 - [ ] Service role solo vía `admin.ts` + `requireRole`
+- [ ] RLS de la fusión: 15 tablas nuevas con 3 políticas c/u; RPCs del pipeline con `EXECUTE` solo `authenticated`; `get_empleado_rol` sin `anon`
 - [ ] `SUPABASE_MCP_TOKEN` exportada en el shell (tooling MCP); valor nunca en el repo
 
 ## 6. Referencias
@@ -96,3 +101,10 @@ Cobertura (scripts/check-secrets.mjs): `NEXT_PUBLIC_*SERVICE_ROLE` en `.env*` ve
 - Las escrituras del navegador se migraron a API (PATCH estado de orden, POST perfiles de tueste, PUT contexto de perfil, POST hitos bulk; sync vía `POST /api/sync`).
 - Lecturas directas **conservadas intencionalmente** (documentadas en `docs/ARCHITECTURE.md` §3.2 y `docs/LEGACY_MIGRATION_PLAN.md`): auth (`getUser/signOut`), cargas de formularios (catálogos pequeños), lecturas del módulo de tueste con fallback offline (IndexedDB), dashboard stats y select-orden-dialog. RLS limita todo acceso directo a filas visibles por rol.
 - Riesgo residual: un atacante autenticado puede escribir directamente vía PostgREST lo que sus políticas RLS permitan; `requireRole` añade la capa de negocio en la API, pero RLS es el límite duro real. Mitigación activa: políticas con `WITH CHECK` revisadas (0014/0016).
+
+## 9. Historial de cambios (Fusión CoffeeBeanFlow — `002-fusion-cbf`)
+
+- **Fecha:** 2026-11-07 · **Rama:** `002-fusion-cbf` · **Merge:** `97c0023` a `main`.
+- **Cambios:** 15 tablas nuevas (`0026`–`0032`) con RLS y 3 políticas cada una; 6 RPCs del pipeline + 2 helpers (`SECURITY INVOKER`, `EXECUTE` solo `authenticated`); `REVOKE EXECUTE ON FUNCTION get_empleado_rol() FROM anon` (linter 0028); índice `idx_catacion_nlote` para la FK `catacion_tueste_nlote_fkey`; endpoints nuevos con `requireRole` por rol (Lotes: Admin/Recepción escritura; etapas: Admin/Recepción; catación: Tostador/Admin; e1: Recepción/Admin).
+- **Verificado:** advisors security/performance revisados; el resto de hallazgos es deuda pre-existente (filas 6–8 de §4).
+- **Pendiente manual:** C1 (rotación de `DB_PASSWORD`/token `sbp_*`) **antes de migrar datos reales CBF**; activar leaked-password protection (fila 7).

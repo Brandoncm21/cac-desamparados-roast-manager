@@ -30,7 +30,7 @@ Fuente editable: [`docs/diagrams/system_arch.mmd`](./diagrams/system_arch.mmd) �
 |------------|-----------|-----------------|-----------|
 | **Client (Browser)** | `app/(dashboard)/**`, `components/**` | Renderizado React 19, formularios con RHF+Zod, gráficos `recharts` (code-split), PDF `jspdf`/`html-to-image` bajo demanda | [`app/layout.tsx:50-72`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/layout.tsx#L50-L72), [`app/(dashboard)/tueste/[perfilId]/hooks/usePDF.ts:47`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/(dashboard)/tueste/[perfilId]/hooks/usePDF.ts#L47) |
 | **Middleware** | [`middleware.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/middleware.ts) | `createServerClient` con `applySecureCookies`; `getUser()` server-side; redirección `!auth → /login` y `auth + /login → /`; headers `Cache-Control: private, no-store` | [`middleware.ts:8-48`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/middleware.ts#L8-L48) |
-| **API Routes** | `app/api/**` (28 handlers) | `withErrorHandler`, `requireAuth`/`requireRole`, validación Zod, `createClient` o `createAdminClientWithRoleCheck` | [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/api-helpers.ts#L57-L87) |
+| **API Routes** | `app/api/**` (38 route files; 9 de la fusión CBF) | `withErrorHandler`, `requireAuth`/`requireRole`, validación Zod, `createClient` o `createAdminClientWithRoleCheck`; escrituras compuestas vía RPC | [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/api-helpers.ts#L57-L87), [`docs/API_REFERENCE.md`](./API_REFERENCE.md) §2.6 |
 | **Services** | `lib/services/**` | Lógica de dominio pura: `resolverTarifaPorPeso` (intervalo `[min,max)`), `calcularEmpaques` (normalización gramos→kg), `orquestador` (orden estable por `prioridad, id`) | [`lib/services/resolver-tarifa.ts:9-20`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/services/resolver-tarifa.ts#L9-L20), [`lib/services/orquestador.ts:21-25`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/services/orquestador.ts#L21-L25) |
 | **Schemas** | `lib/schemas/**` | Contratos Zod: `crearOrdenSchema`, `crearServicioSchema` (intervalos + anti-solape), `bulkTemperaturasSchema` | [`lib/schemas/servicios-maestro.ts:12-64`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/schemas/servicios-maestro.ts#L12-L64) |
 | **Supabase** | `lib/supabase/**`, `supabase/**` | `client.ts` (browser anon), `server.ts` (SSR anon+cookies), `service-role.ts` (`server-only`, service_role), `admin.ts` (`requireRole` + service_role) | [`lib/supabase/service-role.ts:1-15`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/service-role.ts#L1-L15) |
@@ -100,7 +100,30 @@ Respuesta {data: {accepted: [{tempId, recordId}], rejected: [{tempId, code, mess
 - El anti-solape de tarifas es la constraint declarativa `servicio_precios_no_traslape` (`EXCLUDE USING gist` + `numrange`, `0025`) — sin race condition.
 - Orquestador TS eliminado (lo suplantaron las RPCs); `resolver_tarifa_por_peso()` SQL existe pero la resolución en TS (iniciar) se mantiene por ahora (documento: divergencia aceptada, revisar en E4 de `docs/LEGACY_MIGRATION_PLAN.md`).
 
-### 4.4 Hidratación y Cookies
+### 4.4 Pipeline de fusión CBF (0026–0032, rama `002-fusion-cbf`)
+
+Módulos portados de CoffeeBeanFlow y su conexión con el flujo de producción de CafeTrack:
+
+```text
+lotes_cafe ── caracterización (0028) ── secado + 4 series (0029) ── bodega + N:M (0030)
+     │                                                                      │
+     │                                                        trilla + peso verde (0031)
+     │                                                                      │
+     │                                        e1 crear_orden_desde_trilla ─┘
+     ▼                                                │
+orden_lotes_externos (K1) ◄───────────────────────────┘
+     │
+ordenes_trabajo + 7 orden_pasos (tarifas/facturación) ── perfiles_tueste (K2 public_id)
+     │
+     └── e2 catacion_tueste (K3 perfil_tueste_ref) + catacion_rondas ── trazabilidad integral (UI)
+```
+
+- **UI:** `app/(dashboard)/lotes/**` (lista, nueva, detalle con 5 pestañas) y `app/(dashboard)/cataciones/**`; la pestaña *Trazabilidad Integral* (`components/lotes/trazabilidad-panel.tsx`) recorre las 9 etapas.
+- **API:** `app/api/lotes/**` (lote + 4 etapas + e1) y `app/api/cataciones/**`; esquemas en `lib/schemas/lotes.ts|etapas.ts|catacion.ts`.
+- **Atomicidad:** `guardar_caracterizacion|secado|bodega|trilla|catacion` + `crear_orden_desde_trilla` (`SECURITY INVOKER`, `EXECUTE` solo `authenticated`); upsert por id y soft-delete dirigido — sin `replace-all`.
+- **Conectores:** K1 `orden_lotes_externos`, K2 `public_id`, K3 `catacion_tueste.perfil_tueste_ref`, K4 `clientes.external_ref`; detalle en [`ARQUITECTURA_Y_DATOS_INTEGRACION.md`](../ARQUITECTURA_Y_DATOS_INTEGRACION.md) §4.3 y §4.7.
+
+### 4.5 Hidratación y Cookies
 - **Hidratación:** script inline en [`app/layout.tsx:50-72`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/layout.tsx#L50-L72) elimina `bis_skin_checked` (extensión Bitdefender) con `MutationObserver({attributes:true, attributeFilter:["bis_skin_checked"]})`.
 - **Cookies:** [`lib/cookies.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/cookies.ts) preserva `httpOnly` del upstream (Supabase SSR requiere cookies legibles por JS para `createBrowserClient`).
 
@@ -110,3 +133,6 @@ Respuesta {data: {accepted: [{tempId, recordId}], rejected: [{tempId, code, mess
 - **Pesos en `NUMERIC(10,2)`:** nunca `FLOAT` para evitar errores de precisión monetaria ([`supabase/migrations/0017_servicios_maestro_empaques.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0017_servicios_maestro_empaques.sql)).
 - **Precios versionados:** `empaque_precios(valid_from, valid_to)` y `servicio_precios(activo)` preservan historial sin alterar órdenes existentes.
 - **Code-splitting:** `recharts` y `jspdf`/`html-to-image` cargados con `next/dynamic` + `import()` dinámico ([`app/(dashboard)/tueste/[perfilId]/hooks/usePDF.ts:47`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/(dashboard)/tueste/[perfilId]/hooks/usePDF.ts#L47)).
+- **Fusión sin clave compartida (K1):** `perfiles_tueste.numero_lote` **no** es el lote de acopio; el enlace orden↔`nlote` vive en `orden_lotes_externos` (`0026`). La catación se une al tueste por `public_id` (K3), nunca por `numero_lote`.
+- **Trilla con doble fuente de verdad por tipo de dato:** peso facturado → `orden_pasos` (e1); rendimientos/clasificación → `trilla_lote` (portado). CBF no factura, por lo que no hay duplicidad de importes.
+- **Soft-delete dirigido en series:** los RPC de etapas hacen upsert por id y soft-delete solo de los ids omitidos, preservando los insertados en el mismo pase (`v_nuevos int[]` + `NOT IN (SELECT unnest(...))`).

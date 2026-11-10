@@ -5,7 +5,7 @@
 ## 1. Cómo Ejecutar Pruebas
 
 ```bash
-npm run test              # vitest run (jsdom, 90 tests)
+npm run test              # vitest run (jsdom, 189 tests)
 npm run test:watch        # vitest watch
 npm run test:coverage     # @vitest/coverage-v8 → coverage/
 npm run typecheck         # tsc --noEmit
@@ -47,7 +47,16 @@ Progresión: 66.07% (docs base) → 68.15% (Fase 0 flujo) → 77.14% (Fase 3 syn
 
 **Objetivo:** >70% en módulos críticos — cumplido a nivel global; `lib/schemas/*` 100%.
 
-## 3. Suites Existentes (17 suites, 160 tests)
+**Cobertura tras la fusión CBF (rama `002-fusion-cbf`, 2026-11-07):**
+
+```
+Statements : 81.56%  Branches : 70.91%  Functions : 78.21%  Lines : 83.19%
+lib/schemas: 100% statements · 89.09% branches
+```
+
+Suite: **20 archivos · 189 tests**. Nuevos: `lib/__tests__/lotes.schema.test.ts` (12), `etapas.schema.test.ts` (9) y `catacion.schema.test.ts` (8). El pipeline e1/e2 y las RPCs se validaron además con smoke end-to-end en producción (demo SC-003, `docs/RUNBOOK.md` §7bis.1).
+
+## 3. Suites Existentes (20 suites, 189 tests)
 
 | Archivo | Qué cubre | Evidencia |
 |---------|-----------|-----------|
@@ -57,6 +66,9 @@ Progresión: 66.07% (docs base) → 68.15% (Fase 0 flujo) → 77.14% (Fase 3 syn
 | `lib/__tests__/cookies.test.ts` | `secureCookieOptions`, `applySecureCookies` (httpOnly preservado) | [`lib/__tests__/cookies.test.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/__tests__/cookies.test.ts) |
 | `lib/__tests__/api-helpers.auth.test.ts` | `requireAuth`/`requireRole` (401/403) con mocks de `supabase/server` | [`lib/__tests__/api-helpers.auth.test.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/__tests__/api-helpers.auth.test.ts) |
 | `scripts/__tests__/check-secrets.test.ts` | `check-secrets.mjs` (process.env y literales) | [`scripts/__tests__/check-secrets.test.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/scripts/__tests__/check-secrets.test.ts) |
+| `lib/__tests__/lotes.schema.test.ts` | `crearLoteSchema`, `listarLotesFiltrosSchema` (fusión CBF) | [`lib/__tests__/lotes.schema.test.ts`](../lib/__tests__/lotes.schema.test.ts) |
+| `lib/__tests__/etapas.schema.test.ts` | Caracterización, secado (4 series), bodega y trilla | [`lib/__tests__/etapas.schema.test.ts`](../lib/__tests__/etapas.schema.test.ts) |
+| `lib/__tests__/catacion.schema.test.ts` | Catación (48 atributos), rondas y payload e1 | [`lib/__tests__/catacion.schema.test.ts`](../lib/__tests__/catacion.schema.test.ts) |
 
 ## 4. Cómo Agregar Nuevos Tests
 

@@ -12,7 +12,7 @@ Todas las notas de versión de SCACR.
 - **e2 flujo de catación**: selector de perfiles `Completado` (FR-014) + `Puntaje Final` + trazabilidad.
 - **Pestaña "Trazabilidad Integral"** en `/lotes/[id]`: timeline de 9 etapas (Acopio→…→Vendido) con estados reales, resumen por etapa y enlaces directos a la orden (e1) y cataciones (e2).
 - **Conectores** (0026): K1 `orden_lotes_externos` (RLS 3 policies, PK compuesta), K2 `public_id` en orden/perfiles/clientes, K4 `clientes.external_ref`; índice `idx_catacion_nlote`; `REVOKE EXECUTE` de `get_empleado_rol` a `anon` (linter 0028).
-- **RPCs transaccionales de la fusión** (todas INVOKER, EXECUTE solo `authenticated`): `guardar_lote`, `guardar_caracterizacion`, `guardar_secado` (+2 helpers de serie), `guardar_bodega`, `guardar_trilla`, `guardar_catacion`, `crear_orden_desde_trilla`.
+- **RPCs transaccionales de la fusión** (todas INVOKER, EXECUTE solo `authenticated`): `guardar_caracterizacion`, `guardar_secado` (+2 helpers de serie), `guardar_bodega`, `guardar_trilla`, `guardar_catacion`, `crear_orden_desde_trilla` (los lotes se crean por inserción directa con RLS).
 - **Demo SC-003 persistente** (datos de demostración para aceptación): lote `LT-E2E-001` (Finca San Luis) con caracterización → secado (dsecado=2, 3 humedades) → bodega (10 sacos) → trilla (wverde_final 645) → e1 orden **#43 / F-0043** → perfil **#27 "TQ-E2E-01"** Completado → catación **#2** (pfinales 85.25, rtostado 88, dfueste 0.68 g/ml, promedio rondas 87.0). Consultable con la SQL de trazabilidad del doc raíz §5.
 
 ### Changed — Fusión CB
@@ -20,7 +20,7 @@ Todas las notas de versión de SCACR.
 - Helpers de serie (`upsert_serie_secado`, `upsert_serie_camas`, `guardar_catacion`): el soft-delete de "no-enviados" ahora preserva los ids recién insertados sin id (`v_nuevos int[]` + `NOT IN (SELECT unnest(...))`); el patrón viejo `<> ALL (subquery)` mataba ítems nuevos del mismo pase.
 
 ### Security — Fusión CB
-- Todos los endpoints nuevos con JWT + `requireRole` (regla 5 de porteo): `guardar_*`/`crear_orden_desde_trilla` solo `authenticated`; RLS en las 8 tablas nuevas (3 policies c/u) con REVOKE a `anon`.
+- Todos los endpoints nuevos con JWT + `requireRole` (regla 5 de porteo): `guardar_*`/`crear_orden_desde_trilla` solo `authenticated`; RLS en las 15 tablas nuevas (3 policies c/u) con REVOKE a `anon`.
 
 ### Added
 - Módulo maestro de Servicios (`servicios_maestro` + `servicio_precios`) con CRUD administrable por Admin.
