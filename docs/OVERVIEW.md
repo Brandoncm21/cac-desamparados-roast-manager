@@ -4,7 +4,7 @@
 
 ## 1. Resumen Ejecutivo
 
-SCACR es un sistema integral de gestión de torrefacción para el Centro Agrícola Cantonal de Desamparados (CAC) que centraliza el ciclo completo del café —desde la recepción de órdenes de trabajo hasta la trazabilidad de curvas de tueste— sobre una arquitectura **Next.js 16 (App Router, Turbopack) + Supabase (PostgreSQL + Auth + RLS)**, con sincronización offline vía IndexedDB. Evidencia: [`README.md:1-4`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/README.md#L1-L4), [`package.json:1-16`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/package.json#L1-L16).
+SCACR es un sistema integral de gestión de torrefacción para el Centro Agrícola Cantonal de Desamparados (CAC) que centraliza el ciclo completo del café —desde la recepción del lote de acopio, su caracterización, secado, bodega, trilla y catación, hasta la orden de trabajo, la facturación y la trazabilidad de curvas de tueste— sobre una arquitectura **Next.js 16 (App Router, Turbopack) + Supabase (PostgreSQL + Auth + RLS)**, con sincronización offline vía IndexedDB. Evidencia: [`README.md:1-4`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/README.md#L1-L4), [`package.json:1-16`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/package.json#L1-L16), [`ARQUITECTURA_Y_DATOS_INTEGRACION.md`](../ARQUITECTURA_Y_DATOS_INTEGRACION.md).
 
 ## 2. Público Objetivo
 
@@ -21,6 +21,9 @@ SCACR es un sistema integral de gestión de torrefacción para el Centro Agríco
 - **Perfiles de tueste:** trazabilidad minuto a minuto, hitos térmicos, métricas y ajustes, generación de PDF con `jspdf` + `html-to-image` bajo demanda. Evidencia: [`app/(dashboard)/tueste/[perfilId]/hooks/usePDF.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/(dashboard)/tueste/[perfilId]/hooks/usePDF.ts), [`supabase/migrations/0015_granularidad_tiempo.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0015_granularidad_tiempo.sql).
 - **Servicios/Empaques maestros:** catálogo administrable con intervalos de precio (`NUMERIC(10,2)`) y precios versionados (`valid_from`/`valid_to`). Evidencia: [`supabase/migrations/0017_servicios_maestro_empaques.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0017_servicios_maestro_empaques.sql), [`lib/schemas/servicios-maestro.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/schemas/servicios-maestro.ts).
 - **Offline-first:** cola de sincronización en IndexedDB (`idb`) para temperaturas, hitos y métricas. Evidencia: [`lib/offline/db.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/offline/db.ts), [`lib/offline/sync.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/offline/sync.ts).
+- **Lotes de café (fusión CBF):** acopio (`lotes_cafe`), caracterización, secado con 4 series, bodega con relación N:M y trilla con peso verde; UI en `app/(dashboard)/lotes/**`. Evidencia: [`supabase/migrations/0027_lotes_cafe.sql`](../supabase/migrations/0027_lotes_cafe.sql), [`docs/DB_SCHEMA.md`](./DB_SCHEMA.md) §3ter.
+- **Catación y pipeline e1/e2:** la trilla se convierte en orden de trabajo (`crear_orden_desde_trilla`, idempotente) y la catación se enlaza al perfil de tueste por `public_id` (K3). La pestaña *Trazabilidad Integral* recorre las 9 etapas del lote. Evidencia: [`supabase/migrations/0032_catacion_pipeline.sql`](../supabase/migrations/0032_catacion_pipeline.sql), [`components/lotes/trazabilidad-panel.tsx`](../components/lotes/trazabilidad-panel.tsx).
+- **Seguridad de la fusión:** 15 tablas nuevas con RLS (3 políticas c/u), RPCs `SECURITY INVOKER` con `EXECUTE` solo `authenticated` y escrituras compuestas atómicas. Evidencia: [`docs/SECURITY.md`](./SECURITY.md) §9.
 
 ## 4. Stack Técnico (Evidencia: `package.json`)
 
@@ -36,13 +39,13 @@ SCACR es un sistema integral de gestión de torrefacción para el Centro Agríco
 
 ## 5. Estado Actual y Riesgos Conocidos
 
-- **Ramas activas:** `main` integra 22 migraciones y 8 fixes de seguridad/performance documentados. Modelo actual: `fix/general`, `feat/develop`, `test/security` como ramas de larga vida (ver [`docs/CONTRIBUTING.md`](./CONTRIBUTING.md)).
+- **Ramas activas:** `main` integra 32 migraciones (0026–0032: fusión CoffeeBeanFlow, merge `97c0023`) y 8 fixes de seguridad/performance documentados. Modelo actual: `fix/general`, `feat/develop`, `test/security` como ramas de larga vida (ver [`docs/CONTRIBUTING.md`](./CONTRIBUTING.md)).
 - **Riesgo histórico mitigado:** `SUPABASE_SERVICE_ROLE_KEY` aislada en [`lib/supabase/service-role.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/service-role.ts) (`server-only`); `scripts/apply-migration.mjs` contenía credenciales hardcodeadas en el historial — requiere rotación (ver [`docs/SECURITY.md`](./SECURITY.md)).
 - **Cobertura y CI:** workflow en [`.github/workflows/ci.yml`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/.github/workflows/ci.yml) con `check-secrets`, `lint`, `typecheck`, `test:coverage` y `gitleaks`; Dependabot semanal.
 
 ## 6. Estructura de Documentación
 
-Consultar [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) para la vista de componentes y flujo de datos, [`docs/SETUP_AND_RUN.md`](./SETUP_AND_RUN.md) para puesta en marcha, [`docs/API_REFERENCE.md`](./API_REFERENCE.md) para endpoints, [`docs/DB_SCHEMA.md`](./DB_SCHEMA.md) para esquema y RLS, y [`docs/SECURITY.md`](./SECURITY.md) para prácticas y checklist.
+Consultar [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) para la vista de componentes y flujo de datos, [`docs/SETUP_AND_RUN.md`](./SETUP_AND_RUN.md) para puesta en marcha, [`docs/API_REFERENCE.md`](./API_REFERENCE.md) para endpoints, [`docs/DB_SCHEMA.md`](./DB_SCHEMA.md) para esquema y RLS, [`docs/FUSION_CBF_COMPARISON.md`](./FUSION_CBF_COMPARISON.md) para la comparativa CoffeeBeanFlow→CafeTrack y [`docs/SECURITY.md`](./SECURITY.md) para prácticas y checklist.
 
 ## 7. Glosario Mínimo
 

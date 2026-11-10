@@ -49,3 +49,12 @@ export function canDeleteOrder(role: UserRole | null) {
 export function canDeletePerfil(role: UserRole | null) {
   return ["Admin", "Tostador"].includes(role || "");
 }
+
+/** Lotes de café (módulo acopio): escritura solo Admin/Recepción; lectura abierta. */
+export function canEditLote(role: UserRole | null) {
+  return ["Admin", "Recepción"].includes(role || "");
+}
+
+export function canDeleteLote(role: UserRole | null) {
+  return ["Admin", "Recepción"].includes(role || "");
+}

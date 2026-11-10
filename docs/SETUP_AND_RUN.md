@@ -52,7 +52,7 @@ Validación: `npm run check-secrets` falla si existe `NEXT_PUBLIC_*SERVICE_ROLE`
 ```bash
 npx supabase init        # si no existe supabase/config.toml
 npx supabase start       # levanta Postgres + Auth + Storage locales
-npx supabase db push     # aplica las 22 migraciones en supabase/migrations/
+npx supabase db push     # aplica las 32 migraciones en supabase/migrations/ (0026–0032: fusión CBF)
 ```
 
 Evidencia de migraciones: [`supabase/migrations/0001_schema_inicial.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0001_schema_inicial.sql) hasta [`0022_corregir_flujo_pasos.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0022_corregir_flujo_pasos.sql).

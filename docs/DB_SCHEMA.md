@@ -1,6 +1,8 @@
 # DB_SCHEMA — Esquema de Base de Datos
 
-> **Permalink base:** [`80b1dd5`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/tree/80b1dd5) · 22 migraciones en [`supabase/migrations/`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/tree/80b1dd5/supabase/migrations)
+> **Permalink base:** [`80b1dd5`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/tree/80b1dd5) · 32 migraciones (0026–0032: fusión CoffeeBeanFlow) en [`supabase/migrations/`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/tree/80b1dd5/supabase/migrations)
+
+> **Actualización 2026-11-07 (fusión CoffeeBeanFlow):** la rama `002-fusion-cbf` (merge `97c0023`) añade las migraciones **0026–0032** y **15 tablas nuevas** (ver §3ter). Estado verificado en producción: **32 migraciones, 31 tablas, 89 políticas RLS**.
 
 ## 1. Tablas Principales
 
@@ -50,14 +52,54 @@
 
 Notas: corrige el bug de código que consultaba `empleados.auth_user_id` (columna real: `id_auth`); RLS se mantiene (SECURITY INVOKER); sin tabla de recibos de sync — idempotencia por claves naturales + UNIQUEs; la dead-letter queue vive en IndexedDB del cliente (sin tabla server).
 
+## 3ter. Fusión CoffeeBeanFlow (0026–0032, rama `002-fusion-cbf`)
+
+Portado desde CoffeeBeanFlow (CBF, ASP.NET Core + EF Core, 19 entidades). Las tablas nuevas conviven con las 16 originales; el enlace con CafeTrack se hace por los conectores K1–K4 ([`ARQUITECTURA_Y_DATOS_INTEGRACION.md`](../ARQUITECTURA_Y_DATOS_INTEGRACION.md) §4.3).
+
+| Tabla | Propósito | Clave | Campos relevantes | Migración |
+|---|---|---|---|---|
+| `orden_lotes_externos` | **K1** puente orden↔lote CBF | `(id_orden, nlote, origen)` | `peso_kg`, `origen` (`fusion`), `created_at` | 0026 |
+| `lotes_cafe` | Lote de café (acopio) | `id_lote` | `nlote` UNIQUE, `public_id`, `nproductor`, `nfinca`, `zona`, `altura`, `disponible`, `vendido`, `enproceso`, proceso por booleanos (`lavado/natural/miel/semilavado/anaerobico/otro`), `fecha_acopio`, `deleted_at` | 0027 |
+| `caracterizacion_lote` | Caracterización 1:N con el lote (upsert por `(id_lote, tiempo)`) | `id_caracterizacion` | humedad, `densidad`, `m_tabla`, `e_maduracion`, `broca`, `pc_*`, `c_*`, `dr_maduras`, `l_asignado`, `deleted_at` | 0028 |
+| `caracterizacion_rc` | Series RC comparativas (1 por tipo) | `id_caracterizacion_rc` (UNIQUE `(caracterizacion_id, tipo_rc)`) | `vanos`, `secos`, conteos | 0028 |
+| `secado_lote` | Registro de secado | `id_secado` | `dsecado`, `finicio`, `ffinal`, `deleted_at` | 0029 |
+| `secado_humedad` / `secado_ambiente` / `secado_temperatura` / `secado_camas` | 4 series débiles de secado (CASCADE) | `id_serie`, `id_secado` | upsert vía `upsert_serie_secado(p_id_secado, p_items, p_tabla)` y `upsert_serie_camas` | 0029 |
+| `bodega_lote` | Entrada a bodega | `id_bodega` | `cantidad_sacos`, `w_bellota`, `w_pergamino`, `hinicial/hfinal`, `d_bellota/d_pergamino`, `pmh_relativa`, `pmt_interna/externa`, `finicio_reposo`, `deleted_at` | 0030 |
+| `secado_bodega` | N:M secado↔bodega | `(id_secado, id_bodega)` | `cantidad_sacos` (validación de pertenencia en RPC) | 0030 |
+| `trilla_lote` | Trilla (rendimientos y clasificación) | `id_trilla` | `hinicial/hfinal`, `rfinal_*`, `rteorico_*`, `wverde_teorico/final`, 9 porcentajes (`psegundas`…`pinferiores`), `ffinal_reposo`, `deleted_at` | 0031 |
+| `peso_verde_trilla` | 1:1 con trilla (peso verde) | `id_trilla` | `winferiores`, `wfinal`, `wfinal_inferiores`, `deleted_at` (toggle off ⇒ soft-delete) | 0031 |
+| `catacion_tueste` | Catación (48 atributos del snapshot real de CBF) | `id_catacion_tueste` | `pfinales`, `rtostado` (rendimiento), `dfueste` (g/ml), `nlote`, `id_lote`, **K3** `perfil_tueste_ref → perfiles_tueste(public_id)`, defectos `c1*`/`c2*`, `tonagton_*`, `deleted_at` | 0032 |
+| `catacion_rondas` | Rondas de catación (solo calidad) | `id_catacion_ronda` | `catacion_id`, `valor_calidad` (0–100), `deleted_at` | 0032 |
+
+**RPCs de la fusión** (todas `SECURITY INVOKER`, `EXECUTE` solo `authenticated`, rol verificado con `get_empleado_rol()`):
+
+| RPC | Firma verificada | Atomicidad |
+|---|---|---|
+| `guardar_caracterizacion` | `(p_id_lote int, p_datos jsonb, p_rcs jsonb DEFAULT NULL) → jsonb` | caracterización + RC |
+| `guardar_secado` | `(p_id_lote int, p_secado jsonb, p_humedades jsonb, p_ambientes jsonb, p_temperaturas jsonb, p_camas jsonb) → jsonb` | secado + 4 series |
+| `upsert_serie_secado` | `(p_id_secado int, p_items jsonb, p_tabla text) → void` | helper interno (preserva ids nuevos) |
+| `upsert_serie_camas` | `(p_id_secado int, p_items jsonb) → void` | helper interno |
+| `guardar_bodega` | `(p_id_lote int, p_bodega jsonb, p_secados_guardados jsonb DEFAULT NULL) → jsonb` | bodega + N:M |
+| `guardar_trilla` | `(p_id_lote int, p_trilla jsonb) → jsonb` | trilla + peso verde 1:1 |
+| `guardar_catacion` | `(p_catacion jsonb, p_rondas jsonb DEFAULT NULL) → jsonb` | catación + rondas; autoderiva `nlote` vía K1 y exige perfil `Completado` |
+| `crear_orden_desde_trilla` | `(p_id_trilla int) → jsonb` | **e1**: trilla → orden + 7 `orden_pasos` + K1; idempotente (K5 `reused:true`), K4 concilia productor→cliente |
+
+> `lotes_cafe` se crea/edita por inserción directa vía API (no hay `guardar_lote`); RLS restringe la escritura a `Admin/Recepción`.
+
+**Conectores:** K1 `orden_lotes_externos` (transporta `wverde_final` como `peso_inicial_kg` del primer paso) · K2 `public_id` en `ordenes_trabajo`/`perfiles_tueste`/`clientes` · K3 `catacion_tueste.perfil_tueste_ref` · K4 `clientes.external_ref` (productor CBF → cliente).
+
+**Índices nuevos:** `idx_lotes_nlote_trgm`, `idx_lotes_nproductor_trgm`, `idx_lotes_activos_fecha`, `idx_lotes_enproceso`, `idx_ole_origen_nlote`, `idx_caracterizacion_lote_idx`, `idx_caracterizacion_rc_caract`, `idx_secado_lote_idx`, `idx_secado_humedad_idx`, `idx_secado_ambiente_idx`, `idx_secado_temperatura_idx`, `idx_secado_camas_idx`, `idx_bodega_lote_idx`, `idx_secado_bodega_bodega`, `idx_trilla_lote_idx`, `idx_trilla_pesos_verdes`, `idx_catacion_ref`, `idx_catacion_lote`, `idx_catacion_nlote`, `idx_catacion_rondas_idx`.
+
 ## 4. Row Level Security (RLS)
 
-Habilitado en todas las tablas de dominio (`ENABLE ROW LEVEL SECURITY`). Patrones:
+Habilitado en todas las tablas de dominio (**31 tablas**; las **15 de la fusión** tienen 3 políticas cada una — SELECT/INSERT/UPDATE-soft-delete). Patrones:
 
 - **Lectura:** `FOR SELECT TO authenticated USING (deleted_at IS NULL)` — cualquier usuario autenticado ve filas no eliminadas. Ejemplo: [`0012:41`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0012_update_rls_soft_delete.sql#L41) (`ordenes_select`).
 - **Escritura:** `WITH CHECK (get_empleado_rol() IN (...))` — solo roles permitidos. Ejemplo: [`0012:27`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0012_update_rls_soft_delete.sql#L27) (`clientes_insert` requiere `Recepción` o `Admin`).
 - **Función `get_empleado_rol()`:** `SECURITY DEFINER` que lee `empleados.rol` por `auth.uid()` → `id_auth`, evitando recursión RLS ([`0007_fix_empleados_rls.sql:4`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0007_fix_empleados_rls.sql#L4)).
 - **Admin bypass:** endpoints `admin/*` usan `service_role` que bypassa RLS, pero verifican rol vía `requireRole` antes ([`lib/supabase/admin.ts:19`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/admin.ts#L19)).
+
+- **Fusión CBF (0026–0032):** 15 tablas nuevas con RLS habilitado y 3 políticas cada una; `REVOKE EXECUTE ON FUNCTION get_empleado_rol() FROM anon` (linter `anon_security_definer_function_executable`); RPCs del pipeline con `EXECUTE` solo `authenticated`.
 
 ## 5. Seed de Datos Base
 

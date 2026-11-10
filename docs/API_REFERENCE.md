@@ -47,6 +47,26 @@ Helpers: [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desampa
 | 35 | GET/POST | `/api/admin/empaques` | **Admin** | Listar/crear empaque |
 | 36 | GET/PUT/DELETE | `/api/admin/empaques/[id]` | **Admin** | Obtener/actualizar/desactivar empaque |
 | 37 | GET/POST | `/api/admin/empaques/[id]/precios` | **Admin** | Historial / nuevo precio versionado |
+| 38 | GET | `/api/lotes` | `Recepción, Tostador, Admin` | Listar lotes (paginado, `?search=`, filtros `enproceso/desde/hasta`) |
+| 39 | POST | `/api/lotes` | `Recepción, Admin` | Crear lote (`guardarLoteSchema`) |
+| 40 | GET | `/api/lotes/[id]` | `Recepción, Tostador, Admin` | Detalle del lote + órdenes enlazadas (K1) |
+| 41 | PUT | `/api/lotes/[id]` | `Recepción, Admin` | Actualizar lote |
+| 42 | DELETE | `/api/lotes/[id]` | `Recepción, Admin` | Soft delete (`deleted_at`) |
+| 43 | GET | `/api/lotes/[id]/caracterizacion` | `Recepción, Tostador, Admin` | Caracterizaciones + series RC |
+| 44 | PUT | `/api/lotes/[id]/caracterizacion` | `Recepción, Admin` | Upsert → `guardar_caracterizacion` |
+| 45 | GET | `/api/lotes/[id]/secado` | `Recepción, Tostador, Admin` | Secados + 4 series |
+| 46 | PUT | `/api/lotes/[id]/secado` | `Recepción, Admin` | Upsert → `guardar_secado` |
+| 47 | GET | `/api/lotes/[id]/bodega` | `Recepción, Tostador, Admin` | Bodegas + N:M `secado_bodega` |
+| 48 | PUT | `/api/lotes/[id]/bodega` | `Recepción, Admin` | Upsert → `guardar_bodega` |
+| 49 | GET | `/api/lotes/[id]/trilla` | `Recepción, Tostador, Admin` | Trilla + peso verde 1:1 |
+| 50 | PUT | `/api/lotes/[id]/trilla` | `Recepción, Admin` | Upsert → `guardar_trilla` |
+| 51 | POST | `/api/lotes/[id]/trilla/enviar-proceso` | `Recepción, Admin` | **e1** trilla → orden (`crear_orden_desde_trilla`) |
+| 52 | GET | `/api/cataciones` | `Recepción, Tostador, Admin` | Listar cataciones (paginado, embed perfil K3) |
+| 53 | POST | `/api/cataciones` | `Tostador, Admin` | Crear → `guardar_catacion` |
+| 54 | GET | `/api/cataciones/[id]` | `Recepción, Tostador, Admin` | Detalle + rondas |
+| 55 | PUT | `/api/cataciones/[id]` | `Tostador, Admin` | Actualizar → `guardar_catacion` |
+
+> **Fusión CBF:** las rutas 38–55 se detallan en §2.6 y usan el mismo contrato `{ data, pagination }` / `{ error: { code, message, issues } }`.
 
 > **Admin-only:** rutas 33-37 usan `createAdminClientWithRoleCheck(["Admin"])` que bypassa RLS con `service_role` ([`lib/supabase/admin.ts:19`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/admin.ts#L19)).
 
@@ -145,15 +165,47 @@ GET /api/ordenes?page=2&pageSize=10&estado=Pendiente&search=juan
 - Response 200: `{data: {accepted: [{tempId, recordId}], rejected: [{tempId, code, message}]}}` con `code` en `VALIDATION_ERROR|CONFLICT|FOREIGN_KEY|CHECK_VIOLATION|NOT_NULL|DB_ERROR`.
 - Idempotencia: reprocesar el mismo batch no duplica (upsert sobre UNIQUEs existentes).
 
+### 2.6 Fusión CBF — Lotes, Etapas y Catación (0026–0032)
+
+Módulo portado de CoffeeBeanFlow. Todas las escrituras compuestas pasan por RPC transaccional (no hay `replace-all`); los `PUT` de etapas envían el estado completo del formulario y la RPC hace upsert por id + soft-delete de lo omitido.
+
+**`GET /api/lotes`** — paginado (§2.0); `search` sanitizado sobre `nlote`, `nproductor`, `nfinca` (índices trgm); filtros Zod `enproceso`, `desde`/`hasta` (`YYYY-MM-DD`); orden `fecha_acopio DESC, id_lote DESC`; `deleted_at IS NULL`.
+
+**`POST /api/lotes`** — `crearLoteSchema` ([`lib/schemas/lotes.ts`](../../lib/schemas/lotes.ts)); inserción directa en `lotes_cafe` (RLS `Admin/Recepción`); `nlote` UNIQUE → **409** en duplicado.
+
+**`GET /api/lotes/[id]`** — lote + `orden_lotes_externos` (K1: órdenes enlazadas con `peso_kg`). **`PUT`/`DELETE`** actualizan o hacen soft-delete.
+
+**Etapas** (`GET` devuelve la colección de la etapa con sus series; `PUT` llama a la RPC):
+
+| Ruta | Body (Zod) | RPC |
+|---|---|---|
+| `PUT /api/lotes/[id]/caracterizacion` | `guardarCaracterizacionBodySchema` (`caracterizacion`, `rcs[]`) | `guardar_caracterizacion(p_id_lote, p_datos, p_rcs)` |
+| `PUT /api/lotes/[id]/secado` | `guardarSecadoBodySchema` (`secado`, `humedades[]`, `ambientes[]`, `temperaturas[]`, `camas[]`) | `guardar_secado(p_id_lote, p_secado, …)` |
+| `PUT /api/lotes/[id]/bodega` | `guardarBodegaBodySchema` (`bodega`, `secados[]`) | `guardar_bodega(p_id_lote, p_bodega, p_secados_guardados)` |
+| `PUT /api/lotes/[id]/trilla` | `guardarTrillaBodySchema` (`trilla`, `peso_verde`) | `guardar_trilla(p_id_lote, p_trilla)` |
+
+- Los strings vacíos se omiten antes de enviar (`limpiar`) y el esquema aplica el patrón preprocess (`""`→null, `"1,5"`→`1.5`).
+- `PUT /api/lotes/[id]/trilla` con `peso_verde` nulo hace soft-delete del 1:1 (`peso_verde_trilla.deleted_at`).
+
+**`POST /api/lotes/[id]/trilla/enviar-proceso`** — **e1** ([`crear_orden_desde_trilla`](../../supabase/migrations/0032_catacion_pipeline.sql)): requiere trilla con `wverde_final > 0`; crea orden + 7 `orden_pasos` (proceso derivado, FR-010) + puente K1 con `peso_inicial_kg = wverde_final`.
+- Idempotente por lote (**K5**): si ya existe orden enlazada responde `200 { data: { reused: true, ... } }`.
+- **K4:** si el `nproductor` no concilia con un `clientes.external_ref` → **400** pidiendo conciliación.
+- Trilla incompleta/sin peso verde → **422** `VALIDATION_ERROR`.
+
+**`GET /api/cataciones`** — paginado; `search` sobre `nlote`; embed del perfil K3 (`perfiles_tueste!catacion_tueste_perfil_tueste_ref_fkey`); orden `created_at DESC`.
+**`POST` / `PUT /api/cataciones[/id]`** — `guardarCatacionBodySchema` (`catacion` + `rondas[]` con `valor_calidad` 0–100) → `guardar_catacion(p_catacion, p_rondas)`; exige perfil `Completado` (FR-014) y autoderiva `nlote` desde K1 del perfil.
+**`GET /api/cataciones/[id]`** — catación + `rondas` vivas (`deleted_at IS NULL`); 404 si no existe o está eliminada.
+
 ## 3. Códigos de Error Comunes
 
 | Status | Código | Cuándo |
 |--------|--------|--------|
 | 401 | `UNAUTHORIZED` | Sin sesión (`requireAuth`/`requireRole` sin user) |
 | 403 | `FORBIDDEN` | Rol no permitido o `roles=[]` mal configurado |
-| 422 | `VALIDATION_ERROR` | Zod `safeParse` falla |
+| 422 | `VALIDATION_ERROR` | Zod `safeParse` falla, CHECK (`23514`), trilla sin peso verde |
 | 404 | `RESOURCE_NOT_FOUND` | `single()` sin fila |
-| 409 | `CONFLICT` | `23505` unique violation (ej. servicio duplicado) |
+| 409 | `CONFLICT` | `23505` unique violation (ej. servicio duplicado, `nlote` duplicado) |
+| 400 | `BAD_REQUEST` | FK inválida (`23503`), p. ej. e1 sin cliente conciliado (K4) |
 
 ## 4. Ejemplo Completo (Crear Orden)
 

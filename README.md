@@ -1,7 +1,7 @@
 # SCACR - Sistema de Gestión de Torrefacción
 
 Sistema completo de gestión para el Centro Agrícola Cantonal de Desamparados (CAC).
-Administra órdenes de trabajo, clientes, empleados y perfiles de tueste de café.
+Administra lotes de café (acopio, caracterización, secado, bodega, trilla y catación), órdenes de trabajo, clientes, empleados y perfiles de tueste de café.
 
 ## 📚 Documentation
 
@@ -12,15 +12,16 @@ Documentación técnica completa en [`docs/`](./docs/):
 | [Overview](./docs/OVERVIEW.md) | Resumen ejecutivo, público objetivo y stack |
 | [Architecture](./docs/ARCHITECTURE.md) | Componentes, flujo de datos y diagrama Mermaid ([`system_arch.mmd`](./docs/diagrams/system_arch.mmd)) |
 | [Setup & Run](./docs/SETUP_AND_RUN.md) | Instalación, variables de entorno, migrations y seed |
-| [API Reference](./docs/API_REFERENCE.md) | 28+ endpoints con auth, params y ejemplos |
+| [API Reference](./docs/API_REFERENCE.md) | 55 endpoints con auth, params y ejemplos |
 | [DB Schema](./docs/DB_SCHEMA.md) | Tablas, `NUMERIC(10,2)`, triggers, RLS y seed |
 | [Security](./docs/SECURITY.md) | Prácticas, riesgos y checklist |
-| [Tests & CI](./docs/TESTS_AND_CI.md) | Vitest, coverage (79.86% stmts) y workflow CI |
+| [Tests & CI](./docs/TESTS_AND_CI.md) | Vitest, coverage (81.56% stmts) y workflow CI |
 | [Observability](./docs/OBSERVABILITY.md) | Logs estructurados, correlation ID y redacción de secretos |
 | [Performance Testing](./docs/PERFORMANCE_TESTING.md) | Escenarios k6, líneas base y cómo ejecutarlos |
 | [Performance Indexes](./docs/PERFORMANCE_INDEXES.md) | Índices aplicados (0023), EXPLAIN y criterios de retiro |
 | [Data Growth](./docs/DATA_GROWTH_PLAN.md) | Proyecciones de crecimiento y monitoreo mensual |
 | [Legacy Migration Plan](./docs/LEGACY_MIGRATION_PLAN.md) | Plan de retiro de `servicios_ejecutados` (etapas E1-E5) |
+| [Fusion CBF Comparison](./docs/FUSION_CBF_COMPARISON.md) | Comparativa CoffeeBeanFlow→CafeTrack (mejoras, pérdidas y pendientes) |
 | [Contributing](./docs/CONTRIBUTING.md) | Ramas, estilo y validaciones pre-PR |
 | [Runbook](./docs/RUNBOOK.md) | Despliegue, rollback y diagnóstico |
 | [Changelog Guide](./docs/CHANGELOG_GUIDE.md) | Política de versiones y plantilla de PR |
@@ -157,6 +158,18 @@ Todas las rutas `/api/*` requieren autenticación mediante Supabase Auth.
 - `POST /api/perfiles-tueste/[id]/hitos` - Registrar hitos en lote (offline sync)
 - `PUT /api/perfiles-tueste/[id]/metricas/[tipoMetrica]` - Registrar métrica
 - `POST /api/perfiles-tueste/[id]/ajustes` - Registrar ajuste
+
+### Lotes, Etapas y Catación (fusión CoffeeBeanFlow)
+- `GET /api/lotes` - Listar lotes (paginado, búsqueda, filtros)
+- `POST /api/lotes` - Crear lote
+- `GET|PUT|DELETE /api/lotes/[id]` - Detalle / actualizar / soft delete
+- `GET|PUT /api/lotes/[id]/caracterizacion` - Caracterización + series RC
+- `GET|PUT /api/lotes/[id]/secado` - Secado + 4 series
+- `GET|PUT /api/lotes/[id]/bodega` - Bodega + relación N:M
+- `GET|PUT /api/lotes/[id]/trilla` - Trilla + peso verde
+- `POST /api/lotes/[id]/trilla/enviar-proceso` - e1: trilla → orden de trabajo (idempotente)
+- `GET|POST /api/cataciones` - Listar / crear catación con rondas
+- `GET|PUT /api/cataciones/[id]` - Detalle / actualizar catación
 
 ### Otros
 - `GET /api/empleados` - Listar empleados
