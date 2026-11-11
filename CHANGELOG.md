@@ -4,6 +4,14 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Fixed — Correcciones post-fusión (003-correcciones-post-fusion)
+- **DB `0036`**: `CHECK (estado IN ('Pendiente','Completado'))` en `perfiles_tueste` (espejo del enum Zod; última columna de estado sin constraint).
+- **DB `0037`**: eliminados 4 enums huérfanos (`tipo_tueste_enum`, `tipo_molienda_enum`, `tipo_empaque_enum`, `tipo_servicio_enum`; 0 dependencias verificadas).
+- **DB `0033`/`0034`/`0035`**: hardening de `search_path` en 9 funciones; 9 índices de FK + `empleados_lectura_propia` con `(select auth.uid())`; `REVOKE EXECUTE … FROM PUBLIC` de `get_empleado_rol()` (el `REVOKE … FROM anon` de `0026` era inefectivo) y 3 índices redundantes.
+- **`/reportes`**: eliminado el N+1 (una consulta `.in("id_perfil", ids)` + agrupación en memoria).
+- **`/tueste/[perfilId]`**: `RendimientosDialog` y `RegistroConfirmadoDialog` a `next/dynamic` con montaje condicional (chunk bajo demanda).
+- **Fuentes self-hosted**: `next/font/google` (Inter, Montserrat, Geist Mono) → `next/font/local` con variable fonts subset latin en `app/fonts/`; el build deja de depender de Google Fonts.
+
 ### Added — Fusión CoffeeBeanFlow (002-fusion-cbf, Fases 0–4)
 - **Módulo Lotes end-to-end** (0027): `lotes_cafe` (29 columnas, RLS 3 policies, índices incl. `idx_lotes_nlote_trgm`), API `/api/lotes` (GET paginado + búsqueda trgm + filtros, POST→RPC, 23505→409) y `/api/lotes/[id]` (GET con órdenes enlazadas K1, PUT, DELETE soft), UI completa (lista con debounce/estados/badges, nueva, detalle, editar) con RHF+Zod.
 - **Etapas del lote** (0028–0031): `caracterizacion_lote`+3 RC (upsert por id de lote+tiempo), `secado_lote`+4 series débiles con RPCs de upsert dif sync, `bodega_lote`+N:M `secado_bodega` (sync con validación de pertenencia), `trilla_lote`+`peso_verde_trilla` 1:1 (toggle off → soft-delete). UI de 4 pestañas en `/lotes/[id]`.
