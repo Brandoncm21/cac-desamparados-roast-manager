@@ -15,7 +15,7 @@ export async function get(
   const { data, error } = await supabase
     .from("catacion_tueste")
     .select(
-      "*, perfiles_tueste!catacion_tueste_perfil_tueste_ref_fkey(id_orden, numero_lote, nombre_cafe, estado), catacion_rondas(id_catacion_ronda, valor_calidad, deleted_at)"
+      "*, perfiles_tueste!catacion_tueste_perfil_tueste_ref_fkey(id_orden, numero_lote, nombre_cafe, estado), lotes_cafe!catacion_tueste_id_lote_fkey(id_lote, nlote, enproceso, clientes(nombre_completo), fincas(nombre, altura)), catacion_rondas(id_catacion_ronda, valor_calidad, deleted_at)"
     )
     .eq("id_catacion_tueste", catacionId)
     .is("deleted_at", null)

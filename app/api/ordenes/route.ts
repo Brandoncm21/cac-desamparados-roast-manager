@@ -68,7 +68,7 @@ async function post(request: NextRequest) {
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
   const { servicios, tipo_tueste, tipo_molienda, tipo_empaque,
-    observaciones, ...restoOrden } = parsed.data;
+    observaciones, lotes, id_finca, ...restoOrden } = parsed.data;
 
   // Transacción completa en DB: orden + orden_pasos + especificaciones_orden.
   // Sin rollbacks manuales: si algo falla, no queda nada a medias.
@@ -91,6 +91,28 @@ async function post(request: NextRequest) {
         ? 403
         : 500;
     return apiError(mensaje, status);
+  }
+
+  // Asociación posterior a la RPC (no se modifica la transacción): finca y lotes.
+  // El enlace es opcional en ambos sentidos (spec 004 D5); si falla, la orden ya existe.
+  const ordenId = (data as { id_orden?: number } | null)?.id_orden;
+
+  if (ordenId && id_finca) {
+    const { error: errFinca } = await supabase
+      .from("ordenes_trabajo")
+      .update({ id_finca })
+      .eq("id_orden", ordenId);
+    if (errFinca) {
+      return apiError(`Orden #${ordenId} creada, pero no se pudo asignar la finca: ${errFinca.message}`, 500);
+    }
+  }
+
+  if (ordenId && lotes.length > 0) {
+    const filas = lotes.map((id_lote) => ({ id_orden: ordenId, id_lote }));
+    const { error: errLotes } = await supabase.from("orden_lotes").insert(filas);
+    if (errLotes) {
+      return apiError(`Orden #${ordenId} creada, pero no se pudieron enlazar los lotes: ${errLotes.message}`, 500);
+    }
   }
 
   return apiOk(data, 201);

@@ -4,6 +4,21 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Added — Refactor del flujo de lotes (004-refactor-flujo-lotes)
+- **Trazabilidad por `id`**: cadena `cliente → finca → lote → orden → perfil de tueste → catación` (reemplaza el texto libre `nproductor`/`nfinca`/`zona`/`zona_finca`/`zona_procedencia`).
+- **Tabla `fincas`** (0038): finca por cliente con `altura`, zona opcional (`zonas_finca`), UNIQUE parcial por nombre y RLS con 3 policies.
+- **Lote enlazado** (0039): `lotes_cafe.id_cliente`/`id_finca` (FK), `proceso_cafe` (enum `Lavado/Honey/Natural/Otro`) y `enproceso` con `'En Catación'` y `'Vendido'`; `ordenes_trabajo.id_finca`.
+- **`orden_lotes`** (0040): relación N:M lote↔orden con `peso_kg`, PK compuesta y RLS (escritura `Admin`/`Recepción`); reemplaza `orden_lotes_externos`.
+- **Backfill** (0041): clientes desde `nproductor`, fincas desde `(nfinca, zona)` con altura, propagación a lotes y migración de `orden_lotes_externos → orden_lotes` por `nlote` (0 sin-match); corrige la secuencia `clientes_id_cliente_seq`.
+- **Catación con lote** (0042): `guardar_catacion` deriva `nlote` de `orden_lotes` (fallback legacy) y transiciona el lote a `'En Catación'` al guardar, o `'Vendido'` con `finalizada=true`; editar una catación de un lote vendido no lo degrada.
+- **API**: `/api/fincas` (GET paginado por `cliente_id` + búsqueda, POST `23505→409`/`23503→400`, `[id]` GET/PUT/DELETE soft); `/api/lotes` con `id_cliente`/`id_finca` obligatorios y embeds; `/api/ordenes` acepta `id_finca` + `lotes[]` y enlaza tras la RPC; `/api/cataciones` embebe el lote con finca y productor.
+- **UI**: combobox Productor → Finca con **altura auto** y "+ Crear finca" inline (lotes y órdenes); selector de **finca** y multi-select de **lotes** al crear una orden; selector de lote en catación (`nlote · finca · productor`) con checkbox "catación finalizada"; **dashboard con un apartado por fase** (`Acopio`, `Secado`, `Trilla`, `Bodega`, `Catación`, `Vendido`).
+- **Spec** `specs/004-refactor-flujo-lotes/` (spec, plan, tasks) con decisiones D1–D9 y P1–P6 cerradas.
+
+### Fixed — Refactor del flujo de lotes
+- `CatacionForm` enviaba y reseteaba el formulario con una forma plana que no coincidía con `{ catacion, rondas }`: al editar no se precargaban los campos. Ahora `FormValues` es anidado y `reset` mapea las rondas (`id_catacion_ronda → id`).
+- `guardar_catacion` ya no depende solo de `orden_lotes_externos` para derivar `nlote` (usa `orden_lotes` primero).
+
 ### Added — Fusión CoffeeBeanFlow (002-fusion-cbf, Fases 0–4)
 - **Módulo Lotes end-to-end** (0027): `lotes_cafe` (29 columnas, RLS 3 policies, índices incl. `idx_lotes_nlote_trgm`), API `/api/lotes` (GET paginado + búsqueda trgm + filtros, POST→RPC, 23505→409) y `/api/lotes/[id]` (GET con órdenes enlazadas K1, PUT, DELETE soft), UI completa (lista con debounce/estados/badges, nueva, detalle, editar) con RHF+Zod.
 - **Etapas del lote** (0028–0031): `caracterizacion_lote`+3 RC (upsert por id de lote+tiempo), `secado_lote`+4 series débiles con RPCs de upsert dif sync, `bodega_lote`+N:M `secado_bodega` (sync con validación de pertenencia), `trilla_lote`+`peso_verde_trilla` 1:1 (toggle off → soft-delete). UI de 4 pestañas en `/lotes/[id]`.

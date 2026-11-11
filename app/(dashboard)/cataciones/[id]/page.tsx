@@ -43,6 +43,13 @@ interface CatacionDetalle {
     nombre_cafe: string | null;
     estado: string;
   } | null;
+  lotes_cafe: {
+    id_lote: number;
+    nlote: string;
+    enproceso: string | null;
+    clientes: { nombre_completo: string } | null;
+    fincas: { nombre: string; altura: number | null } | null;
+  } | null;
   rondas: { id: number; valor_calidad: number | null }[];
 }
 
@@ -102,6 +109,18 @@ export default function CatacionDetallePage() {
             <div>
               <span className="text-muted-foreground">Lote:</span>{" "}
               <span className="font-mono">{catacion.nlote || "-"}</span>
+              {catacion.lotes_cafe?.enproceso && (
+                <Badge variant="secondary" className="ml-2">{catacion.lotes_cafe.enproceso}</Badge>
+              )}
+            </div>
+            <div>
+              <span className="text-muted-foreground">Finca / Productor:</span>{" "}
+              {catacion.lotes_cafe?.fincas?.nombre ?? "-"}
+              {catacion.lotes_cafe?.fincas?.altura != null
+                ? ` (${catacion.lotes_cafe.fincas.altura} msnm)`
+                : ""}
+              {" · "}
+              {catacion.lotes_cafe?.clientes?.nombre_completo ?? "-"}
             </div>
             <div>
               <span className="text-muted-foreground">Reposo:</span>{" "}

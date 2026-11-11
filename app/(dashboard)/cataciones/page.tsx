@@ -22,6 +22,13 @@ interface Catacion {
     nombre_cafe: string | null;
     estado: string;
   } | null;
+  lotes_cafe: {
+    id_lote: number;
+    nlote: string;
+    enproceso: string | null;
+    clientes: { nombre_completo: string } | null;
+    fincas: { nombre: string; altura: number | null } | null;
+  } | null;
 }
 
 const can = (rol: string | null) => rol === "Tostador" || rol === "Admin";
@@ -115,7 +122,14 @@ export default function CatacionesPage() {
                 <TableCell>
                   {c.perfiles_tueste?.numero_lote || c.perfiles_tueste?.nombre_cafe || `Perfil #${c.perfiles_tueste?.id_orden ?? "-"}`}
                 </TableCell>
-                <TableCell className="font-mono">{c.nlote || "-"}</TableCell>
+                <TableCell>
+                  <div className="font-mono">{c.nlote || "-"}</div>
+                  {(c.lotes_cafe?.fincas?.nombre || c.lotes_cafe?.clientes?.nombre_completo) && (
+                    <div className="text-xs text-muted-foreground">
+                      {c.lotes_cafe?.fincas?.nombre ?? "-"} · {c.lotes_cafe?.clientes?.nombre_completo ?? "-"}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell>
                   {c.pfinales != null ? (
                     <span className="font-semibold">{c.pfinales}</span>

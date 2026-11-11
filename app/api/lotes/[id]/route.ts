@@ -14,18 +14,18 @@ async function get(
 
   const { data: lote, error } = await supabase
     .from("lotes_cafe")
-    .select("*")
+    .select("*, clientes(nombre_completo), fincas(nombre, altura, zonas_finca(nombre))")
     .eq("id_lote", loteId)
     .is("deleted_at", null)
     .single();
 
   if (error) return apiError("Lote no encontrado", 404);
 
-  // K1: órdenes de trabajo enlazadas a este lote (trazabilidad end-to-end)
+  // Órdenes enlazadas por id (orden_lotes, N:M por id — spec 004 D4).
   const { data: vinculos } = await supabase
-    .from("orden_lotes_externos")
-    .select("id_orden, peso_kg, origen, created_at")
-    .eq("nlote", lote.nlote)
+    .from("orden_lotes")
+    .select("id_orden, peso_kg, created_at, ordenes_trabajo(numero_factura, estado_orden, fecha_orden)")
+    .eq("id_lote", loteId)
     .order("created_at", { ascending: false });
 
   return apiOk({ ...lote, ordenes_vinculadas: vinculos ?? [] });
@@ -54,7 +54,10 @@ async function put(
     .select()
     .single();
 
-  if (error) return apiError(error.message, 500);
+  if (error) {
+    const status = error.code === "23505" ? 409 : error.code === "23503" ? 400 : 500;
+    return apiError(error.message, status);
+  }
   if (!data) return apiError("Lote no encontrado", 404);
   return apiOk(data);
 }
