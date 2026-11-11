@@ -90,7 +90,7 @@ Portado desde CoffeeBeanFlow (CBF, ASP.NET Core + EF Core, 19 entidades). Las ta
 
 **Índices nuevos:** `idx_lotes_nlote_trgm`, `idx_lotes_nproductor_trgm`, `idx_lotes_activos_fecha`, `idx_lotes_enproceso`, `idx_ole_origen_nlote`, `idx_caracterizacion_lote_idx`, `idx_caracterizacion_rc_caract`, `idx_secado_lote_idx`, `idx_secado_humedad_idx`, `idx_secado_ambiente_idx`, `idx_secado_temperatura_idx`, `idx_secado_camas_idx`, `idx_bodega_lote_idx`, `idx_secado_bodega_bodega`, `idx_trilla_lote_idx`, `idx_trilla_pesos_verdes`, `idx_catacion_ref`, `idx_catacion_lote`, `idx_catacion_nlote`, `idx_catacion_rondas_idx`.
 
-## 3quater. Refactor del flujo de lotes (0033–0042, rama `feat/flujo-lotes`)
+## 3quater. Refactor del flujo de lotes (0033–0043, rama `feat/flujo-lotes`)
 
 Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/spec.md)): enlazar **por `id`** toda la cadena
 `cliente → finca → lote → orden → perfil de tueste → catación`, reemplazando el texto libre (`nproductor`, `nfinca`,
@@ -105,6 +105,7 @@ Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/sp
 | `ordenes_trabajo.id_finca` | FK nullable a `fincas` (finca de la orden, independiente del cliente) | 0039 |
 | `orden_lotes` | **Tabla nueva N:M** lote↔orden con `peso_kg` opcional y PK `(id_orden, id_lote)`; reemplaza a `orden_lotes_externos`; RLS 3 policies (escritura `Admin`/`Recepción`) | 0040 |
 | `guardar_catacion` | Deriva `nlote` del lote (o de `orden_lotes` y, como fallback, de `orden_lotes_externos`); con `id_lote` transiciona el lote a `En Catación`, o a `Vendido` si llega `finalizada=true` (no degrada un lote ya vendido) | 0042 |
+| `catacion_tueste.id_lote` | Backfill por `nlote` de las cataciones previas a 0039 (idempotente) | 0043 |
 
 **Reglas del modelo (decisiones cerradas con el dueño):**
 
@@ -119,7 +120,7 @@ Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/sp
 `lotes_cafe.id_cliente/id_finca`, y migración de `orden_lotes_externos → orden_lotes` por `nlote`. Incluye
 `setval` de la secuencia `clientes_id_cliente_seq` (estaba desincronizada: `last_value=1` con `max=5`).
 
-> **Deprecado, pendiente de DROP (T12 / `0043`+)**: `lotes_cafe.nproductor`, `nfinca`, `zona`, `altura`,
+> **Deprecado, pendiente de DROP (T12 / `0044`+)**: `lotes_cafe.nproductor`, `nfinca`, `zona`, `altura`,
 > `ordenes_trabajo.zona_finca`, `clientes.zona_procedencia` y la tabla `orden_lotes_externos`.
 
 ## 4. Row Level Security (RLS)

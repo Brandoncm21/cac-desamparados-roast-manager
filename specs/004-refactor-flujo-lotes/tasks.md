@@ -1,7 +1,7 @@
 # Tasks: Refactor del flujo — lotes ↔ clientes/fincas ↔ órdenes ↔ tueste ↔ catación
 
 **Feature**: `004-refactor-flujo-lotes` | **Input**: [spec.md](./spec.md) + [plan.md](./plan.md)
-**Estado**: en curso · rama `feat/flujo-lotes` (sin commit) · `typecheck` 0 · `lint` 0 err · `test` 191/191
+**Estado**: T1–T11, T13–T15 completas · **T12 (drop legacy) pendiente** · rama `feat/flujo-lotes` · commit `c555cf8` (local, sin push) · `typecheck` 0 · `lint` 0 err · `test` 194/194 · `build` OK
 
 > Protocolo: plan → aprobado → ejecutar → evidencia por tarea. Migraciones vía MCP (de a una); `.sql` versionado.
 
@@ -33,10 +33,12 @@
   - API: GET de `/api/cataciones` y `/[id]` embeben `lotes_cafe!catacion_tueste_id_lote_fkey(... clientes, fincas)`; sintaxis PostgREST verificada (HTTP 200).
   - UI: `CatacionForm` con select de lote (`nlote · finca · productor (estado)`), info de finca/altura/productor, checkbox "Catación finalizada → Vendido"; `FormValues` anidado y `reset` ya precarga la catación al editar. Lista y detalle muestran finca/productor/estado.
   - Tests: 194/194 (`catacion.schema.test.ts` +3: lote sin perfil, sin perfil y sin lote, `finalizada` default).
+  - Migración **`0043_backfill_catacion_id_lote.sql`** (aplicada): completa `catacion_tueste.id_lote` por `nlote` para las cataciones anteriores a 0039 (1 fila: catación #2 → lote `LT-E2E-001`).
 - [x] **T15. Dashboard por fase** — apartado por servicio/fase (`ENPROCESO_LOTE`) con los lotes de ese estado, cliente y finca, y enlace al lote.
-- [ ] **T12. `0042_drop_legacy.sql`** — DROP `lotes_cafe.nproductor/nfinca/zona/altura`, `ordenes_trabajo.zona_finca`, `clientes.zona_procedencia`, `orden_lotes_externos`; `SET NOT NULL` en `lotes_cafe.id_cliente/id_finca`. **Requiere:** quitar `zona_finca` de `crear_orden_completa` (RPC), del schema de orden y de la UI de nueva orden.
+- [ ] **T12. `0044_drop_legacy.sql`** — DROP `lotes_cafe.nproductor/nfinca/zona/altura`, `ordenes_trabajo.zona_finca`, `clientes.zona_procedencia`, `orden_lotes_externos`; `SET NOT NULL` en `lotes_cafe.id_cliente/id_finca`. **Requiere:** quitar `zona_finca` de `crear_orden_completa` (RPC), del schema de orden y de la UI de nueva orden; y `crear_orden_desde_trilla` aún escribe `orden_lotes_externos`.
 
 ## Fase 5 — Verificación
 
 - [x] **T13.** `typecheck` 0 · `lint` 0 err (41 warnings preexistentes) · `test` 194/194 · `build` OK.
-- [ ] **T14.** Demo de trazabilidad `cliente → finca → lote → orden → perfil → catación`; actualizar `docs/` + `CHANGELOG`; commit.
+- [x] **T14.** Demo de trazabilidad `cliente → finca → lote → orden → perfil → catación`; `docs/DB_SCHEMA.md` (§3quater) + `CHANGELOG`; commit `c555cf8` en `feat/flujo-lotes` (local, sin push).
+  - Demo (SQL sobre datos reales): `LT-E2E-001` → **Finca San Luis** → finca **Lote Demo SC-003** (1200 msnm) → orden **43 / F-0043** (645 kg en `orden_lotes`) → perfil **27 TQ-E2E-01** (Completado) → catación **#2** (pfinales 85.25); y `www2222` → **www** → **dasas** (898 msnm) sin orden ni catación (enlace opcional, D5).
