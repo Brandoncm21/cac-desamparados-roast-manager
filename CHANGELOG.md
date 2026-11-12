@@ -24,6 +24,13 @@ Todas las notas de versión de SCACR.
 ### Fixed — Refactor del flujo de lotes
 - `CatacionForm` enviaba y reseteaba el formulario con una forma plana que no coincidía con `{ catacion, rondas }`: al editar no se precargaban los campos. Ahora `FormValues` es anidado y `reset` mapea las rondas (`id_catacion_ronda → id`).
 - `guardar_catacion` ya no depende solo de `orden_lotes_externos` para derivar `nlote` (usa `orden_lotes` primero; desde 0045 ya no existe el fallback).
+### Fixed — Correcciones post-fusión (003-correcciones-post-fusion)
+- **DB `0036`**: `CHECK (estado IN ('Pendiente','Completado'))` en `perfiles_tueste` (espejo del enum Zod; última columna de estado sin constraint).
+- **DB `0037`**: eliminados 4 enums huérfanos (`tipo_tueste_enum`, `tipo_molienda_enum`, `tipo_empaque_enum`, `tipo_servicio_enum`; 0 dependencias verificadas).
+- **DB `0033`/`0034`/`0035`**: hardening de `search_path` en 9 funciones; 9 índices de FK + `empleados_lectura_propia` con `(select auth.uid())`; `REVOKE EXECUTE … FROM PUBLIC` de `get_empleado_rol()` (el `REVOKE … FROM anon` de `0026` era inefectivo) y 3 índices redundantes.
+- **`/reportes`**: eliminado el N+1 (una consulta `.in("id_perfil", ids)` + agrupación en memoria).
+- **`/tueste/[perfilId]`**: `RendimientosDialog` y `RegistroConfirmadoDialog` a `next/dynamic` con montaje condicional (chunk bajo demanda).
+- **Fuentes self-hosted**: `next/font/google` (Inter, Montserrat, Geist Mono) → `next/font/local` con variable fonts subset latin en `app/fonts/`; el build deja de depender de Google Fonts.
 
 ### Added — Fusión CoffeeBeanFlow (002-fusion-cbf, Fases 0–4)
 - **Módulo Lotes end-to-end** (0027): `lotes_cafe` (29 columnas, RLS 3 policies, índices incl. `idx_lotes_nlote_trgm`), API `/api/lotes` (GET paginado + búsqueda trgm + filtros, POST→RPC, 23505→409) y `/api/lotes/[id]` (GET con órdenes enlazadas K1, PUT, DELETE soft), UI completa (lista con debounce/estados/badges, nueva, detalle, editar) con RHF+Zod.

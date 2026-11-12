@@ -5,8 +5,6 @@ import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ContextHeader } from "./components/ContextHeader";
-import { RendimientosDialog } from "./components/RendimientosDialog";
-import { RegistroConfirmadoDialog } from "./components/RegistroConfirmadoDialog";
 import { TemperatureInput } from "./components/TemperatureInput";
 import { QuickMilestones } from "./components/QuickMilestones";
 
@@ -16,6 +14,16 @@ const LiveChart = dynamic(
     ssr: false,
     loading: () => <p className="text-sm text-muted-foreground p-4">Cargando gráfico...</p>,
   }
+);
+
+const RendimientosDialog = dynamic(
+  () => import("./components/RendimientosDialog").then((m) => m.RendimientosDialog),
+  { ssr: false }
+);
+
+const RegistroConfirmadoDialog = dynamic(
+  () => import("./components/RegistroConfirmadoDialog").then((m) => m.RegistroConfirmadoDialog),
+  { ssr: false }
 );
 import { MachineAdjustments } from "./components/MachineAdjustments";
 import { RegisteredMilestones } from "./components/RegisteredMilestones";
@@ -276,19 +284,23 @@ export default function CapturaTuestePage() {
         onIrAOrden={irAOrden}
       />
 
-      <RendimientosDialog
-        open={rendimientosOpen}
-        onOpenChange={setRendimientosOpen}
-        metricas={metricas}
-        setMetricas={setMetricas}
-        calcularDiferencia={calcularDiferencia}
-        onConfirmar={confirmarFinalizacion}
-        onIrAOrden={irAOrden}
-        resumen={resumen}
-        submitting={finalizacionSubmitting}
-      />
+      {rendimientosOpen && (
+        <RendimientosDialog
+          open={rendimientosOpen}
+          onOpenChange={setRendimientosOpen}
+          metricas={metricas}
+          setMetricas={setMetricas}
+          calcularDiferencia={calcularDiferencia}
+          onConfirmar={confirmarFinalizacion}
+          onIrAOrden={irAOrden}
+          resumen={resumen}
+          submitting={finalizacionSubmitting}
+        />
+      )}
 
-      <RegistroConfirmadoDialog registro={ultimoRegistro} onClose={cerrarUltimoRegistro} />
+      {ultimoRegistro && (
+        <RegistroConfirmadoDialog registro={ultimoRegistro} onClose={cerrarUltimoRegistro} />
+      )}
     </div>
   );
 }
