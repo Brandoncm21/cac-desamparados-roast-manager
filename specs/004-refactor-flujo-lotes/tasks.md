@@ -1,7 +1,7 @@
 # Tasks: Refactor del flujo — lotes ↔ clientes/fincas ↔ órdenes ↔ tueste ↔ catación
 
 **Feature**: `004-refactor-flujo-lotes` | **Input**: [spec.md](./spec.md) + [plan.md](./plan.md)
-**Estado**: **completa** (T1–T15) · rama `feat/flujo-lotes` (push a origin) · `typecheck` 0 · `lint` 0 err · `test` 194/194 · `build` OK
+**Estado**: **completa** (T1–T15) · rama `feat/flujo-lotes` publicada · incluye el merge de `fix/general` (`00245ed`, correcciones 003 / migraciones 0033–0037) para que el repo reproduzca la DB: 0033→0045 sin huecos · `typecheck` 0 · `lint` 0 err · `test` 194/194 · `build` OK
 
 > Protocolo: plan → aprobado → ejecutar → evidencia por tarea. Migraciones vía MCP (de a una); `.sql` versionado.
 
