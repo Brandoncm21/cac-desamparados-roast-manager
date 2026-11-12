@@ -31,5 +31,5 @@
 
 ## Pendiente / notas
 
-- Las fincas de los clientes demo 2–5 no existen: se crean desde `/fincas` o con **+ Crear finca** en el alta de lote (no se inventan datos).
+- [x] **T15. `0047_seed_fincas_demo.sql`** (aplicada) — 5 fincas demo para los productores 2–5 (Cooperativa Los Santos queda con **2** para mostrar 1 cliente → N fincas), con zona, ubicación y altura. Idempotente por `(cliente, nombre)`; la cabecera del archivo trae el `UPDATE ... deleted_at` para revertirlas.
 - Si el dueño quiere **histórico** de altura por lote (snapshot), requiere una columna nueva (`lotes_cafe.altura_msnm`); hoy la altura se lee en vivo (spec 004 D8).

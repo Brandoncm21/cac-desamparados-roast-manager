@@ -10,6 +10,7 @@ Todas las notas de versión de SCACR.
 - **`FincaForm`** con productor, nombre, altura, zona del catálogo (con "+ Nueva zona" inline) y ubicación.
 - **Fuente única de fincas/zonas** (`lib/fincas.ts` + `FincaSelect`): la usan el alta de lote, el alta de orden y el módulo de fincas.
 - **`GET /api/fincas/[id]`** devuelve `lotes[]`, `ordenes_count` y `tiene_dependencias`; `PUT`/`DELETE` responden **409** con lotes u órdenes asociados (no se orfanan datos).
+- **Datos demo** (0047): 5 fincas para los productores 2–5 con zona, ubicación y altura — Cooperativa Los Santos con 2 para mostrar 1 cliente → N fincas. Idempotente y reversible.
 
 ### Fixed — Alta de lotes (005)
 - **El trigger de los `Select` mostraba el `id`**: Base UI renderiza el `value` crudo si el Root no recibe `items`. Se pasan `items` en productor, finca, perfil/lote de catación, servicios, responsable y finca de la edición de orden.
