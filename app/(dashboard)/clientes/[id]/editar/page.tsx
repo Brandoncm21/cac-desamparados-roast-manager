@@ -14,7 +14,6 @@ interface Cliente {
   id_cliente: number;
   nombre_completo: string;
   telefono: string | null;
-  zona_procedencia: string | null;
 }
 
 export default function EditarClientePage() {
@@ -24,7 +23,6 @@ export default function EditarClientePage() {
 
   const [nombreCompleto, setNombreCompleto] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [zonaProcedencia, setZonaProcedencia] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -39,7 +37,7 @@ export default function EditarClientePage() {
 
       const { data, error } = await supabase
         .from("clientes")
-        .select("id_cliente, nombre_completo, telefono, zona_procedencia")
+        .select("id_cliente, nombre_completo, telefono")
         .eq("id_cliente", id)
         .is("deleted_at", null)
         .single();
@@ -53,7 +51,6 @@ export default function EditarClientePage() {
       const loaded = data as Cliente;
       setNombreCompleto(loaded.nombre_completo);
       setTelefono(loaded.telefono ?? "");
-      setZonaProcedencia(loaded.zona_procedencia ?? "");
       setLoading(false);
     };
 
@@ -77,7 +74,6 @@ export default function EditarClientePage() {
         body: JSON.stringify({
           nombre_completo: nombreCompleto.trim(),
           telefono: telefono.trim() || null,
-          zona_procedencia: zonaProcedencia.trim() || null,
         }),
       });
 
@@ -138,17 +134,6 @@ export default function EditarClientePage() {
                 value={telefono}
                 onChange={(e) => setTelefono(e.target.value)}
                 placeholder="Teléfono"
-                disabled={saving}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="zona_procedencia">Zona de procedencia</Label>
-              <Input
-                id="zona_procedencia"
-                value={zonaProcedencia}
-                onChange={(e) => setZonaProcedencia(e.target.value)}
-                placeholder="Zona de procedencia"
                 disabled={saving}
               />
             </div>

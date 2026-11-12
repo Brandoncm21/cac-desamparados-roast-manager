@@ -1,7 +1,7 @@
 # Tasks: Refactor del flujo — lotes ↔ clientes/fincas ↔ órdenes ↔ tueste ↔ catación
 
 **Feature**: `004-refactor-flujo-lotes` | **Input**: [spec.md](./spec.md) + [plan.md](./plan.md)
-**Estado**: T1–T11, T13–T15 completas · **T12 (drop legacy) pendiente** · rama `feat/flujo-lotes` · commit `c555cf8` (local, sin push) · `typecheck` 0 · `lint` 0 err · `test` 194/194 · `build` OK
+**Estado**: **completa** (T1–T15) · rama `feat/flujo-lotes` (push a origin) · `typecheck` 0 · `lint` 0 err · `test` 194/194 · `build` OK
 
 > Protocolo: plan → aprobado → ejecutar → evidencia por tarea. Migraciones vía MCP (de a una); `.sql` versionado.
 
@@ -35,7 +35,13 @@
   - Tests: 194/194 (`catacion.schema.test.ts` +3: lote sin perfil, sin perfil y sin lote, `finalizada` default).
   - Migración **`0043_backfill_catacion_id_lote.sql`** (aplicada): completa `catacion_tueste.id_lote` por `nlote` para las cataciones anteriores a 0039 (1 fila: catación #2 → lote `LT-E2E-001`).
 - [x] **T15. Dashboard por fase** — apartado por servicio/fase (`ENPROCESO_LOTE`) con los lotes de ese estado, cliente y finca, y enlace al lote.
-- [ ] **T12. `0044_drop_legacy.sql`** — DROP `lotes_cafe.nproductor/nfinca/zona/altura`, `ordenes_trabajo.zona_finca`, `clientes.zona_procedencia`, `orden_lotes_externos`; `SET NOT NULL` en `lotes_cafe.id_cliente/id_finca`. **Requiere:** quitar `zona_finca` de `crear_orden_completa` (RPC), del schema de orden y de la UI de nueva orden; y `crear_orden_desde_trilla` aún escribe `orden_lotes_externos`.
+- [x] **T12. `0044_drop_legacy.sql` + `0045_guardar_catacion_sin_legacy.sql`** (aplicadas vía MCP).
+  - **0044**: `crear_orden_completa` inserta `id_finca` (adiós `zona_finca`); `crear_orden_desde_trilla` usa `id_cliente`/`id_finca` del lote (sin conciliación K4 por nombre) e idempotencia K5 por `orden_lotes`; `SET NOT NULL` en `lotes_cafe.id_cliente/id_finca`; **DROP** de `lotes_cafe.nproductor/nfinca/zona/altura`, `ordenes_trabajo.zona_finca`, `clientes.zona_procedencia` y la tabla `orden_lotes_externos`; nuevo `idx_fincas_nombre_trgm`.
+  - **0045**: `guardar_catacion` sin fallback a `orden_lotes_externos` (la tabla ya no existe).
+  - Código: `zona_finca` fuera de `crearOrdenSchema`/`actualizarOrdenSchema`, del alta de orden y del detalle; la edición de orden ahora selecciona **Finca** (`id_finca`); `zona_procedencia` fuera de `crearClienteSchema`, `/api/clientes`, listado/detalle/edición de clientes y `seed.sql`.
+  - Evidencia DB: 32 tablas (−1), `lotes_cafe` sin columnas legacy con `id_cliente NOT NULL, id_finca NOT NULL`, `ordenes_trabajo` con `id_finca` y sin `zona_finca`, ninguna función referencia identificadores legacy, `orden_lotes_externos` dropeada, grants intactos (`authenticated` sí, `anon` no).
+  - Prueba transaccional (revertida, `tests=0`, `max(id_orden)=43`): `TEST_OK [paso1] orden con id_finca=1 · [paso2] e1 reused #43 · [paso3] catación con lote y nlote derivado`.
+  - Verificación: `typecheck` 0 · `lint` 0 err (41 warnings) · `test` 194/194 · `build` OK.
 
 ## Fase 5 — Verificación
 

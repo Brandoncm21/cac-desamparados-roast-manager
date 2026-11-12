@@ -13,7 +13,6 @@ interface Cliente {
   id_cliente: number;
   nombre_completo: string;
   telefono: string | null;
-  zona_procedencia: string | null;
 }
 
 export default function ClientesPage() {
@@ -86,7 +85,6 @@ export default function ClientesPage() {
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground space-y-1">
                 {cliente.telefono && <p>📞 {cliente.telefono}</p>}
-                {cliente.zona_procedencia && <p>📍 {cliente.zona_procedencia}</p>}
               </CardContent>
             </Card>
           </Link>

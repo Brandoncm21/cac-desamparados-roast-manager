@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Phone, MapPin, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Phone, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface OrdenResumen {
@@ -24,7 +24,6 @@ interface Cliente {
   id_cliente: number;
   nombre_completo: string;
   telefono: string | null;
-  zona_procedencia: string | null;
   historial_ordenes: OrdenResumen[];
 }
 
@@ -120,11 +119,6 @@ export default function ClienteDetallePage() {
           {cliente.telefono && (
             <p className="flex items-center gap-2 text-muted-foreground">
               <Phone className="h-4 w-4" /> {cliente.telefono}
-            </p>
-          )}
-          {cliente.zona_procedencia && (
-            <p className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" /> {cliente.zona_procedencia}
             </p>
           )}
         </CardContent>

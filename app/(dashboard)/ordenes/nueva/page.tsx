@@ -15,7 +15,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ClienteAutocomplete } from "@/components/forms/cliente-autocomplete";
-import { InlineAddSelect } from "@/components/forms/inline-add-select";
 import {
   MOLIENDA_DEFAULT,
   requiereHumedad,
@@ -44,11 +43,6 @@ interface ClienteOption {
 
 interface EmpleadoOption {
   id_empleado: number;
-  nombre: string;
-}
-
-interface ZonaOption {
-  id_zona: number;
   nombre: string;
 }
 
@@ -123,7 +117,6 @@ export default function NuevaOrdenPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
-  const [zonas, setZonas] = useState<ZonaOption[]>([]);
   const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
   const [serviciosActivos, setServiciosActivos] = useState<ServicioActivo[]>([]);
   const [fincasOrden, setFincasOrden] = useState<Array<{ id_finca: number; nombre: string; altura: number; cliente_id: number }>>([]);
@@ -140,7 +133,6 @@ export default function NuevaOrdenPage() {
       id_cliente: 0,
       id_finca: null,
       lotes: [],
-      zona_finca: "",
       descripcion_producto: "",
       proceso_cafe: "",
       porcentaje_humedad_entrada: null,
@@ -211,14 +203,12 @@ export default function NuevaOrdenPage() {
 
   useEffect(() => {
     const load = async () => {
-      const [{ data: cli }, { data: zon }, { data: emp }, resServicios] = await Promise.all([
+      const [{ data: cli }, { data: emp }, resServicios] = await Promise.all([
         supabase.from("clientes").select("id_cliente, nombre_completo").order("nombre_completo"),
-        supabase.from("zonas_finca").select("id_zona, nombre").order("nombre"),
         supabase.from("empleados").select("id_empleado, nombre").eq("activo", true).order("nombre"),
         fetch("/api/servicios-activos"),
       ]);
       if (cli) setClientes(cli);
-      if (zon) setZonas(zon);
       if (emp) setEmpleados(emp);
 
       if (resServicios.ok) {
@@ -328,20 +318,6 @@ export default function NuevaOrdenPage() {
     }
   };
 
-  const agregarZona = async (nombre: string) => {
-    const res = await fetch("/api/zonas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre }),
-    });
-    if (!res.ok) throw new Error("No se pudo guardar la zona");
-    const result = await res.json();
-    setZonas((prev) => [...prev, result.data].sort((a, b) => a.nombre.localeCompare(b.nombre)));
-    return result.data.nombre;
-  };
-
-  const zonaOptions = zonas.map((z) => ({ value: z.nombre, label: z.nombre }));
-
   return (
     <div className="max-w-3xl mx-auto space-y-4 md:space-y-6 pb-32 pt-12 lg:pt-0">
       <h1 className="text-xl md:text-2xl font-bold">Nueva Orden de Trabajo</h1>
@@ -369,27 +345,6 @@ export default function NuevaOrdenPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="zona_finca"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Zona o Finca</FormLabel>
-                    <FormControl>
-                      <InlineAddSelect
-                        options={zonaOptions}
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        onAdd={agregarZona}
-                        placeholder="Seleccionar zona o finca..."
-                        addLabel="Agregar nueva zona..."
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               <FormField
                 control={form.control}
                 name="id_finca"
@@ -757,7 +712,6 @@ export default function NuevaOrdenPage() {
 
               {(() => {
                 const vacios: string[] = [];
-                if (!pendingValues.zona_finca) vacios.push("Zona o Finca");
                 if (!pendingValues.proceso_cafe) vacios.push("Proceso de café");
                 if (!pendingValues.descripcion_producto) vacios.push("Descripción del producto");
                 if (hayTueste && !pendingValues.tipo_tueste) vacios.push("Tipo de tueste");
