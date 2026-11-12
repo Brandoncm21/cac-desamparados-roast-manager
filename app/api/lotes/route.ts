@@ -12,8 +12,18 @@ async function get(request: NextRequest) {
   const paginacion = parsePaginacion(searchParams);
   if (!paginacion.success) return apiValidationError(paginacion.error.flatten());
 
+  // Filtro opcional por finca (number en query string).
+  const idFincaRaw = searchParams.get("id_finca");
+  let idFinca: number | undefined;
+  if (idFincaRaw) {
+    const n = Number(idFincaRaw);
+    if (!Number.isInteger(n) || n <= 0) return apiError("id_finca inválido", 422);
+    idFinca = n;
+  }
+
   const filtrosParseo = listarLotesFiltrosSchema.safeParse({
     enproceso: searchParams.get("enproceso") ?? "",
+    id_finca: idFinca,
     desde: searchParams.get("desde") ?? "",
     hasta: searchParams.get("hasta") ?? "",
   });
@@ -27,21 +37,21 @@ async function get(request: NextRequest) {
 
   let query = supabase
     .from("lotes_cafe")
-    .select("*", { count: "exact" })
+    .select(
+      "*, clientes(nombre_completo), fincas(nombre, altura, zonas_finca(nombre))",
+      { count: "exact" }
+    )
     .is("deleted_at", null)
     .order("fecha_acopio", { ascending: false })
     .order("id_lote", { ascending: false })
     .range(from, to);
 
   if (filtros.enproceso) query = query.eq("enproceso", filtros.enproceso);
+  if (filtros.id_finca) query = query.eq("id_finca", filtros.id_finca);
   if (filtros.desde) query = query.gte("fecha_acopio", `${filtros.desde}T00:00:00.000Z`);
   if (filtros.hasta) query = query.lte("fecha_acopio", `${filtros.hasta}T23:59:59.999Z`);
 
-  if (busqueda) {
-    query = query.or(
-      `nlote.ilike.%${busqueda}%,nproductor.ilike.%${busqueda}%,nfinca.ilike.%${busqueda}%`
-    );
-  }
+  if (busqueda) query = query.ilike("nlote", `%${busqueda}%`);
 
   const { data, count, error } = await query;
   if (error) return apiError(error.message, 500);
@@ -65,7 +75,10 @@ async function post(request: NextRequest) {
     .select()
     .single();
 
-  if (error) return apiError(error.message, error.code === "23505" ? 409 : 500);
+  if (error) {
+    const status = error.code === "23505" ? 409 : error.code === "23503" ? 400 : 500;
+    return apiError(error.message, status);
+  }
   return apiOk(data, 201);
 }
 

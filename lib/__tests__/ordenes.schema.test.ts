@@ -4,7 +4,6 @@ import { crearOrdenSchema, actualizarOrdenSchema } from "../schemas/ordenes";
 describe("crearOrdenSchema", () => {
   const validData = {
     id_cliente: 1,
-    zona_finca: "Zona Alta",
     descripcion_producto: "Café arábica",
     proceso_cafe: "Lavado",
     porcentaje_humedad_entrada: 12.5,
@@ -27,7 +26,6 @@ describe("crearOrdenSchema", () => {
       tipo_tueste: null,
       tipo_molienda: "",
       tipo_empaque: null,
-      zona_finca: "",
       observaciones: "",
     });
     expect(result.success).toBe(true);
@@ -92,7 +90,6 @@ describe("crearOrdenSchema", () => {
 describe("actualizarOrdenSchema", () => {
   it("acepta actualización parcial", () => {
     const result = actualizarOrdenSchema.safeParse({
-      zona_finca: "Nueva zona",
       estado_orden: "En Proceso",
     });
     expect(result.success).toBe(true);

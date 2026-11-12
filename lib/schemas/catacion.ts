@@ -21,10 +21,13 @@ const fechaTz = z.string().optional().nullable().or(z.literal(""));
 // ── Catación (48 atributos del snapshot real; disp. 2: c2cortado) ─────────────
 export const catacionSchema = z.object({
   id_catacion_tueste: z.number().int().positive().optional(),
-  perfil_tueste_ref: z.string().uuid("Perfil de tueste requerido"),
+  /** FR-012: perfil, lote o ambos; la validación de "al menos uno" va en superRefine. */
+  perfil_tueste_ref: z.string().uuid("Perfil de tueste inválido").optional().nullable().or(z.literal("")),
   producto_analizado: z.enum(["tueste", "verde"]).default("tueste"),
   id_lote: z.number().int().positive().optional().nullable(),
   nlote: z.string().trim().max(100).optional().nullable().or(z.literal("")),
+  /** FR-004: al marcarla finalizada el lote pasa a 'Vendido'; si no, a 'En Catación'. */
+  finalizada: z.boolean().optional().default(false),
   ffreposo: fechaTz,
   pfinales: porcentaje,
 
@@ -81,6 +84,16 @@ export const catacionSchema = z.object({
   tonagton_75: porcentaje,
   tonagton_85: porcentaje,
   tonagton_95: porcentaje,
+}).superRefine((val, ctx) => {
+  const tienePerfil = typeof val.perfil_tueste_ref === "string" && val.perfil_tueste_ref.length > 0;
+  const tieneLote = typeof val.id_lote === "number";
+  if (!tienePerfil && !tieneLote) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["perfil_tueste_ref"],
+      message: "Seleccione un perfil de tueste o un lote",
+    });
+  }
 });
 
 export const rondaSchema = z.object({

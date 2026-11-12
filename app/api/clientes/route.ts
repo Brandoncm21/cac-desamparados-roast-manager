@@ -20,7 +20,7 @@ async function get(request: NextRequest) {
   let query = supabase
     .from("clientes")
     .select(
-      "id_cliente, nombre_completo, telefono, zona_procedencia, fecha_registro",
+      "id_cliente, nombre_completo, telefono, fecha_registro",
       { count: "exact" }
     )
     .is("deleted_at", null)

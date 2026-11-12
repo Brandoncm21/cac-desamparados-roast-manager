@@ -105,23 +105,25 @@ Respuesta {data: {accepted: [{tempId, recordId}], rejected: [{tempId, code, mess
 Módulos portados de CoffeeBeanFlow y su conexión con el flujo de producción de CafeTrack:
 
 ```text
-lotes_cafe ── caracterización (0028) ── secado + 4 series (0029) ── bodega + N:M (0030)
-     │                                                                      │
-     │                                                        trilla + peso verde (0031)
-     │                                                                      │
-     │                                        e1 crear_orden_desde_trilla ─┘
-     ▼                                                │
-orden_lotes_externos (K1) ◄───────────────────────────┘
+clientes ── fincas (0038) ── lotes_cafe.id_cliente/id_finca (0039)
+                                  │
+                caracterización (0028) ── secado + 4 series (0029) ── bodega + N:M (0030)
+                                  │                                          │
+                                  │                            trilla + peso verde (0031)
+                                  │                                          │
+                                  │            e1 crear_orden_desde_trilla ──┘
+                                  ▼                      │
+orden_lotes (N:M, 0040) ◄────────────────────────────────┘
      │
-ordenes_trabajo + 7 orden_pasos (tarifas/facturación) ── perfiles_tueste (K2 public_id)
+ordenes_trabajo (+ id_finca, 7 orden_pasos) ── perfiles_tueste (K2 public_id)
      │
-     └── e2 catacion_tueste (K3 perfil_tueste_ref) + catacion_rondas ── trazabilidad integral (UI)
+     └── e2 catacion_tueste (K3 perfil_tueste_ref | id_lote) + catacion_rondas ── trazabilidad integral (UI)
 ```
 
 - **UI:** `app/(dashboard)/lotes/**` (lista, nueva, detalle con 5 pestañas) y `app/(dashboard)/cataciones/**`; la pestaña *Trazabilidad Integral* (`components/lotes/trazabilidad-panel.tsx`) recorre las 9 etapas.
 - **API:** `app/api/lotes/**` (lote + 4 etapas + e1) y `app/api/cataciones/**`; esquemas en `lib/schemas/lotes.ts|etapas.ts|catacion.ts`.
 - **Atomicidad:** `guardar_caracterizacion|secado|bodega|trilla|catacion` + `crear_orden_desde_trilla` (`SECURITY INVOKER`, `EXECUTE` solo `authenticated`); upsert por id y soft-delete dirigido — sin `replace-all`.
-- **Conectores:** K1 `orden_lotes_externos`, K2 `public_id`, K3 `catacion_tueste.perfil_tueste_ref`, K4 `clientes.external_ref`; detalle en [`ARQUITECTURA_Y_DATOS_INTEGRACION.md`](../ARQUITECTURA_Y_DATOS_INTEGRACION.md) §4.3 y §4.7.
+- **Conectores:** K1 `orden_lotes` (por id, desde 0040/0044), K2 `public_id`, K3 `catacion_tueste.perfil_tueste_ref`, K4 resuelto por `lotes_cafe.id_cliente`; detalle en [`ARQUITECTURA_Y_DATOS_INTEGRACION.md`](../ARQUITECTURA_Y_DATOS_INTEGRACION.md) §4.3 y §4.7, y en [`DB_SCHEMA.md`](./DB_SCHEMA.md) §3quater.
 
 ### 4.5 Hidratación y Cookies
 - **Hidratación:** script inline en [`app/layout.tsx:50-72`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/layout.tsx#L50-L72) elimina `bis_skin_checked` (extensión Bitdefender) con `MutationObserver({attributes:true, attributeFilter:["bis_skin_checked"]})`.
@@ -133,6 +135,6 @@ ordenes_trabajo + 7 orden_pasos (tarifas/facturación) ── perfiles_tueste (K
 - **Pesos en `NUMERIC(10,2)`:** nunca `FLOAT` para evitar errores de precisión monetaria ([`supabase/migrations/0017_servicios_maestro_empaques.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0017_servicios_maestro_empaques.sql)).
 - **Precios versionados:** `empaque_precios(valid_from, valid_to)` y `servicio_precios(activo)` preservan historial sin alterar órdenes existentes.
 - **Code-splitting:** `recharts` y `jspdf`/`html-to-image` cargados con `next/dynamic` + `import()` dinámico ([`app/(dashboard)/tueste/[perfilId]/hooks/usePDF.ts:47`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/(dashboard)/tueste/[perfilId]/hooks/usePDF.ts#L47)).
-- **Fusión sin clave compartida (K1):** `perfiles_tueste.numero_lote` **no** es el lote de acopio; el enlace orden↔`nlote` vive en `orden_lotes_externos` (`0026`). La catación se une al tueste por `public_id` (K3), nunca por `numero_lote`.
+- **Fusión sin clave compartida (K1):** `perfiles_tueste.numero_lote` **no** es el lote de acopio; el enlace orden↔lote vive en `orden_lotes` (N:M por `id_lote`, `0040`), que desde `0044` sustituye a `orden_lotes_externos`. La catación se une al tueste por `public_id` (K3), nunca por `numero_lote`.
 - **Trilla con doble fuente de verdad por tipo de dato:** peso facturado → `orden_pasos` (e1); rendimientos/clasificación → `trilla_lote` (portado). CBF no factura, por lo que no hay duplicidad de importes.
 - **Soft-delete dirigido en series:** los RPC de etapas hacen upsert por id y soft-delete solo de los ids omitidos, preservando los insertados en el mismo pase (`v_nuevos int[]` + `NOT IN (SELECT unnest(...))`).

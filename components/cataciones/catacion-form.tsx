@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +25,22 @@ interface Perfil {
   numero_lote: string | null;
   nombre_cafe: string | null;
 }
+
+/** Lote disponible para catar (nlote + finca + productor en el selector) */
+interface Lote {
+  id_lote: number;
+  nlote: string;
+  enproceso: string | null;
+  clientes: { nombre_completo: string } | null;
+  fincas: { nombre: string; altura: number | null } | null;
+}
+
+const SIN_LOTE = "__sin_lote__";
+
+/** Respuesta de GET /api/cataciones/[id] (fila + rondas) */
+type CatacionCargada = Record<string, unknown> & {
+  rondas?: { id_catacion_ronda?: number | null; valor_calidad?: number | null }[];
+};
 
 /* Los 48 campos del snapshot CBF organizados por secciones */
 const CAMPOS: Record<SeccionKey, { name: string; label: string; pct?: boolean }[]> = {
@@ -86,12 +103,17 @@ const CAMPOS: Record<SeccionKey, { name: string; label: string; pct?: boolean }[
 type SeccionKey = "fisico" | "c1" | "c2" | "zarandas" | "agtron";
 
 type RondaForm = { id: number | null; valor_calidad: string | number | null };
-type FormValues = Partial<GuardarCatacionBody["catacion"]> & { rondas: RondaForm[] };
+/** El body que espera la API es { catacion: {...}, rondas: [...] } — se respeta anidado. */
+type FormValues = {
+  catacion: Partial<GuardarCatacionBody["catacion"]>;
+  rondas: RondaForm[];
+};
 
 export function CatacionForm({ catacionId }: { catacionId?: number }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [perfiles, setPerfiles] = useState<Perfil[]>([]);
+  const [lotes, setLotes] = useState<Lote[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -105,7 +127,7 @@ export function CatacionForm({ catacionId }: { catacionId?: number }) {
     formState: { isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(guardarCatacionBodySchema as never),
-    defaultValues: { rondas: [{ valor_calidad: null }] },
+    defaultValues: { rondas: [{ valor_calidad: null }], catacion: { finalizada: false } as never },
   });
 
   const { fields: rondasFields, append: appendRonda, remove: removeRonda } = useFieldArray({ control, name: "rondas" });
@@ -124,30 +146,58 @@ export function CatacionForm({ catacionId }: { catacionId?: number }) {
   }, [supabase]);
 
   useEffect(() => {
+    fetch("/api/lotes?pageSize=100&page=1")
+      .then((r) => r.json())
+      .then((result: { data?: Lote[] }) => setLotes(result.data ?? []))
+      .catch(() => toast.error("No se pudieron cargar los lotes"));
+  }, []);
+
+  useEffect(() => {
     if (!catacionId) {
       setLoading(false);
       return;
     }
     fetch(`/api/cataciones/${catacionId}`)
       .then((r) => r.json())
-      .then((result) => {
-        if (result.data) {
-          reset(result.data);
-        }
+      .then((result: { data?: CatacionCargada }) => {
+        if (!result.data) return;
+        const cargada = result.data;
+        const rondas: RondaForm[] = (cargada.rondas ?? []).map((r) => ({
+          id: r.id_catacion_ronda ?? null,
+          valor_calidad: r.valor_calidad ?? null,
+        }));
+        reset({
+          catacion: cargada as unknown as Partial<GuardarCatacionBody["catacion"]>,
+          rondas: rondas.length > 0 ? rondas : [{ id: null, valor_calidad: null }],
+        });
       })
       .catch(() => toast.error("No se pudo cargar la catación"))
       .finally(() => setLoading(false));
   }, [catacionId, reset]);
 
-  const perfilRef = watch("perfil_tueste_ref");
+  const perfilRef = watch("catacion.perfil_tueste_ref");
   const perfilElegido = perfiles.find((p) => p.public_id === perfilRef);
+  const loteId = watch("catacion.id_lote");
+  const finalizada = watch("catacion.finalizada");
+  const loteElegido = lotes.find((l) => l.id_lote === loteId);
+
+  const seleccionarLote = (valor: string) => {
+    if (valor === SIN_LOTE) {
+      setValue("catacion.id_lote", null);
+      setValue("catacion.nlote", null);
+      return;
+    }
+    const id = Number(valor);
+    const lote = lotes.find((l) => l.id_lote === id);
+    setValue("catacion.id_lote", id);
+    setValue("catacion.nlote", lote?.nlote ?? null);
+  };
 
   const onSubmit = async (formData: FormValues) => {
     setSaving(true);
     try {
-      const aux = { ...formData, rondas: undefined } as Partial<typeof formData>;
       const body = {
-        catacion: aux,
+        catacion: formData.catacion,
         rondas: formData.rondas,
       };
 
@@ -196,15 +246,18 @@ export function CatacionForm({ catacionId }: { catacionId?: number }) {
       {/* Sección 1: Perfil e2 + identidad */}
       <Card>
         <CardHeader>
-          <CardTitle>Perfil Cataado (e2)</CardTitle>
-          <CardDescription>Seleccione un perfil de tueste en estado Completado.</CardDescription>
+          <CardTitle>Perfil Cataado (e2) y Lote</CardTitle>
+          <CardDescription>
+            Elija un perfil de tueste Completado, un lote, o ambos. Con lote, el lote pasa a
+            «En Catación» y a «Vendido» al marcarla finalizada.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label>Perfil de Tueste</Label>
             <Select
               value={perfilRef ?? undefined}
-              onValueChange={(v) => setValue("perfil_tueste_ref", v ?? undefined)}
+              onValueChange={(v) => setValue("catacion.perfil_tueste_ref", v ?? undefined)}
             >
               <SelectTrigger>
                 <SelectValue placeholder={perfiles.length ? "Elija perfil Completado" : "Sin perfiles Completados"} />
@@ -225,8 +278,37 @@ export function CatacionForm({ catacionId }: { catacionId?: number }) {
             )}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="f-nlote">Lote (opcional)</Label>
-            <Input id="f-nlote" placeholder="Se autoderiva del enlace K1" {...register("catacion.nlote" as never)} />
+            <Label>Lote</Label>
+            <Select
+              value={loteId ? String(loteId) : SIN_LOTE}
+              onValueChange={(v) => seleccionarLote(v ?? SIN_LOTE)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={lotes.length ? "Elija lote (N° · finca · productor)" : "Sin lotes registrados"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SIN_LOTE}>— Sin lote (solo perfil) —</SelectItem>
+                {lotes.map((l) => (
+                  <SelectItem key={l.id_lote} value={String(l.id_lote)}>
+                    <span className="font-mono">{l.nlote}</span>
+                    {" · "}
+                    {l.fincas?.nombre ?? "sin finca"}
+                    {" · "}
+                    {l.clientes?.nombre_completo ?? "sin productor"}
+                    {l.enproceso ? ` (${l.enproceso})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {loteElegido && (
+              <p className="text-xs text-muted-foreground">
+                Finca: {loteElegido.fincas?.nombre ?? "-"}
+                {loteElegido.fincas?.altura != null ? ` (${loteElegido.fincas.altura} msnm)` : ""}
+                {" — Productor: "}
+                {loteElegido.clientes?.nombre_completo ?? "-"}
+                {loteElegido.enproceso ? ` — Estado actual: ${loteElegido.enproceso}` : ""}
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="f-ffreposo">Fecha de Reposo</Label>
@@ -235,6 +317,22 @@ export function CatacionForm({ catacionId }: { catacionId?: number }) {
           <div className="space-y-1.5">
             <Label htmlFor="f-pfinales">Puntaje Final (pfinales)</Label>
             <Input id="f-pfinales" type="number" step="0.01" placeholder="0–100" {...register("catacion.pfinales" as never)} />
+          </div>
+          <div className="md:col-span-2">
+            <label className="flex items-center gap-3 text-sm">
+              <Checkbox
+                checked={Boolean(finalizada)}
+                disabled={!loteId}
+                onCheckedChange={(c) => setValue("catacion.finalizada", Boolean(c))}
+                className="h-5 w-5"
+              />
+              <span>
+                Catación finalizada — el lote pasa a <strong>Vendido</strong>
+                {!loteId && (
+                  <span className="text-muted-foreground"> (requiere un lote)</span>
+                )}
+              </span>
+            </label>
           </div>
         </CardContent>
       </Card>
@@ -345,7 +443,7 @@ export function CatacionForm({ catacionId }: { catacionId?: number }) {
         <Button type="button" variant="outline" onClick={() => router.push("/cataciones")}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isSubmitting || saving || !perfilRef}>
+        <Button type="submit" disabled={isSubmitting || saving || (!perfilRef && !loteId)}>
           {saving ? "Guardando…" : catacionId ? "Actualizar Catación" : "Guardar Catación"}
         </Button>
       </div>

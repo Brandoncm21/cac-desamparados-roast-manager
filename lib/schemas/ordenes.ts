@@ -4,7 +4,9 @@ const nullifyNaN = (v: unknown) => (typeof v === "number" && Number.isNaN(v) ? n
 
 export const crearOrdenSchema = z.object({
   id_cliente: z.number().int().positive("Seleccione un cliente"),
-  zona_finca: z.string().max(150).optional().or(z.literal("")),
+  // Finca (opcional en la orden — spec 004 P4) y lotes a procesar (N:M, D4).
+  id_finca: z.number().int().positive().optional().nullable(),
+  lotes: z.array(z.number().int().positive()).optional().default([]),
   porcentaje_humedad_entrada: z.preprocess(nullifyNaN, z.number().min(0).max(100).optional().nullable()),
   proceso_cafe: z.enum(["Lavado", "Honey", "Natural", "Otro", ""]).nullable().optional(),
   descripcion_producto: z.string().optional().or(z.literal("")),
@@ -27,7 +29,7 @@ export const cambiarEstadoOrdenSchema = z.object({
 });
 
 export const actualizarOrdenSchema = z.object({
-  zona_finca: z.string().max(150).optional().nullable().or(z.literal("")),
+  id_finca: z.number().int().positive().optional().nullable(),
   porcentaje_humedad_entrada: z.number().min(0).max(100).optional().nullable(),
   proceso_cafe: z.enum(["Lavado", "Honey", "Natural", "Otro", ""]).optional().nullable(),
   descripcion_producto: z.string().optional().nullable().or(z.literal("")),

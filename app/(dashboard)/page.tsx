@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Users, Thermometer, AlertTriangle } from "lucide-react";
+import { ENPROCESO_LOTE } from "@/lib/schemas/lotes";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
@@ -13,6 +14,27 @@ export default function DashboardPage() {
     perfiles_hoy: 0,
     proximos_vencer: 0,
   });
+
+  const [lotesPorFase, setLotesPorFase] = useState<
+    Record<string, Array<{ id_lote: number; nlote: string; clientes: { nombre_completo: string } | null; fincas: { nombre: string } | null }>>
+  >({});
+
+  useEffect(() => {
+    fetch("/api/lotes?pageSize=100&page=1")
+      .then((r) => r.json())
+      .then((j) => {
+        const grupos: Record<
+          string,
+          Array<{ id_lote: number; nlote: string; clientes: { nombre_completo: string } | null; fincas: { nombre: string } | null }>
+        > = {};
+        for (const l of (j.data ?? [])) {
+          const fase = (l.enproceso as string) ?? "No";
+          (grupos[fase] ??= []).push(l);
+        }
+        setLotesPorFase(grupos);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -93,6 +115,45 @@ export default function DashboardPage() {
             </Link>
           );
         })}
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold">Lotes por fase de proceso</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {ENPROCESO_LOTE.map((fase) => {
+            const lotes = lotesPorFase[fase] ?? [];
+            const etiqueta = fase === "No" ? "En acopio" : fase;
+            return (
+              <Card key={fase}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">{etiqueta}</CardTitle>
+                  <span className="text-xs text-muted-foreground">{lotes.length}</span>
+                </CardHeader>
+                <CardContent>
+                  {lotes.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Sin lotes</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {lotes.slice(0, 8).map((l) => (
+                        <li key={l.id_lote}>
+                          <Link href={`/lotes/${l.id_lote}`} className="text-sm hover:underline">
+                            <span className="font-mono">{l.nlote}</span>
+                            <span className="text-muted-foreground">
+                              {" "}— {l.clientes?.nombre_completo ?? "-"} · {l.fincas?.nombre ?? "-"}
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                      {lotes.length > 8 && (
+                        <li className="text-xs text-muted-foreground">+{lotes.length - 8} más</li>
+                      )}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

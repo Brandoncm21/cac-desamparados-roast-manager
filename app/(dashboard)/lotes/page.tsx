@@ -15,16 +15,15 @@ import { toast } from "sonner";
 interface Lote {
   id_lote: number;
   nlote: string;
-  nproductor: string;
-  nfinca: string;
-  zona: string | null;
+  clientes: { nombre_completo: string } | null;
+  fincas: { nombre: string; altura: number; zonas_finca: { nombre: string } | null } | null;
   disponible: number | null;
   enproceso: string;
   vendido: boolean;
   fecha_acopio: string;
 }
 
-const ESTADOS_LOTE = ["No", "En Secado", "En Trilla", "En Bodega", "Vendido"];
+const ESTADOS_LOTE = ["No", "En Secado", "En Trilla", "En Bodega", "En Catación", "Vendido"];
 
 export default function LotesPage() {
   const router = useRouter();
@@ -102,6 +101,7 @@ export default function LotesPage() {
       "En Secado": "bg-amber-100 text-amber-800",
       "En Trilla": "bg-blue-100 text-blue-800",
       "En Bodega": "bg-purple-100 text-purple-800",
+      "En Catación": "bg-orange-100 text-orange-800",
       Vendido: "bg-green-100 text-green-800",
     };
     return colors[estado] || "bg-gray-100 text-gray-800";
@@ -125,7 +125,7 @@ export default function LotesPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por lote, productor o finca..."
+            placeholder="Buscar por N° de lote..."
             className="pl-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -161,9 +161,9 @@ export default function LotesPage() {
             {lotes.map((lote) => (
               <TableRow key={lote.id_lote}>
                 <TableCell className="font-mono">{lote.nlote}</TableCell>
-                <TableCell>{lote.nproductor}</TableCell>
-                <TableCell>{lote.nfinca}</TableCell>
-                <TableCell className="hidden md:table-cell">{lote.zona || "-"}</TableCell>
+                <TableCell>{lote.clientes?.nombre_completo ?? "-"}</TableCell>
+                <TableCell>{lote.fincas?.nombre ?? "-"}</TableCell>
+                <TableCell className="hidden md:table-cell">{lote.fincas?.zonas_finca?.nombre || "-"}</TableCell>
                 <TableCell>
                   {lote.disponible != null ? `${lote.disponible} kg` : "-"}
                 </TableCell>

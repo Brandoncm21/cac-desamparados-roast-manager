@@ -68,9 +68,10 @@ async function post(request: NextRequest) {
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
   const { servicios, tipo_tueste, tipo_molienda, tipo_empaque,
-    observaciones, ...restoOrden } = parsed.data;
+    observaciones, lotes, ...restoOrden } = parsed.data;
 
   // Transacción completa en DB: orden + orden_pasos + especificaciones_orden.
+  // `id_finca` viaja en p_orden (0044) y la RPC la inserta en la misma transacción.
   // Sin rollbacks manuales: si algo falla, no queda nada a medias.
   const { data, error } = await supabase.rpc("crear_orden_completa", {
     p_orden: restoOrden as unknown as object,
@@ -91,6 +92,18 @@ async function post(request: NextRequest) {
         ? 403
         : 500;
     return apiError(mensaje, status);
+  }
+
+  // Asociación posterior a la RPC (la finca ya va en la transacción): lotes (N:M, D4).
+  // El enlace es opcional (spec 004 D5); si falla, la orden ya existe.
+  const ordenId = (data as { id_orden?: number } | null)?.id_orden;
+
+  if (ordenId && lotes.length > 0) {
+    const filas = lotes.map((id_lote) => ({ id_orden: ordenId, id_lote }));
+    const { error: errLotes } = await supabase.from("orden_lotes").insert(filas);
+    if (errLotes) {
+      return apiError(`Orden #${ordenId} creada, pero no se pudieron enlazar los lotes: ${errLotes.message}`, 500);
+    }
   }
 
   return apiOk(data, 201);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -19,21 +20,32 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
+interface ClienteOpcion {
+  id_cliente: number;
+  nombre_completo: string;
+}
+
+interface FincaOpcion {
+  id_finca: number;
+  nombre: string;
+  altura: number;
+  cliente_id: number;
+}
+
 export interface LoteActual {
   id_lote: number;
   nlote: string;
   nrecibo: number;
-  nproductor: string;
-  nfinca: string;
-  zona: string | null;
-  altura: number | null;
+  id_cliente: number;
+  id_finca: number;
   robjetivo: number | null;
   rtotal: number | null;
   disponible: number | null;
   vendido: boolean;
   enproceso: string;
+  proceso_cafe: string | null;
   semilavado: boolean;
-  "natural": boolean;
+  natural: boolean;
   anaerobico: boolean;
   miel: boolean;
   lavado: boolean;
@@ -76,6 +88,14 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
   const router = useRouter();
   const editando = Boolean(lote);
 
+  const [clientes, setClientes] = useState<ClienteOpcion[]>([]);
+  const [fincas, setFincas] = useState<FincaOpcion[]>([]);
+  const [clienteId, setClienteId] = useState<number | null>(lote?.id_cliente ?? null);
+  const [fincaId, setFincaId] = useState<number | null>(lote?.id_finca ?? null);
+  const [nuevaFincaOpen, setNuevaFincaOpen] = useState(false);
+  const [nuevaFincaNombre, setNuevaFincaNombre] = useState("");
+  const [nuevaFincaAltura, setNuevaFincaAltura] = useState("");
+
   const {
     register,
     handleSubmit,
@@ -90,10 +110,10 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
       ? {
           ...lote,
           nlote: "",
-          zona: lote.zona ?? "",
+          id_cliente: lote.id_cliente,
+          id_finca: lote.id_finca,
           otro: lote.otro ?? "",
           fecha_acopio: isoToLocalInput(lote.fecha_acopio) || "",
-          altura: lote.altura ?? undefined,
           robjetivo: lote.robjetivo ?? undefined,
           rtotal: lote.rtotal ?? undefined,
           disponible: lote.disponible ?? undefined,
@@ -107,8 +127,8 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
       : {
           nrecibo: undefined as unknown as number,
           nlote: "",
-          nproductor: "",
-          nfinca: "",
+          id_cliente: undefined as unknown as number,
+          id_finca: undefined as unknown as number,
           vendido: false,
           enproceso: "No",
           semilavado: false,
@@ -120,12 +140,102 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
   });
 
   const enprocesoActual = watch("enproceso") ?? "No";
+  const fincaSeleccionada = fincas.find((f) => f.id_finca === fincaId) ?? null;
+
+  // Clientes (productores) para el combobox.
+  useEffect(() => {
+    let activo = true;
+    fetch("/api/clientes?pageSize=100&page=1")
+      .then((r) => r.json())
+      .then((j) => {
+        if (activo) setClientes(j.data ?? []);
+      })
+      .catch(() => toast.error("No se pudieron cargar los clientes"));
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  // Fincas del cliente seleccionado.
+  useEffect(() => {
+    if (!clienteId) {
+      setFincas([]);
+      return;
+    }
+    let activo = true;
+    fetch(`/api/fincas?cliente_id=${clienteId}&pageSize=100&page=1`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!activo) return;
+        const lista: FincaOpcion[] = j.data ?? [];
+        setFincas(lista);
+        // Si la finca actual no pertenece al cliente, limpiar.
+        if (fincaId && !lista.some((f) => f.id_finca === fincaId)) {
+          setFincaId(null);
+          setValue("id_finca", undefined as unknown as number);
+        }
+      })
+      .catch(() => toast.error("No se pudieron cargar las fincas"));
+    return () => {
+      activo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteId]);
+
+  const onClienteChange = (value: string | null) => {
+    if (!value) return;
+    const id = Number(value);
+    setClienteId(id);
+    setValue("id_cliente", id, { shouldValidate: true });
+    setFincaId(null);
+    setValue("id_finca", undefined as unknown as number);
+  };
+
+  const onFincaChange = (value: string | null) => {
+    if (!value) return;
+    const id = Number(value);
+    setFincaId(id);
+    setValue("id_finca", id, { shouldValidate: true });
+  };
+
+  const crearFinca = async () => {
+    if (!clienteId) {
+      toast.error("Seleccioná un productor primero");
+      return;
+    }
+    const altura = Number(nuevaFincaAltura);
+    if (!nuevaFincaNombre.trim()) {
+      toast.error("El nombre de la finca es obligatorio");
+      return;
+    }
+    if (!Number.isFinite(altura) || altura < 0) {
+      toast.error("La altura (msnm) es obligatoria");
+      return;
+    }
+    const res = await fetch("/api/fincas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cliente_id: clienteId, nombre: nuevaFincaNombre.trim(), altura }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      toast.error("Error al crear finca: " + (result.error?.message || "Error desconocido"));
+      return;
+    }
+    toast.success("Finca creada");
+    setNuevaFincaOpen(false);
+    setNuevaFincaNombre("");
+    setNuevaFincaAltura("");
+    const nueva = result.data as FincaOpcion;
+    setFincas((prev) => [...prev, nueva]);
+    onFincaChange(String(nueva.id_finca));
+  };
 
   const onSubmit = async (values: CrearLoteInput) => {
     try {
       const { fecha_acopio, ...datos } = values;
       const payload: Record<string, unknown> = Object.fromEntries(
-        Object.entries(datos).filter(([, v]) => v !== "" && v !== undefined)
+        Object.entries(datos).filter(([, v]) => v !== "" && v !== undefined && v !== null)
       );
       if (fecha_acopio) payload["fecha_acopio"] = fecha_acopio;
 
@@ -161,7 +271,7 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
             <Input
               id="nlote"
               placeholder="Ej: LOTE-2024-001"
-              disabled={editando} /* convención CBF: nlote no editable (disp. 1) */
+              disabled={editando}
               {...register("nlote", { required: !editando })}
             />
             {errors.nlote && <p className="text-sm text-red-600">{String(errors.nlote.message)}</p>}
@@ -171,24 +281,93 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
             <Input id="nrecibo" type="number" min={0} {...register("nrecibo", { valueAsNumber: true })} />
             {errors.nrecibo && <p className="text-sm text-red-600">{String(errors.nrecibo.message)}</p>}
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="nproductor">Productor *</Label>
-            <Input id="nproductor" maxLength={100} {...register("nproductor", { required: true })} />
-            {errors.nproductor && <p className="text-sm text-red-600">{String(errors.nproductor.message)}</p>}
+            <Label>Productor (cliente) *</Label>
+            <Select value={clienteId ? String(clienteId) : ""} onValueChange={onClienteChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar productor" />
+              </SelectTrigger>
+              <SelectContent>
+                {clientes.map((c) => (
+                  <SelectItem key={c.id_cliente} value={String(c.id_cliente)}>
+                    {c.nombre_completo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.id_cliente && <p className="text-sm text-red-600">{String(errors.id_cliente.message)}</p>}
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="nfinca">Finca *</Label>
-            <Input id="nfinca" maxLength={100} {...register("nfinca", { required: true })} />
-            {errors.nfinca && <p className="text-sm text-red-600">{String(errors.nfinca.message)}</p>}
+            <div className="flex items-center justify-between">
+              <Label>Finca *</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                disabled={!clienteId}
+                onClick={() => setNuevaFincaOpen((v) => !v)}
+              >
+                + Crear finca
+              </Button>
+            </div>
+            <Select
+              value={fincaId ? String(fincaId) : ""}
+              onValueChange={onFincaChange}
+              disabled={!clienteId || fincas.length === 0}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={clienteId ? "Seleccionar finca" : "Elegí un productor primero"} />
+              </SelectTrigger>
+              <SelectContent>
+                {fincas.map((f) => (
+                  <SelectItem key={f.id_finca} value={String(f.id_finca)}>
+                    {f.nombre} — {f.altura} msnm
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.id_finca && <p className="text-sm text-red-600">{String(errors.id_finca.message)}</p>}
           </div>
+
+          {nuevaFincaOpen && (
+            <div className="col-span-full grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-md border p-3">
+              <div className="space-y-2">
+                <Label htmlFor="nf-nombre">Nombre de la finca *</Label>
+                <Input
+                  id="nf-nombre"
+                  value={nuevaFincaNombre}
+                  onChange={(e) => setNuevaFincaNombre(e.target.value)}
+                  maxLength={150}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="nf-altura">Altura (msnm) *</Label>
+                <Input
+                  id="nf-altura"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={nuevaFincaAltura}
+                  onChange={(e) => setNuevaFincaAltura(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end gap-2">
+                <Button type="button" size="sm" onClick={crearFinca}>Crear finca</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setNuevaFincaOpen(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="zona">Zona</Label>
-            <Input id="zona" maxLength={100} {...register("zona")} />
+            <Label>Altura (msnm)</Label>
+            <Input value={fincaSeleccionada ? `${fincaSeleccionada.altura}` : ""} readOnly placeholder="Se completa desde la finca" />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="altura">Altura (msnm)</Label>
-            <Input id="altura" type="number" step="0.01" min={0} {...register("altura", { valueAsNumber: true })} />
-          </div>
+
           <div className="space-y-2">
             <Label htmlFor="fecha_acopio">Fecha/Hora de acopio</Label>
             <Input id="fecha_acopio" type="datetime-local" {...register("fecha_acopio")} />

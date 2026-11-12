@@ -20,10 +20,10 @@ interface LoteDetalle {
   id_lote: number;
   nlote: string;
   nrecibo: number;
-  nproductor: string;
-  nfinca: string;
-  zona: string | null;
-  altura: number | null;
+  id_cliente: number;
+  id_finca: number;
+  clientes: { nombre_completo: string } | null;
+  fincas: { nombre: string; altura: number; zonas_finca: { nombre: string } | null } | null;
   robjetivo: number | null;
   rtotal: number | null;
   disponible: number | null;
@@ -45,8 +45,12 @@ interface LoteDetalle {
   ordenes_vinculadas: Array<{
     id_orden: number;
     peso_kg: number | null;
-    origen: string;
     created_at: string;
+    ordenes_trabajo: {
+      numero_factura: string | null;
+      estado_orden: string | null;
+      fecha_orden: string | null;
+    } | null;
   }>;
 }
 
@@ -155,10 +159,10 @@ export default function LoteDetallePage() {
         </CardHeader>
         <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
           <div><span className="text-muted-foreground block">Recibo</span>#{lote.nrecibo}</div>
-          <div><span className="text-muted-foreground block">Productor</span>{lote.nproductor}</div>
-          <div><span className="text-muted-foreground block">Finca</span>{lote.nfinca}</div>
-          <div><span className="text-muted-foreground block">Zona</span>{lote.zona || "-"}</div>
-          <div><span className="text-muted-foreground block">Altura (msnm)</span>{finfo(lote.altura)}</div>
+          <div><span className="text-muted-foreground block">Productor</span>{lote.clientes?.nombre_completo ?? "-"}</div>
+          <div><span className="text-muted-foreground block">Finca</span>{lote.fincas?.nombre ?? "-"}</div>
+          <div><span className="text-muted-foreground block">Zona</span>{lote.fincas?.zonas_finca?.nombre || "-"}</div>
+          <div><span className="text-muted-foreground block">Altura (msnm)</span>{finfo(lote.fincas?.altura ?? null)}</div>
           <div>
             <span className="text-muted-foreground block">Fecha de acopio</span>
             {new Date(lote.fecha_acopio).toLocaleString("es-CR")}
@@ -195,7 +199,7 @@ export default function LoteDetallePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Órdenes enlazadas (K1)</CardTitle>
+          <CardTitle>Órdenes enlazadas</CardTitle>
         </CardHeader>
         <CardContent>
           {lote.ordenes_vinculadas.length === 0 ? (
@@ -208,21 +212,23 @@ export default function LoteDetallePage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Orden</TableHead>
+                    <TableHead>Factura</TableHead>
+                    <TableHead>Estado</TableHead>
                     <TableHead>Peso (kg)</TableHead>
-                    <TableHead>Origen</TableHead>
                     <TableHead>Enlazada</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {lote.ordenes_vinculadas.map((v) => (
-                    <TableRow key={`${v.id_orden}-${v.origen}`}>
+                    <TableRow key={v.id_orden}>
                       <TableCell>
                         <Link href={`/ordenes/${v.id_orden}`} className="underline">
                           #{v.id_orden}
                         </Link>
                       </TableCell>
+                      <TableCell className="font-mono text-xs">{v.ordenes_trabajo?.numero_factura ?? "-"}</TableCell>
+                      <TableCell>{v.ordenes_trabajo?.estado_orden ?? "-"}</TableCell>
                       <TableCell>{v.peso_kg ?? "-"}</TableCell>
-                      <TableCell className="font-mono text-xs">{v.origen}</TableCell>
                       <TableCell>{new Date(v.created_at).toLocaleDateString("es-CR")}</TableCell>
                     </TableRow>
                   ))}

@@ -11,8 +11,8 @@ import { LoteForm } from "@/components/lotes/lote-form";
 interface LoteReciente {
   id_lote: number;
   nlote: string;
-  nproductor: string;
-  nfinca: string;
+  clientes: { nombre_completo: string } | null;
+  fincas: { nombre: string } | null;
   enproceso: string;
   fecha_acopio: string;
 }
@@ -73,7 +73,7 @@ export default function NuevoLotePage() {
                     {l.nlote}
                   </Link>
                   <span className="text-muted-foreground">
-                    {l.nproductor} — {l.nfinca}
+                    {l.clientes?.nombre_completo ?? "-"} — {l.fincas?.nombre ?? "-"}
                   </span>
                   <Badge variant="outline">{l.enproceso}</Badge>
                   <span className="ml-auto text-muted-foreground text-xs">

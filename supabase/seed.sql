@@ -10,12 +10,12 @@ INSERT INTO empleados (nombre, rol, activo) VALUES
   ('Pedro Operador', 'Operador', TRUE);
 
 -- CLIENTES
-INSERT INTO clientes (nombre_completo, telefono, zona_procedencia) VALUES
-  ('Finca San Luis', '8888-1111', 'Tarrazú'),
-  ('Cooperativa Los Santos', '8888-2222', 'Los Santos'),
-  ('Beneficio El Valle', '8888-3333', 'Valle Central'),
-  ('Cafetalera Doña Ana', '8888-4444', 'Brunca'),
-  ('Hacienda La Amistad', '8888-5555', 'Turrialba');
+INSERT INTO clientes (nombre_completo, telefono) VALUES
+  ('Finca San Luis', '8888-1111'),
+  ('Cooperativa Los Santos', '8888-2222'),
+  ('Beneficio El Valle', '8888-3333'),
+  ('Cafetalera Doña Ana', '8888-4444'),
+  ('Hacienda La Amistad', '8888-5555');
 
 -- ÓRDENES DE TRABAJO
 INSERT INTO ordenes_trabajo (id_cliente, porcentaje_humedad_entrada, proceso_cafe, descripcion_producto, id_empleado_recibe, id_empleado_entrega, estado_orden, firma_aprobacion_cliente) VALUES

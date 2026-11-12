@@ -29,6 +29,32 @@ describe("catacion schema (48 campos + rondas)", () => {
     expect(parsed.success).toBe(false);
   });
 
+  it("FR-012: acepta catación solo con lote (sin perfil)", () => {
+    const parsed = catacionSchema.safeParse({ id_lote: 7, pfinales: "83" });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.id_lote).toBe(7);
+      expect(parsed.data.finalizada).toBe(false);
+    }
+  });
+
+  it("FR-012: rechaza catación sin perfil y sin lote con mensaje claro", () => {
+    const parsed = catacionSchema.safeParse({ perfil_tueste_ref: "", pfinales: "80" });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues.some((i) => /perfil de tueste o un lote/i.test(i.message))).toBe(true);
+    }
+  });
+
+  it("FR-004: finalizada es booleana y por defecto false", () => {
+    const sinFlag = catacionSchema.safeParse({ ...base });
+    const conFlag = catacionSchema.safeParse({ ...base, finalizada: true });
+    expect(sinFlag.success).toBe(true);
+    expect(conFlag.success).toBe(true);
+    if (sinFlag.success) expect(sinFlag.data.finalizada).toBe(false);
+    if (conFlag.success) expect(conFlag.data.finalizada).toBe(true);
+  });
+
   it("rechaza pfinales fuera de 0-100", () => {
     const parsed = catacionSchema.safeParse({ ...base, pfinales: "120" });
     expect(parsed.success).toBe(false);

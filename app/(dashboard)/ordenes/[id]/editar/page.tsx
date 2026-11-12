@@ -16,14 +16,23 @@ const OPCIONES_PROCESO = ["Lavado", "Honey", "Natural", "Otro"];
 
 interface Orden {
   id_orden: number;
+  id_cliente: number;
+  id_finca: number | null;
   porcentaje_humedad_entrada: number | null;
   proceso_cafe: string | null;
   descripcion_producto: string | null;
-  zona_finca: string | null;
   fecha_orden: string | null;
   hora_cierre: string | null;
   firma_aprobacion_cliente: boolean | null;
 }
+
+interface Finca {
+  id_finca: number;
+  nombre: string;
+  altura: number | null;
+}
+
+const SIN_FINCA = "sin_finca";
 
 export default function EditarOrdenPage() {
   const params = useParams<{ id: string }>();
@@ -36,7 +45,8 @@ export default function EditarOrdenPage() {
   const [porcentajeHumedad, setPorcentajeHumedad] = useState<string>("");
   const [procesoCafe, setProcesoCafe] = useState<string>("");
   const [descripcionProducto, setDescripcionProducto] = useState<string>("");
-  const [zonaFinca, setZonaFinca] = useState<string>("");
+  const [idFinca, setIdFinca] = useState<number | null>(null);
+  const [fincas, setFincas] = useState<Finca[]>([]);
   const [fechaOrden, setFechaOrden] = useState<string>("");
   const [horaCierre, setHoraCierre] = useState<string>("");
   const [firmaAprobacion, setFirmaAprobacion] = useState<boolean>(false);
@@ -53,7 +63,7 @@ export default function EditarOrdenPage() {
       const { data, error } = await supabase
         .from("ordenes_trabajo")
         .select(
-          "id_orden, porcentaje_humedad_entrada, proceso_cafe, descripcion_producto, zona_finca, fecha_orden, hora_cierre, firma_aprobacion_cliente"
+          "id_orden, id_cliente, id_finca, porcentaje_humedad_entrada, proceso_cafe, descripcion_producto, fecha_orden, hora_cierre, firma_aprobacion_cliente"
         )
         .eq("id_orden", id)
         .is("deleted_at", null)
@@ -69,10 +79,19 @@ export default function EditarOrdenPage() {
       setPorcentajeHumedad(orden.porcentaje_humedad_entrada?.toString() ?? "");
       setProcesoCafe(orden.proceso_cafe ?? "");
       setDescripcionProducto(orden.descripcion_producto ?? "");
-      setZonaFinca(orden.zona_finca ?? "");
+      setIdFinca(orden.id_finca ?? null);
       setFechaOrden(orden.fecha_orden ?? "");
       setHoraCierre(orden.hora_cierre ?? "");
       setFirmaAprobacion(orden.firma_aprobacion_cliente ?? false);
+
+      if (orden.id_cliente) {
+        const resFincas = await fetch(`/api/fincas?cliente_id=${orden.id_cliente}&pageSize=100&page=1`);
+        if (resFincas.ok) {
+          const { data: filas } = (await resFincas.json()) as { data?: Finca[] };
+          setFincas(filas ?? []);
+        }
+      }
+
       setLoading(false);
     };
 
@@ -89,7 +108,7 @@ export default function EditarOrdenPage() {
         porcentaje_humedad_entrada: porcentajeHumedad === "" ? null : Number(porcentajeHumedad),
         proceso_cafe: procesoCafe || null,
         descripcion_producto: descripcionProducto.trim() || null,
-        zona_finca: zonaFinca.trim() || null,
+        id_finca: idFinca,
         fecha_orden: fechaOrden || null,
         hora_cierre: horaCierre || null,
         firma_aprobacion_cliente: firmaAprobacion,
@@ -186,14 +205,30 @@ export default function EditarOrdenPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="zona_finca">Zona / Finca</Label>
-              <Input
-                id="zona_finca"
-                value={zonaFinca}
-                onChange={(e) => setZonaFinca(e.target.value)}
-                placeholder="Zona o finca"
+              <Label htmlFor="id_finca">Finca</Label>
+              <Select
+                value={idFinca ? String(idFinca) : SIN_FINCA}
+                onValueChange={(v) => setIdFinca(v && v !== SIN_FINCA ? Number(v) : null)}
                 disabled={saving}
-              />
+              >
+                <SelectTrigger id="id_finca">
+                  <SelectValue placeholder="Sin especificar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SIN_FINCA}>Sin especificar</SelectItem>
+                  {fincas.map((f) => (
+                    <SelectItem key={f.id_finca} value={String(f.id_finca)}>
+                      {f.nombre}
+                      {f.altura != null ? ` — ${f.altura} msnm` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fincas.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  El cliente no tiene fincas registradas. Créalas desde el lote o al crear una orden.
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

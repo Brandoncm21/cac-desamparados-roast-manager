@@ -19,7 +19,6 @@ const ESTADOS = ["Pendiente", "En Proceso", "Completado", "Cancelado"];
 interface Cliente {
   nombre_completo: string;
   telefono: string | null;
-  zona_procedencia: string | null;
 }
 
 interface Servicio {
@@ -61,8 +60,8 @@ interface Orden {
   proceso_cafe: string | null;
   porcentaje_humedad_entrada: number | null;
   descripcion_producto: string | null;
-  zona_finca: string | null;
   clientes: Cliente | null;
+  fincas?: { nombre: string; altura: number | null } | null;
   servicios_ejecutados: Servicio[];
   orden_pasos: Paso[];
   especificaciones_orden: Especificaciones | null;
@@ -109,6 +108,7 @@ export default function OrdenDetallePage() {
           `
           *,
           clientes(*),
+          fincas(nombre, altura),
           servicios_ejecutados(*),
           orden_pasos(servicios_maestro(tipo)),
           especificaciones_orden(*),
@@ -422,7 +422,6 @@ export default function OrdenDetallePage() {
             <CardContent className="space-y-1 text-sm">
               <p className="font-medium">{cliente?.nombre_completo || "—"}</p>
               <p>{cliente?.telefono || "—"}</p>
-              <p>{cliente?.zona_procedencia || "—"}</p>
             </CardContent>
           </Card>
 
@@ -447,7 +446,12 @@ export default function OrdenDetallePage() {
               Responsable: <span className="font-medium">{orden.empleado_recibe?.nombre || "Sin asignar"}</span>
             </p>
             <p>
-              Zona/Finca: <span className="font-medium">{orden.zona_finca || "Sin especificar"}</span>
+              Finca:{" "}
+              <span className="font-medium">
+                {orden.fincas?.nombre
+                  ? `${orden.fincas.nombre}${orden.fincas.altura != null ? ` (${orden.fincas.altura} msnm)` : ""}`
+                  : "Sin especificar"}
+              </span>
             </p>
             <p>
               Producto: <span className="font-medium">{orden.descripcion_producto || "Sin especificar"}</span>
