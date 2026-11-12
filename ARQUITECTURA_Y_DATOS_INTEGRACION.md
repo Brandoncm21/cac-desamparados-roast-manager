@@ -898,7 +898,7 @@ Patrones CBF a corregir en la fusión: PUT replace-all (discrepancia 16), 404-vs
 
 | ID | Conector | Definición propuesta | Justificación verificada |
 |---|---|---|---|
-| **K1** | Tabla puente `orden_lotes_externos` | `(id_orden int FK, nlote varchar(50), peso_kg numeric, origen text)` con **PK compuesta (id_orden, nlote, origen)** | Relación **N:M**: una orden puede cubrir varios lotes y un lote puede alimentar varias órdenes |
+| **K1** | Tabla puente `orden_lotes_externos` | `(id_orden int FK, nlote varchar(50), peso_kg numeric, origen text)` con **PK compuesta (id_orden, nlote, origen)** | Relación **N:M**: una orden puede cubrir varios lotes y un lote puede alimentar varias órdenes. **Actualizado (spec 004, `0040`/`0044`)**: el puente vigente es `orden_lotes(id_orden, id_lote, peso_kg)` — por `id`, no por `nlote` — y `orden_lotes_externos` fue eliminada |
 | **K2** | `public_id uuid DEFAULT gen_random_uuid() UNIQUE` | En `ordenes_trabajo`, `perfiles_tueste`, `clientes` | Los `serial` son locales y reasignables entre entornos; el UUID es estable inter-sistema |
 | **K3** | `perfil_tueste_ref uuid` | En la futura tabla de catación → `perfiles_tueste.public_id` | La catación consume el resultado del tueste de CafeTrack |
 | **K4** | `clientes.external_ref varchar(100)` | + conciliación manual inicial | CBF no tiene entidad productor; el productor/finca se mapéa a cliente |
@@ -1056,7 +1056,7 @@ flowchart TB
 
 Eventos de enlace exactos:
 
-- **e1 (CBF→CafeTrack)**: una trilla con `wverde_final` registrado crea una orden CafeTrack (RPC `crear_orden_completa`) cuyo primer paso (Chancado) recibe `peso_inicial_kg = wverde_final`; la fila `orden_lotes_externos` (K1) vincula la orden con el/los `nlote` y guarda `origen='CBF'` (idempotencia K5).
+- **e1 (CBF→CafeTrack)**: una trilla con `wverde_final` registrado crea una orden CafeTrack (RPC `crear_orden_completa`) cuyo primer paso (Chancado) recibe `peso_inicial_kg = wverde_final`; la fila `orden_lotes` (**K1**, desde spec 004; antes `orden_lotes_externos`) vincula la orden con el/los lotes e idempotencia K5 se resuelve por `id_lote`.
 - **e2 (CafeTrack→CBF)**: un perfil de tueste en estado `'Completado'` queda disponible para catación; la catación nueva referencia `perfil_tueste_ref` = `perfiles_tueste.public_id` (K3) y opcionalmente registra `rtostado/dfueste` de vuelta para comparar con el DTR del perfil (bucle de calidad).
 - **Cierre**: `catacion` de la última ronda o decisión comercial marca `area_acopio.enproceso='Vendido'`/`vendido=true` en CBF y `ordenes_trabajo.estado_orden='Completado'` con `numero_factura` (K6) en CafeTrack.
 - **Fuente de verdad de la trilla (RESUELTO 2026-11-06)**: por tipo de dato — rendimientos/clasificación → módulo portado de CBF; **pesos facturados → CafeTrack (`orden_pasos`)**; enlace por `nlote` (K1). Respaldado por el diseño de CBF: no hay campos de precio/facturación en sus 19 tablas (verificado por grep del resumen). *(Pendiente de planta: quién pesa, quién factura, y si se factura sobre entrada o salida)*.

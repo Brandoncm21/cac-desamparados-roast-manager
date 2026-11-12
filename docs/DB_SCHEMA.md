@@ -9,9 +9,9 @@
 | Tabla | Propósito | Clave | Campos Relevantes | Evidencia |
 |-------|-----------|-------|-------------------|-----------|
 | `empleados` | Usuarios del sistema | `id_empleado` | `nombre`, `rol` (`Admin\|Tostador\|Recepción\|Operador`), `id_auth` (FK a `auth.users`), `activo`, `deleted_at` | [`0001_schema_inicial.sql:250`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0001_schema_inicial.sql#L250) |
-| `clientes` | Fincas / cooperativas | `id_cliente` | `nombre_completo`, `telefono`, `zona_procedencia`, `deleted_at` | [`0001:267`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0001_schema_inicial.sql#L267) |
+| `clientes` | Productores / cooperativas (1:N `fincas`) | `id_cliente` | `nombre_completo`, `telefono`, `external_ref`, `deleted_at` (`zona_procedencia` eliminada en 0044: la zona vive en `fincas.zona_id`) | [`0001:267`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0001_schema_inicial.sql#L267) |
 | `zonas_finca` | Catálogo de zonas | `id_zona` | `nombre` (unique) | [`0003_zonas_finca.sql:8`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0003_zonas_finca.sql#L8) |
-| `ordenes_trabajo` | Orden central | `id_orden` | `id_cliente`, `numero_factura` (talonario auto), `estado_orden` (`Pendiente\|En Proceso\|Completado`), `porcentaje_humedad_entrada`, `proceso_cafe` (enum), `deleted_at` | [`0005_talonario_auto.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0005_talonario_auto.sql), [`0011_add_soft_delete.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0011_add_soft_delete.sql) |
+| `ordenes_trabajo` | Orden central | `id_orden` | `id_cliente`, `id_finca` (nullable, 0039), `numero_factura` (talonario auto), `estado_orden` (`Pendiente\|En Proceso\|Completado`), `porcentaje_humedad_entrada`, `proceso_cafe` (enum), `deleted_at` (`zona_finca` eliminada en 0044) | [`0005_talonario_auto.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0005_talonario_auto.sql), [`0011_add_soft_delete.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0011_add_soft_delete.sql) |
 | `servicios_maestro` | Catálogo de servicios | `id_servicio_maestro` | `nombre`, `descripcion`, `tipo` (`general\|tueste\|empacado`), `prioridad` (int), `activo` | [`0017_servicios_maestro_empaques.sql:116`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0017_servicios_maestro_empaques.sql#L116) |
 | `servicio_precios` | Tarifas por intervalo | `id_precio` | `id_servicio`, `min_weight_kg` (`NUMERIC(10,2)`), `max_weight_kg` (nullable → sin límite), `precio_por_kg`, `activo` | [`0019_flujo_secuencial_tarifas_intervalo.sql`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0019_flujo_secuencial_tarifas_intervalo.sql) |
 | `empaques` | Catálogo de empaques | `id_empaque` | `nombre`, `capacidad_kg`, `unit_weight_kg`, `activo` | [`0017:136`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0017_servicios_maestro_empaques.sql#L136) |
@@ -58,8 +58,8 @@ Portado desde CoffeeBeanFlow (CBF, ASP.NET Core + EF Core, 19 entidades). Las ta
 
 | Tabla | Propósito | Clave | Campos relevantes | Migración |
 |---|---|---|---|---|
-| `orden_lotes_externos` | **K1** puente orden↔lote CBF | `(id_orden, nlote, origen)` | `peso_kg`, `origen` (`fusion`), `created_at` | 0026 |
-| `lotes_cafe` | Lote de café (acopio) | `id_lote` | `nlote` UNIQUE, `public_id`, `nproductor`, `nfinca`, `zona`, `altura`, `disponible`, `vendido`, `enproceso`, proceso por booleanos (`lavado/natural/miel/semilavado/anaerobico/otro`), `fecha_acopio`, `deleted_at` | 0027 |
+| `orden_lotes_externos` | **K1** puente orden↔lote CBF — **eliminada en 0044**, sustituida por `orden_lotes` (0040) | `(id_orden, nlote, origen)` | `peso_kg`, `origen` (`fusion`), `created_at` | 0026 |
+| `lotes_cafe` | Lote de café (acopio) | `id_lote` | `nlote` UNIQUE, `public_id`, `disponible`, `vendido`, `enproceso`, proceso por booleanos (`lavado/natural/miel/semilavado/anaerobico/otro`), `fecha_acopio`, `deleted_at`; desde 0039 `id_cliente`/`id_finca`/`proceso_cafe`. Los textos `nproductor`/`nfinca`/`zona`/`altura` se eliminaron en 0044 | 0027 |
 | `caracterizacion_lote` | Caracterización 1:N con el lote (upsert por `(id_lote, tiempo)`) | `id_caracterizacion` | humedad, `densidad`, `m_tabla`, `e_maduracion`, `broca`, `pc_*`, `c_*`, `dr_maduras`, `l_asignado`, `deleted_at` | 0028 |
 | `caracterizacion_rc` | Series RC comparativas (1 por tipo) | `id_caracterizacion_rc` (UNIQUE `(caracterizacion_id, tipo_rc)`) | `vanos`, `secos`, conteos | 0028 |
 | `secado_lote` | Registro de secado | `id_secado` | `dsecado`, `finicio`, `ffinal`, `deleted_at` | 0029 |
@@ -86,9 +86,9 @@ Portado desde CoffeeBeanFlow (CBF, ASP.NET Core + EF Core, 19 entidades). Las ta
 
 > `lotes_cafe` se crea/edita por inserción directa vía API (no hay `guardar_lote`); RLS restringe la escritura a `Admin/Recepción`.
 
-**Conectores:** K1 `orden_lotes_externos` (transporta `wverde_final` como `peso_inicial_kg` del primer paso) · K2 `public_id` en `ordenes_trabajo`/`perfiles_tueste`/`clientes` · K3 `catacion_tueste.perfil_tueste_ref` · K4 `clientes.external_ref` (productor CBF → cliente).
+**Conectores:** K1 `orden_lotes_externos` (hasta 0043; desde 0044 el puente es `orden_lotes`, por id) · K2 `public_id` en `ordenes_trabajo`/`perfiles_tueste`/`clientes` · K3 `catacion_tueste.perfil_tueste_ref` · K4 `clientes.external_ref` (resuelto por `lotes_cafe.id_cliente` desde 0039).
 
-**Índices nuevos:** `idx_lotes_nlote_trgm`, `idx_lotes_nproductor_trgm`, `idx_lotes_activos_fecha`, `idx_lotes_enproceso`, `idx_ole_origen_nlote`, `idx_caracterizacion_lote_idx`, `idx_caracterizacion_rc_caract`, `idx_secado_lote_idx`, `idx_secado_humedad_idx`, `idx_secado_ambiente_idx`, `idx_secado_temperatura_idx`, `idx_secado_camas_idx`, `idx_bodega_lote_idx`, `idx_secado_bodega_bodega`, `idx_trilla_lote_idx`, `idx_trilla_pesos_verdes`, `idx_catacion_ref`, `idx_catacion_lote`, `idx_catacion_nlote`, `idx_catacion_rondas_idx`.
+**Índices nuevos:** `idx_lotes_nlote_trgm`, `idx_lotes_activos_fecha`, `idx_lotes_enproceso`, `idx_ole_origen_nlote` (eliminado con su tabla en 0044), `idx_caracterizacion_lote_idx`, `idx_caracterizacion_rc_caract`, `idx_secado_lote_idx`, `idx_secado_humedad_idx`, `idx_secado_ambiente_idx`, `idx_secado_temperatura_idx`, `idx_secado_camas_idx`, `idx_bodega_lote_idx`, `idx_secado_bodega_bodega`, `idx_trilla_lote_idx`, `idx_trilla_pesos_verdes`, `idx_catacion_ref`, `idx_catacion_lote`, `idx_catacion_nlote`, `idx_catacion_rondas_idx`. Nota: `idx_lotes_nproductor_trgm` se eliminó junto con la columna en 0044 y su equivalente para el combobox es `idx_fincas_nombre_trgm`.
 
 ## 3quater. Refactor del flujo de lotes (0033–0043, rama `feat/flujo-lotes`)
 
@@ -106,6 +106,9 @@ Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/sp
 | `orden_lotes` | **Tabla nueva N:M** lote↔orden con `peso_kg` opcional y PK `(id_orden, id_lote)`; reemplaza a `orden_lotes_externos`; RLS 3 policies (escritura `Admin`/`Recepción`) | 0040 |
 | `guardar_catacion` | Deriva `nlote` del lote (o de `orden_lotes` y, como fallback, de `orden_lotes_externos`); con `id_lote` transiciona el lote a `En Catación`, o a `Vendido` si llega `finalizada=true` (no degrada un lote ya vendido) | 0042 |
 | `catacion_tueste.id_lote` | Backfill por `nlote` de las cataciones previas a 0039 (idempotente) | 0043 |
+| `crear_orden_completa` / `crear_orden_desde_trilla` | Inserta/valida `id_finca` en lugar del texto `zona_finca`; e1 usa `id_cliente`/`id_finca` del lote (sin conciliación por nombre) e idempotencia por `orden_lotes` | 0044 |
+| **DROP legacy** | `lotes_cafe.nproductor/nfinca/zona/altura`, `ordenes_trabajo.zona_finca`, `clientes.zona_procedencia` y la tabla `orden_lotes_externos`; `SET NOT NULL` en `lotes_cafe.id_cliente/id_finca`; índice `idx_fincas_nombre_trgm` | 0044 |
+| `guardar_catacion` | Sin fallback a `orden_lotes_externos`; `nlote` desde el lote o desde `orden_lotes` vía el perfil | 0045 |
 
 **Reglas del modelo (decisiones cerradas con el dueño):**
 
@@ -120,12 +123,13 @@ Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/sp
 `lotes_cafe.id_cliente/id_finca`, y migración de `orden_lotes_externos → orden_lotes` por `nlote`. Incluye
 `setval` de la secuencia `clientes_id_cliente_seq` (estaba desincronizada: `last_value=1` con `max=5`).
 
-> **Deprecado, pendiente de DROP (T12 / `0044`+)**: `lotes_cafe.nproductor`, `nfinca`, `zona`, `altura`,
+> **Eliminado en `0044`** (T12): `lotes_cafe.nproductor`, `nfinca`, `zona`, `altura`,
 > `ordenes_trabajo.zona_finca`, `clientes.zona_procedencia` y la tabla `orden_lotes_externos`.
+> El esquema queda **solo por `id`**; la altura vive únicamente en `fincas.altura` (D8).
 
 ## 4. Row Level Security (RLS)
 
-Habilitado en todas las tablas de dominio (**33 tablas**; las **15 de la fusión** y las **2 del refactor de lotes** —`fincas` y `orden_lotes`— tienen 3 políticas cada una — SELECT/INSERT/UPDATE-soft-delete). Patrones:
+Habilitado en todas las tablas de dominio (**32 tablas**; las **15 de la fusión** y las **2 del refactor de lotes** —`fincas` y `orden_lotes`— tienen 3 políticas cada una — SELECT/INSERT/UPDATE-soft-delete). Patrones:
 
 - **Lectura:** `FOR SELECT TO authenticated USING (deleted_at IS NULL)` — cualquier usuario autenticado ve filas no eliminadas. Ejemplo: [`0012:41`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0012_update_rls_soft_delete.sql#L41) (`ordenes_select`).
 - **Escritura:** `WITH CHECK (get_empleado_rol() IN (...))` — solo roles permitidos. Ejemplo: [`0012:27`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/supabase/migrations/0012_update_rls_soft_delete.sql#L27) (`clientes_insert` requiere `Recepción` o `Admin`).

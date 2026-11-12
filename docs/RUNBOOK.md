@@ -175,17 +175,17 @@ console.log('ordenes count (service_role):', count);
 ### 7bis.1 Verificar la trazabilidad end-to-end de un lote
 
 ```sql
--- Cadena lote → K1 → orden → perfil → catación (una sola consulta)
-SELECT l.nlote, ole.peso_kg, o.numero_factura, p.id_perfil, p.estado, c.id_catacion_tueste, c.pfinales
+-- Cadena lote → orden → perfil → catación (una sola consulta, modelo por id desde 0044)
+SELECT l.nlote, ol.peso_kg, o.numero_factura, p.id_perfil, p.estado, c.id_catacion_tueste, c.pfinales
 FROM lotes_cafe l
-JOIN orden_lotes_externos ole ON ole.nlote = l.nlote
-JOIN ordenes_trabajo o ON o.id_orden = ole.id_orden
+JOIN orden_lotes ol ON ol.id_lote = l.id_lote
+JOIN ordenes_trabajo o ON o.id_orden = ol.id_orden
 LEFT JOIN perfiles_tueste p ON p.id_orden = o.id_orden
-LEFT JOIN catacion_tueste c ON c.perfil_tueste_ref = p.public_id
+LEFT JOIN catacion_tueste c ON c.id_lote = l.id_lote
 WHERE l.nlote = 'LT-E2E-001' AND l.deleted_at IS NULL;
 ```
 
-Esperado para la demo SC-003: `ole.peso_kg = 645`, `numero_factura = 'F-0043'`, `p.estado = 'Completado'`, `c.pfinales = 85.25`.
+Esperado para la demo SC-003: `ol.peso_kg = 645`, `numero_factura = 'F-0043'`, `p.estado = 'Completado'`, `c.pfinales = 85.25`.
 
 ### 7bis.2 Limpiar datos de demostración SC-003
 
@@ -195,10 +195,10 @@ Los datos de aceptación viven en `lotes_cafe` (`nlote = 'LT-E2E-001'`), orden `
 
 | Síntoma | Causa probable | Verificación |
 |---|---|---|
-| e1 responde **400** "conciliar cliente" | `lotes_cafe.nproductor` no coincide con `clientes.external_ref` (K4) | Conciliar productor→cliente o registrar `external_ref` |
-| e1 responde **409/`reused:true`** | La trilla ya generó orden (K5 idempotente) | Consultar `orden_lotes_externos` por `nlote` |
+| e1 responde **400** "no tiene productor (cliente) asignado" | El lote no tiene `id_cliente` | Asignar cliente/finca al lote (obligatorios desde 0044) |
+| e1 responde **409/`reused:true`** | El lote ya está enlazado a una orden (K5 idempotente) | Consultar `orden_lotes` por `id_lote` |
 | Catación rechazada (**422**) | El perfil no está `Completado` (FR-014) | Cambiar estado del perfil antes de catarlo |
-| `nlote` no autoderivado | El perfil no tiene puente K1 en `orden_lotes_externos` | Crear la orden vía e1 (no manualmente) |
+| `nlote` no autoderivado | El perfil no tiene orden con lote en `orden_lotes` | Enlazar el lote a la orden (e1 o multi-select al crear la orden) |
 | 403 en catación | Rol distinto de `Tostador/Admin` | `requireRole(["Tostador","Admin"])` |
 | Advisors: `function_search_path_mutable` | Deuda pre-existente (9 funciones legacy) | Ver `docs/SECURITY.md` §4 fila 6 |
 

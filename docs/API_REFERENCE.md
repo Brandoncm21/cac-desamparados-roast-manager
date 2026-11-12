@@ -49,7 +49,7 @@ Helpers: [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desampa
 | 37 | GET/POST | `/api/admin/empaques/[id]/precios` | **Admin** | Historial / nuevo precio versionado |
 | 38 | GET | `/api/lotes` | `Recepción, Tostador, Admin` | Listar lotes (paginado, `?search=`, filtros `enproceso/desde/hasta`) |
 | 39 | POST | `/api/lotes` | `Recepción, Admin` | Crear lote (`guardarLoteSchema`) |
-| 40 | GET | `/api/lotes/[id]` | `Recepción, Tostador, Admin` | Detalle del lote + órdenes enlazadas (K1) |
+| 40 | GET | `/api/lotes/[id]` | `Recepción, Tostador, Admin` | Detalle del lote + órdenes enlazadas (`orden_lotes`) |
 | 41 | PUT | `/api/lotes/[id]` | `Recepción, Admin` | Actualizar lote |
 | 42 | DELETE | `/api/lotes/[id]` | `Recepción, Admin` | Soft delete (`deleted_at`) |
 | 43 | GET | `/api/lotes/[id]/caracterizacion` | `Recepción, Tostador, Admin` | Caracterizaciones + series RC |
@@ -65,8 +65,13 @@ Helpers: [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desampa
 | 53 | POST | `/api/cataciones` | `Tostador, Admin` | Crear → `guardar_catacion` |
 | 54 | GET | `/api/cataciones/[id]` | `Recepción, Tostador, Admin` | Detalle + rondas |
 | 55 | PUT | `/api/cataciones/[id]` | `Tostador, Admin` | Actualizar → `guardar_catacion` |
+| 56 | GET | `/api/fincas` | `Recepción, Tostador, Admin` | Listar fincas (`cliente_id`, `search`, paginado) |
+| 57 | POST | `/api/fincas` | `Recepción, Admin` | Crear finca (`crearFincaSchema`) |
+| 58 | GET | `/api/fincas/[id]` | `Recepción, Tostador, Admin` | Detalle de finca |
+| 59 | PUT | `/api/fincas/[id]` | `Recepción, Admin` | Actualizar finca |
+| 60 | DELETE | `/api/fincas/[id]` | `Recepción, Admin` | Soft delete (`deleted_at`) |
 
-> **Fusión CBF:** las rutas 38–55 se detallan en §2.6 y usan el mismo contrato `{ data, pagination }` / `{ error: { code, message, issues } }`.
+> **Fusión CBF:** las rutas 38–55 se detallan en §2.6 y usan el mismo contrato `{ data, pagination }` / `{ error: { code, message, issues } }`. Las rutas 56–60 (`fincas`) son del refactor 004 y siguen el mismo contrato.
 
 > **Admin-only:** rutas 33-37 usan `createAdminClientWithRoleCheck(["Admin"])` que bypassa RLS con `service_role` ([`lib/supabase/admin.ts:19`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/admin.ts#L19)).
 
@@ -116,7 +121,7 @@ GET /api/ordenes?page=2&pageSize=10&estado=Pendiente&search=juan
 - Auth: `requireRole(["Admin","Recepción"])`
 - Body validado por [`lib/schemas/clientes.ts:3`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/schemas/clientes.ts#L3) (`crearClienteSchema`)
 ```json
-{ "nombre_completo": "Finca X", "telefono": "8888-0000", "zona_procedencia": "Tarrazú" }
+{ "nombre_completo": "Finca X", "telefono": "8888-0000" }
 ```
 - Response 201: cliente creado.
 
@@ -169,11 +174,13 @@ GET /api/ordenes?page=2&pageSize=10&estado=Pendiente&search=juan
 
 Módulo portado de CoffeeBeanFlow. Todas las escrituras compuestas pasan por RPC transaccional (no hay `replace-all`); los `PUT` de etapas envían el estado completo del formulario y la RPC hace upsert por id + soft-delete de lo omitido.
 
-**`GET /api/lotes`** — paginado (§2.0); `search` sanitizado sobre `nlote`, `nproductor`, `nfinca` (índices trgm); filtros Zod `enproceso`, `desde`/`hasta` (`YYYY-MM-DD`); orden `fecha_acopio DESC, id_lote DESC`; `deleted_at IS NULL`.
+**`GET /api/lotes`** — paginado (§2.0); `search` sanitizado sobre `nlote`; filtros Zod `enproceso`, `id_finca`, `desde`/`hasta` (`YYYY-MM-DD`); embebe `clientes(nombre_completo)` y `fincas(nombre, altura, zonas_finca(nombre))`; orden `fecha_acopio DESC, id_lote DESC`; `deleted_at IS NULL`.
 
-**`POST /api/lotes`** — `crearLoteSchema` ([`lib/schemas/lotes.ts`](../../lib/schemas/lotes.ts)); inserción directa en `lotes_cafe` (RLS `Admin/Recepción`); `nlote` UNIQUE → **409** en duplicado.
+**`POST /api/lotes`** — `crearLoteSchema` ([`lib/schemas/lotes.ts`](../../lib/schemas/lotes.ts)); exige `id_cliente` + `id_finca` (FKs, spec 004) e inserción directa en `lotes_cafe` (RLS `Admin/Recepción`); `nlote` UNIQUE → **409** en duplicado y `23503` → **400**.
 
-**`GET /api/lotes/[id]`** — lote + `orden_lotes_externos` (K1: órdenes enlazadas con `peso_kg`). **`PUT`/`DELETE`** actualizan o hacen soft-delete.
+**`GET /api/lotes/[id]`** — lote + embed de cliente/finca + órdenes enlazadas desde `orden_lotes` (N:M, `peso_kg`). **`PUT`/`DELETE`** actualizan o hacen soft-delete.
+
+**`/api/fincas`** — fincas del productor: `GET` paginado con `cliente_id` + `search` (`ilike nombre`), `POST` (`crearFincaSchema`: `cliente_id`, `nombre`, `zona_id?`, `altura`; `23505`→**409**, `23503`→**400**) y `[id]` `GET`/`PUT`/`DELETE` soft.
 
 **Etapas** (`GET` devuelve la colección de la etapa con sus series; `PUT` llama a la RPC):
 
@@ -188,12 +195,12 @@ Módulo portado de CoffeeBeanFlow. Todas las escrituras compuestas pasan por RPC
 - `PUT /api/lotes/[id]/trilla` con `peso_verde` nulo hace soft-delete del 1:1 (`peso_verde_trilla.deleted_at`).
 
 **`POST /api/lotes/[id]/trilla/enviar-proceso`** — **e1** ([`crear_orden_desde_trilla`](../../supabase/migrations/0032_catacion_pipeline.sql)): requiere trilla con `wverde_final > 0`; crea orden + 7 `orden_pasos` (proceso derivado, FR-010) + puente K1 con `peso_inicial_kg = wverde_final`.
-- Idempotente por lote (**K5**): si ya existe orden enlazada responde `200 { data: { reused: true, ... } }`.
-- **K4:** si el `nproductor` no concilia con un `clientes.external_ref` → **400** pidiendo conciliación.
+- Idempotente por lote (**K5**): si el lote ya está enlazado a una orden en `orden_lotes` responde `200 { data: { reused: true, ... } }`.
+- **K4 resuelto por id:** usa `lotes_cafe.id_cliente`/`id_finca` (ya no concilia por `nproductor`); si el lote no tiene cliente → **400**.
 - Trilla incompleta/sin peso verde → **422** `VALIDATION_ERROR`.
 
 **`GET /api/cataciones`** — paginado; `search` sobre `nlote`; embed del perfil K3 (`perfiles_tueste!catacion_tueste_perfil_tueste_ref_fkey`); orden `created_at DESC`.
-**`POST` / `PUT /api/cataciones[/id]`** — `guardarCatacionBodySchema` (`catacion` + `rondas[]` con `valor_calidad` 0–100) → `guardar_catacion(p_catacion, p_rondas)`; exige perfil `Completado` (FR-014) y autoderiva `nlote` desde K1 del perfil.
+**`POST` / `PUT /api/cataciones[/id]`** — `guardarCatacionBodySchema` (`catacion` + `rondas[]` con `valor_calidad` 0–100) → `guardar_catacion(p_catacion, p_rondas)`; el perfil `Completado` es opcional si se envía `id_lote` (FR-012); con lote, el lote pasa a `En Catación` y a `Vendido` con `finalizada: true` (FR-004).
 **`GET /api/cataciones/[id]`** — catación + `rondas` vivas (`deleted_at IS NULL`); 404 si no existe o está eliminada.
 
 ## 3. Códigos de Error Comunes
@@ -205,7 +212,7 @@ Módulo portado de CoffeeBeanFlow. Todas las escrituras compuestas pasan por RPC
 | 422 | `VALIDATION_ERROR` | Zod `safeParse` falla, CHECK (`23514`), trilla sin peso verde |
 | 404 | `RESOURCE_NOT_FOUND` | `single()` sin fila |
 | 409 | `CONFLICT` | `23505` unique violation (ej. servicio duplicado, `nlote` duplicado) |
-| 400 | `BAD_REQUEST` | FK inválida (`23503`), p. ej. e1 sin cliente conciliado (K4) |
+| 400 | `BAD_REQUEST` | FK inválida (`23503`), p. ej. lote sin cliente asignado |
 
 ## 4. Ejemplo Completo (Crear Orden)
 
@@ -215,9 +222,10 @@ curl -X POST http://localhost:3016/api/ordenes \
   -H "Content-Type: application/json" \
   -d '{
     "id_cliente": 1,
+    "id_finca": 1,
+    "lotes": [1],
     "id_empleado_recibe": 1,
     "servicios": [{"servicio_id": 1, "tipo_servicio": "general"}],
-    "zona_finca": "Tarrazú",
     "proceso_cafe": "Lavado"
   }'
 # 201 { data: { id_orden: 4, estado_orden: "Pendiente", ... } }
