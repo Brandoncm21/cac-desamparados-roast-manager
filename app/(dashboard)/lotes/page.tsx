@@ -16,7 +16,7 @@ interface Lote {
   id_lote: number;
   nlote: string;
   clientes: { nombre_completo: string } | null;
-  fincas: { nombre: string; altura: number; zonas_finca: { nombre: string } | null } | null;
+  fincas: { nombre: string; altura: number | null; zonas_finca: { nombre: string } | null } | null;
   disponible: number | null;
   enproceso: string;
   vendido: boolean;

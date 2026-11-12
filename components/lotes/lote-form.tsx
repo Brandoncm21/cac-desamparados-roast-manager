@@ -18,18 +18,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FincaSelect } from "@/components/fincas/finca-select";
+import { opcionesCliente, type FincaOpcion } from "@/lib/fincas";
 import { toast } from "sonner";
 
 interface ClienteOpcion {
   id_cliente: number;
   nombre_completo: string;
-}
-
-interface FincaOpcion {
-  id_finca: number;
-  nombre: string;
-  altura: number;
-  cliente_id: number;
 }
 
 export interface LoteActual {
@@ -89,12 +84,8 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
   const editando = Boolean(lote);
 
   const [clientes, setClientes] = useState<ClienteOpcion[]>([]);
-  const [fincas, setFincas] = useState<FincaOpcion[]>([]);
   const [clienteId, setClienteId] = useState<number | null>(lote?.id_cliente ?? null);
-  const [fincaId, setFincaId] = useState<number | null>(lote?.id_finca ?? null);
-  const [nuevaFincaOpen, setNuevaFincaOpen] = useState(false);
-  const [nuevaFincaNombre, setNuevaFincaNombre] = useState("");
-  const [nuevaFincaAltura, setNuevaFincaAltura] = useState("");
+  const [finca, setFinca] = useState<FincaOpcion | null>(null);
 
   const {
     register,
@@ -140,7 +131,6 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
   });
 
   const enprocesoActual = watch("enproceso") ?? "No";
-  const fincaSeleccionada = fincas.find((f) => f.id_finca === fincaId) ?? null;
 
   // Clientes (productores) para el combobox.
   useEffect(() => {
@@ -156,79 +146,21 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
     };
   }, []);
 
-  // Fincas del cliente seleccionado.
-  useEffect(() => {
-    if (!clienteId) {
-      setFincas([]);
-      return;
-    }
-    let activo = true;
-    fetch(`/api/fincas?cliente_id=${clienteId}&pageSize=100&page=1`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (!activo) return;
-        const lista: FincaOpcion[] = j.data ?? [];
-        setFincas(lista);
-        // Si la finca actual no pertenece al cliente, limpiar.
-        if (fincaId && !lista.some((f) => f.id_finca === fincaId)) {
-          setFincaId(null);
-          setValue("id_finca", undefined as unknown as number);
-        }
-      })
-      .catch(() => toast.error("No se pudieron cargar las fincas"));
-    return () => {
-      activo = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clienteId]);
-
   const onClienteChange = (value: string | null) => {
     if (!value) return;
     const id = Number(value);
     setClienteId(id);
     setValue("id_cliente", id, { shouldValidate: true });
-    setFincaId(null);
+    // `FincaSelect` recarga la lista del productor y limpia la finca si no aplica.
+    setFinca(null);
     setValue("id_finca", undefined as unknown as number);
   };
 
-  const onFincaChange = (value: string | null) => {
-    if (!value) return;
-    const id = Number(value);
-    setFincaId(id);
-    setValue("id_finca", id, { shouldValidate: true });
-  };
-
-  const crearFinca = async () => {
-    if (!clienteId) {
-      toast.error("Seleccioná un productor primero");
-      return;
-    }
-    const altura = Number(nuevaFincaAltura);
-    if (!nuevaFincaNombre.trim()) {
-      toast.error("El nombre de la finca es obligatorio");
-      return;
-    }
-    if (!Number.isFinite(altura) || altura < 0) {
-      toast.error("La altura (msnm) es obligatoria");
-      return;
-    }
-    const res = await fetch("/api/fincas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cliente_id: clienteId, nombre: nuevaFincaNombre.trim(), altura }),
+  const onFincaChange = (seleccionada: FincaOpcion | null) => {
+    setFinca(seleccionada);
+    setValue("id_finca", (seleccionada?.id_finca ?? undefined) as unknown as number, {
+      shouldValidate: true,
     });
-    const result = await res.json();
-    if (!res.ok) {
-      toast.error("Error al crear finca: " + (result.error?.message || "Error desconocido"));
-      return;
-    }
-    toast.success("Finca creada");
-    setNuevaFincaOpen(false);
-    setNuevaFincaNombre("");
-    setNuevaFincaAltura("");
-    const nueva = result.data as FincaOpcion;
-    setFincas((prev) => [...prev, nueva]);
-    onFincaChange(String(nueva.id_finca));
   };
 
   const onSubmit = async (values: CrearLoteInput) => {
@@ -238,6 +170,9 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
         Object.entries(datos).filter(([, v]) => v !== "" && v !== undefined && v !== null)
       );
       if (fecha_acopio) payload["fecha_acopio"] = fecha_acopio;
+      // La altura viaja en el payload (derivada de la finca); el API la valida
+      // contra `fincas.altura` y la devuelve en el reporte del lote.
+      if (finca?.altura != null) payload["altura"] = finca.altura;
 
       const res = await fetch(lote ? `/api/lotes/${lote.id_lote}` : "/api/lotes", {
         method: lote ? "PUT" : "POST",
@@ -284,7 +219,11 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
 
           <div className="space-y-2">
             <Label>Productor (cliente) *</Label>
-            <Select value={clienteId ? String(clienteId) : ""} onValueChange={onClienteChange}>
+            <Select
+              items={opcionesCliente(clientes)}
+              value={clienteId ? String(clienteId) : null}
+              onValueChange={onClienteChange}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar productor" />
               </SelectTrigger>
@@ -300,72 +239,28 @@ export function LoteForm({ lote }: { lote?: LoteActual }) {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Finca *</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs"
-                disabled={!clienteId}
-                onClick={() => setNuevaFincaOpen((v) => !v)}
-              >
-                + Crear finca
-              </Button>
-            </div>
-            <Select
-              value={fincaId ? String(fincaId) : ""}
-              onValueChange={onFincaChange}
-              disabled={!clienteId || fincas.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={clienteId ? "Seleccionar finca" : "Elegí un productor primero"} />
-              </SelectTrigger>
-              <SelectContent>
-                {fincas.map((f) => (
-                  <SelectItem key={f.id_finca} value={String(f.id_finca)}>
-                    {f.nombre} — {f.altura} msnm
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.id_finca && <p className="text-sm text-red-600">{String(errors.id_finca.message)}</p>}
+            <FincaSelect
+              clienteId={clienteId}
+              value={finca?.id_finca ?? null}
+              onChange={onFincaChange}
+              error={errors.id_finca ? String(errors.id_finca.message) : undefined}
+            />
           </div>
-
-          {nuevaFincaOpen && (
-            <div className="col-span-full grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-md border p-3">
-              <div className="space-y-2">
-                <Label htmlFor="nf-nombre">Nombre de la finca *</Label>
-                <Input
-                  id="nf-nombre"
-                  value={nuevaFincaNombre}
-                  onChange={(e) => setNuevaFincaNombre(e.target.value)}
-                  maxLength={150}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="nf-altura">Altura (msnm) *</Label>
-                <Input
-                  id="nf-altura"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={nuevaFincaAltura}
-                  onChange={(e) => setNuevaFincaAltura(e.target.value)}
-                />
-              </div>
-              <div className="flex items-end gap-2">
-                <Button type="button" size="sm" onClick={crearFinca}>Crear finca</Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setNuevaFincaOpen(false)}>
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          )}
 
           <div className="space-y-2">
             <Label>Altura (msnm)</Label>
-            <Input value={fincaSeleccionada ? `${fincaSeleccionada.altura}` : ""} readOnly placeholder="Se completa desde la finca" />
+            <Input
+              value={finca?.altura != null ? String(finca.altura) : ""}
+              readOnly
+              placeholder={
+                finca
+                  ? "La finca no tiene altura registrada"
+                  : "Se completa al elegir la finca"
+              }
+            />
+            {finca?.zonas_finca?.nombre && (
+              <p className="text-xs text-muted-foreground">Zona: {finca.zonas_finca.nombre}</p>
+            )}
           </div>
 
           <div className="space-y-2">

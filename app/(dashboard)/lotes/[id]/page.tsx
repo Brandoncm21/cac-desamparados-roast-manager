@@ -23,7 +23,7 @@ interface LoteDetalle {
   id_cliente: number;
   id_finca: number;
   clientes: { nombre_completo: string } | null;
-  fincas: { nombre: string; altura: number; zonas_finca: { nombre: string } | null } | null;
+  fincas: { nombre: string; altura: number | null; zonas_finca: { nombre: string } | null } | null;
   robjetivo: number | null;
   rtotal: number | null;
   disponible: number | null;

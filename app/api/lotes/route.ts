@@ -66,13 +66,35 @@ async function post(request: NextRequest) {
   const parsed = crearLoteSchema.safeParse(body);
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
-  const { fecha_acopio, ...resto } = parsed.data;
+  // `altura` no es columna del lote (spec 004 D8): se valida contra la finca y se
+  // devuelve en el reporte del lote creado.
+  const { fecha_acopio, altura, ...resto } = parsed.data;
+
+  const { data: finca, error: errorFinca } = await supabase
+    .from("fincas")
+    .select("id_finca, cliente_id, altura")
+    .eq("id_finca", resto.id_finca)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (errorFinca) return apiError(errorFinca.message, 500);
+  if (!finca) return apiError("La finca indicada no existe o fue eliminada", 400);
+  if (finca.cliente_id !== resto.id_cliente) {
+    return apiError("La finca no pertenece al productor seleccionado", 400);
+  }
+  if (altura != null && finca.altura != null && Number(altura) !== Number(finca.altura)) {
+    return apiError(
+      `La altura enviada (${altura} msnm) no coincide con la de la finca (${finca.altura} msnm)`,
+      400
+    );
+  }
+
   const payload = { ...resto, ...(fecha_acopio ? { fecha_acopio } : {}) };
 
   const { data, error } = await supabase
     .from("lotes_cafe")
     .insert(payload)
-    .select()
+    .select("*, clientes(nombre_completo), fincas(id_finca, nombre, altura, zonas_finca(nombre))")
     .single();
 
   if (error) {

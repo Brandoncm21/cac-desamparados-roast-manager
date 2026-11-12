@@ -54,7 +54,7 @@ async function post(request: NextRequest) {
   const { data, error } = await supabase
     .from("fincas")
     .insert(parsed.data)
-    .select()
+    .select("*, clientes(nombre_completo), zonas_finca(nombre)")
     .single();
 
   if (error) {

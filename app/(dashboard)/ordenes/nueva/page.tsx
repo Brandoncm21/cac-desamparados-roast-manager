@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ClienteAutocomplete } from "@/components/forms/cliente-autocomplete";
+import { FincaSelect } from "@/components/fincas/finca-select";
 import {
   MOLIENDA_DEFAULT,
   requiereHumedad,
@@ -119,11 +120,7 @@ export default function NuevaOrdenPage() {
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
   const [serviciosActivos, setServiciosActivos] = useState<ServicioActivo[]>([]);
-  const [fincasOrden, setFincasOrden] = useState<Array<{ id_finca: number; nombre: string; altura: number; cliente_id: number }>>([]);
   const [lotesOrden, setLotesOrden] = useState<Array<{ id_lote: number; nlote: string; clientes: { nombre_completo: string } | null; fincas: { nombre: string } | null }>>([]);
-  const [nuevaFincaOpen, setNuevaFincaOpen] = useState(false);
-  const [nuevaFincaNombre, setNuevaFincaNombre] = useState("");
-  const [nuevaFincaAltura, setNuevaFincaAltura] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -148,14 +145,17 @@ export default function NuevaOrdenPage() {
 
   const { watch } = form;
 
+  // Etiquetas para los Select (Base UI muestra el `value` crudo si no recibe `items`).
+  const empleadoItems = empleados.map((e) => ({ value: String(e.id_empleado), label: e.nombre }));
+  const servicioItems = serviciosActivos.map((s) => ({
+    value: String(s.id_servicio_maestro),
+    label: s.nombre,
+  }));
+
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "servicios" });
 
-  // Fincas (tabla fincas) y lotes en acopio para esta orden.
+  // Lotes en acopio para enlazar a la orden (las fincas las maneja `FincaSelect`).
   useEffect(() => {
-    fetch("/api/fincas?pageSize=100&page=1")
-      .then((r) => r.json())
-      .then((j) => setFincasOrden(j.data ?? []))
-      .catch(() => {});
     fetch("/api/lotes?pageSize=100&page=1")
       .then((r) => r.json())
       .then((j) => setLotesOrden(j.data ?? []))
@@ -166,39 +166,6 @@ export default function NuevaOrdenPage() {
     const actuales = (form.getValues("lotes") ?? []) as number[];
     const next = on ? Array.from(new Set([...actuales, id])) : actuales.filter((x) => x !== id);
     form.setValue("lotes", next, { shouldValidate: true });
-  };
-
-  const crearFincaOrden = async () => {
-    const clienteId = form.getValues("id_cliente");
-    if (!clienteId) {
-      toast.error("Seleccioná un cliente primero");
-      return;
-    }
-    const altura = Number(nuevaFincaAltura);
-    if (!nuevaFincaNombre.trim()) {
-      toast.error("El nombre de la finca es obligatorio");
-      return;
-    }
-    if (!Number.isFinite(altura) || altura < 0) {
-      toast.error("La altura (msnm) es obligatoria");
-      return;
-    }
-    const res = await fetch("/api/fincas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cliente_id: clienteId, nombre: nuevaFincaNombre.trim(), altura }),
-    });
-    const result = await res.json();
-    if (!res.ok) {
-      toast.error("Error al crear finca: " + (result.error?.message || "Error desconocido"));
-      return;
-    }
-    toast.success("Finca creada");
-    setFincasOrden((prev) => [...prev, result.data]);
-    form.setValue("id_finca", result.data.id_finca, { shouldValidate: true });
-    setNuevaFincaOpen(false);
-    setNuevaFincaNombre("");
-    setNuevaFincaAltura("");
   };
 
   useEffect(() => {
@@ -350,63 +317,18 @@ export default function NuevaOrdenPage() {
                 name="id_finca"
                 render={({ field }) => (
                   <FormItem>
-                    <div className="flex items-center justify-between">
-                      <FormLabel>Finca</FormLabel>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => setNuevaFincaOpen((v) => !v)}
-                      >
-                        + Crear finca
-                      </Button>
-                    </div>
                     <FormControl>
-                      <Select
-                        value={field.value ? String(field.value) : ""}
-                        onValueChange={(v) => field.onChange(v ? Number(v) : null)}
-                      >
-                        <SelectTrigger className="h-12 md:h-10 text-base">
-                          <SelectValue placeholder="Seleccionar finca..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fincasOrden.map((f) => (
-                            <SelectItem key={f.id_finca} value={String(f.id_finca)}>
-                              {f.nombre} — {f.altura} msnm
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FincaSelect
+                        clienteId={form.watch("id_cliente") || null}
+                        value={field.value ?? null}
+                        onChange={(finca) => field.onChange(finca?.id_finca ?? null)}
+                        error={form.formState.errors.id_finca?.message}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              {nuevaFincaOpen && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-md border p-3">
-                  <Input
-                    placeholder="Nombre de la finca"
-                    value={nuevaFincaNombre}
-                    onChange={(e) => setNuevaFincaNombre(e.target.value)}
-                  />
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="Altura (msnm)"
-                    value={nuevaFincaAltura}
-                    onChange={(e) => setNuevaFincaAltura(e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <Button type="button" size="sm" onClick={crearFincaOrden}>Crear</Button>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setNuevaFincaOpen(false)}>
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -468,6 +390,7 @@ export default function NuevaOrdenPage() {
               )}
 
               <Select
+                items={servicioItems}
                 onValueChange={(v) => {
                   const id = Number(v);
                   if (id) addServicio(id);
@@ -533,7 +456,7 @@ export default function NuevaOrdenPage() {
               <FormField control={form.control} name="id_empleado_recibe" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Responsable *</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(Number(v))} value={field.value ? String(field.value) : ""}>
+                  <Select items={empleadoItems} onValueChange={(v) => field.onChange(Number(v))} value={field.value ? String(field.value) : ""}>
                     <FormControl>
                       <SelectTrigger className="h-12 md:h-10 text-base"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                     </FormControl>

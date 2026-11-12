@@ -4,6 +4,19 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Added — Módulo de Fincas y correcciones del alta de lotes (005-fincas-crud)
+- **CRUD de Fincas** en `/fincas` (lista con búsqueda, filtro por productor y paginación), `/fincas/nueva`, `/fincas/[id]` (datos, resumen y lotes de la finca) y `/fincas/[id]/editar`; entrada **Fincas** en el sidebar.
+- **`fincas.ubicacion`** (texto libre ≤ 200) y **`altura` opcional** (0046): antes era `NOT NULL`.
+- **`FincaForm`** con productor, nombre, altura, zona del catálogo (con "+ Nueva zona" inline) y ubicación.
+- **Fuente única de fincas/zonas** (`lib/fincas.ts` + `FincaSelect`): la usan el alta de lote, el alta de orden y el módulo de fincas.
+- **`GET /api/fincas/[id]`** devuelve `lotes[]`, `ordenes_count` y `tiene_dependencias`; `PUT`/`DELETE` responden **409** con lotes u órdenes asociados (no se orfanan datos).
+
+### Fixed — Alta de lotes (005)
+- **El trigger de los `Select` mostraba el `id`**: Base UI renderiza el `value` crudo si el Root no recibe `items`. Se pasan `items` en productor, finca, perfil/lote de catación, servicios, responsable y finca de la edición de orden.
+- **"Solo el primer cliente tenía fincas"**: los clientes demo 2–5 no tenían fincas registradas (no era un permiso). El selector ahora avisa, ofrece **+ Crear finca** inline y el módulo `/fincas` permite administrarlas.
+- **Selector de finca reactivo al productor** y con la misma fuente que Crear Órdenes (mismo componente y endpoint).
+- **Altura automática**: al elegir la finca se completa sola (read-only) y viaja en el payload del lote; el API la valida contra `fincas.altura` (400 si no coincide) y la devuelve en el reporte con la finca.
+
 ### Added — Refactor del flujo de lotes (004-refactor-flujo-lotes)
 - **Trazabilidad por `id`**: cadena `cliente → finca → lote → orden → perfil de tueste → catación` (reemplaza el texto libre `nproductor`/`nfinca`/`zona`/`zona_finca`/`zona_procedencia`).
 - **Tabla `fincas`** (0038): finca por cliente con `altura`, zona opcional (`zonas_finca`), UNIQUE parcial por nombre y RLS con 3 policies.
