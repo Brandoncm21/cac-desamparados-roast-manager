@@ -44,14 +44,15 @@ async function put(
   const parsed = actualizarLoteSchema.safeParse(body);
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
-  const { fecha_acopio, ...resto } = parsed.data;
+  // `altura` es derivada de la finca (spec 004 D8): no se persiste en el lote.
+  const { fecha_acopio, altura: _altura, ...resto } = parsed.data;
   const payload = { ...resto, ...(fecha_acopio ? { fecha_acopio } : {}) };
 
   const { data, error } = await supabase
     .from("lotes_cafe")
     .update(payload)
     .eq("id_lote", loteId)
-    .select()
+    .select("*, clientes(nombre_completo), fincas(id_finca, nombre, altura, zonas_finca(nombre))")
     .single();
 
   if (error) {

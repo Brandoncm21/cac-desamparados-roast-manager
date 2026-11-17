@@ -256,6 +256,10 @@ export function CatacionForm({ catacionId }: { catacionId?: number }) {
           <div className="space-y-1.5">
             <Label>Perfil de Tueste</Label>
             <Select
+              items={perfiles.map((p) => ({
+                value: p.public_id,
+                label: `${p.numero_lote || p.nombre_cafe || `Perfil #${p.id_perfil}`}${p.id_orden ? ` — Orden #${p.id_orden}` : ""}`,
+              }))}
               value={perfilRef ?? undefined}
               onValueChange={(v) => setValue("catacion.perfil_tueste_ref", v ?? undefined)}
             >
@@ -280,6 +284,13 @@ export function CatacionForm({ catacionId }: { catacionId?: number }) {
           <div className="space-y-1.5">
             <Label>Lote</Label>
             <Select
+              items={[
+                { value: SIN_LOTE, label: "— Sin lote (solo perfil) —" },
+                ...lotes.map((l) => ({
+                  value: String(l.id_lote),
+                  label: `${l.nlote} · ${l.fincas?.nombre ?? "sin finca"} · ${l.clientes?.nombre_completo ?? "sin productor"}${l.enproceso ? ` (${l.enproceso})` : ""}`,
+                })),
+              ]}
               value={loteId ? String(loteId) : SIN_LOTE}
               onValueChange={(v) => seleccionarLote(v ?? SIN_LOTE)}
             >

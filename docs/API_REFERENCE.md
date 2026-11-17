@@ -176,11 +176,11 @@ Módulo portado de CoffeeBeanFlow. Todas las escrituras compuestas pasan por RPC
 
 **`GET /api/lotes`** — paginado (§2.0); `search` sanitizado sobre `nlote`; filtros Zod `enproceso`, `id_finca`, `desde`/`hasta` (`YYYY-MM-DD`); embebe `clientes(nombre_completo)` y `fincas(nombre, altura, zonas_finca(nombre))`; orden `fecha_acopio DESC, id_lote DESC`; `deleted_at IS NULL`.
 
-**`POST /api/lotes`** — `crearLoteSchema` ([`lib/schemas/lotes.ts`](../../lib/schemas/lotes.ts)); exige `id_cliente` + `id_finca` (FKs, spec 004) e inserción directa en `lotes_cafe` (RLS `Admin/Recepción`); `nlote` UNIQUE → **409** en duplicado y `23503` → **400**.
+**`POST /api/lotes`** — `crearLoteSchema` ([`lib/schemas/lotes.ts`](../../lib/schemas/lotes.ts)); exige `id_cliente` + `id_finca` (FKs, spec 004) e inserción directa en `lotes_cafe` (RLS `Admin/Recepción`); `nlote` UNIQUE → **409** en duplicado y `23503` → **400**. Acepta `altura` (derivada de la finca): se valida contra `fincas.altura` (**400** si no coincide), no se persiste (D8) y el reporte del lote la devuelve con la finca. La finca debe existir y pertenecer al productor.
 
 **`GET /api/lotes/[id]`** — lote + embed de cliente/finca + órdenes enlazadas desde `orden_lotes` (N:M, `peso_kg`). **`PUT`/`DELETE`** actualizan o hacen soft-delete.
 
-**`/api/fincas`** — fincas del productor: `GET` paginado con `cliente_id` + `search` (`ilike nombre`), `POST` (`crearFincaSchema`: `cliente_id`, `nombre`, `zona_id?`, `altura`; `23505`→**409**, `23503`→**400**) y `[id]` `GET`/`PUT`/`DELETE` soft.
+**`/api/fincas`** — fincas del productor (spec 005): `GET` paginado con `cliente_id` + `search` (`ilike nombre`), embebe `clientes(nombre_completo)` y `zonas_finca(nombre)`; `POST` (`crearFincaSchema`: `cliente_id`, `nombre`, `zona_id?`, `ubicacion?`, `altura?` —opcional desde 0046—; `23505`→**409**, `23503`→**400**) y `[id]` `GET` (incluye `lotes[]`, `ordenes_count` y `tiene_dependencias`), `PUT` y `DELETE` soft. `PUT` que cambie `cliente_id` y `DELETE` con lotes/órdenes asociados → **409**.
 
 **Etapas** (`GET` devuelve la colección de la etapa con sus series; `PUT` llama a la RPC):
 

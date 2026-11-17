@@ -42,19 +42,29 @@ export default function ReportesPage() {
         .select("id_perfil, numero_lote, nombre_cafe")
         .order("fecha_tueste", { ascending: false });
 
-      if (perfilesData) {
-        const withCurvas = await Promise.all(
-          perfilesData.map(async (p) => {
-            const { data: temps } = await supabase
-              .from("trazabilidad_temperatura")
-              .select("minuto, temperatura_registrada")
-              .eq("id_perfil", p.id_perfil)
-              .order("minuto");
-            return { ...p, temperaturas: temps || [] };
-          })
-        );
-        setPerfiles(withCurvas);
+      if (!perfilesData || perfilesData.length === 0) {
+        setPerfiles([]);
+        return;
       }
+
+      // Una sola consulta para todas las curvas (evita el N+1 por perfil).
+      const ids = perfilesData.map((p) => p.id_perfil);
+      const { data: temps } = await supabase
+        .from("trazabilidad_temperatura")
+        .select("id_perfil, minuto, temperatura_registrada")
+        .in("id_perfil", ids)
+        .order("minuto");
+
+      const porPerfil = new Map<number, { minuto: number; temperatura_registrada: number }[]>();
+      for (const t of temps ?? []) {
+        const curva = porPerfil.get(t.id_perfil) ?? [];
+        curva.push({ minuto: t.minuto, temperatura_registrada: t.temperatura_registrada });
+        porPerfil.set(t.id_perfil, curva);
+      }
+
+      setPerfiles(
+        perfilesData.map((p) => ({ ...p, temperaturas: porPerfil.get(p.id_perfil) ?? [] }))
+      );
     };
     load();
   }, [supabase]);

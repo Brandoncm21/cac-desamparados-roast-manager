@@ -27,6 +27,12 @@ export const crearLoteSchema = z.object({
   // Productor (cliente) y finca: FKs reales (spec 004 D2/D3). Reemplazan nproductor/nfinca/zona/altura.
   id_cliente: z.number().int().positive("El productor es obligatorio"),
   id_finca: z.number().int().positive("La finca es obligatoria"),
+  /**
+   * Altura leída de la finca (msnm). No se guarda en `lotes_cafe` (spec 004 D8:
+   * la altura vive en `fincas.altura`); el API la usa para validar coherencia
+   * y la devuelve en el reporte junto con la finca.
+   */
+  altura: z.number().min(0).max(4000).optional().nullable(),
   robjetivo: numeroNoNegativo,
   rtotal: numeroNoNegativo,
   disponible: numeroNoNegativo,

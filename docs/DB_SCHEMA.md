@@ -98,7 +98,7 @@ Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/sp
 
 | Objeto | Cambio | Migración |
 |---|---|---|
-| `fincas` | **Tabla nueva**: `id_finca`, `cliente_id → clientes` (RESTRICT), `nombre` (1–150), `zona_id → zonas_finca` (SET NULL), `altura numeric(10,2) NOT NULL ≥ 0`, `deleted_at`; UNIQUE parcial `(cliente_id, nombre) WHERE deleted_at IS NULL`; RLS 3 policies | 0038 |
+| `fincas` | **Tabla nueva**: `id_finca`, `cliente_id → clientes` (RESTRICT), `nombre` (1–150), `zona_id → zonas_finca` (SET NULL), `ubicacion` (texto ≤ 200, 0046), `altura numeric(10,2) ≥ 0` **nullable** desde 0046, `deleted_at`; UNIQUE parcial `(cliente_id, nombre) WHERE deleted_at IS NULL`; RLS 3 policies | 0038 / 0046 |
 | `lotes_cafe.id_cliente` / `id_finca` | FKs al productor y su finca; `id_finca` pasa a NOT NULL tras el backfill (T12) | 0039 / 0041 |
 | `lotes_cafe.proceso_cafe` | Enum `Lavado / Honey / Natural / Otro` (nullable), editable en trilla y bodega. Los 5 booleanos de despulpado se conservan (paridad CBF `FR-010`) | 0039 |
 | `lotes_cafe.enproceso` | CHECK ampliado: `No`, `En Secado`, `En Trilla`, `En Bodega`, **`En Catación`**, **`Vendido`** | 0039 |
@@ -109,6 +109,7 @@ Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/sp
 | `crear_orden_completa` / `crear_orden_desde_trilla` | Inserta/valida `id_finca` en lugar del texto `zona_finca`; e1 usa `id_cliente`/`id_finca` del lote (sin conciliación por nombre) e idempotencia por `orden_lotes` | 0044 |
 | **DROP legacy** | `lotes_cafe.nproductor/nfinca/zona/altura`, `ordenes_trabajo.zona_finca`, `clientes.zona_procedencia` y la tabla `orden_lotes_externos`; `SET NOT NULL` en `lotes_cafe.id_cliente/id_finca`; índice `idx_fincas_nombre_trgm` | 0044 |
 | `guardar_catacion` | Sin fallback a `orden_lotes_externos`; `nlote` desde el lote o desde `orden_lotes` vía el perfil | 0045 |
+| `fincas.ubicacion` / `altura` opcional | `ubicacion varchar(200)`; `altura` pasa a NULL-able (se muestra "—") | 0046 |
 
 **Reglas del modelo (decisiones cerradas con el dueño):**
 

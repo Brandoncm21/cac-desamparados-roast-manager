@@ -1,746 +1,105 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { useForm, useFieldArray } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { crearOrdenSchema, type CrearOrdenInput } from "@/lib/schemas/ordenes";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ClienteAutocomplete } from "@/components/forms/cliente-autocomplete";
-import {
-  MOLIENDA_DEFAULT,
-  requiereHumedad,
-  tieneMolido,
-  tieneTipoEmpacado,
-  tieneTipoTueste,
-} from "@/lib/services/visibilidad";
-import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Form } from "@/components/ui/form";
+import { SeccionAprobacion, SeccionEncabezado } from "./components/SeccionEncabezado";
+import { SeccionCliente } from "./components/SeccionCliente";
+import { SeccionHumedad } from "./components/SeccionHumedad";
+import { SeccionLotes } from "./components/SeccionLotes";
+import { SeccionResponsable } from "./components/SeccionResponsable";
+import { SeccionServicios } from "./components/SeccionServicios";
+import { SeccionTuesteEmpaque } from "./components/SeccionTuesteEmpaque";
+import { useNuevaOrden } from "./hooks/useNuevaOrden";
+import { useOrdenFormulario } from "./hooks/useOrdenFormulario";
 
-const OPCIONES_TUESTE = ["Claro", "Medio", "Oscuro"];
-const OPCIONES_MOLIENDA = ["Fina", "Media", "Gruesa", "Grano Entero"];
-const OPCIONES_EMPAQUE = [
-  "Bolsa con válvula 500g",
-  "Bolsa con válvula 1Kg",
-  "Bolsa 5Kg",
-  "Saco 46Kg",
-  "A granel",
-];
-const OPCIONES_PROCESO = ["Lavado", "Honey", "Natural", "Otro"];
-
-interface ClienteOption {
-  id_cliente: number;
-  nombre_completo: string;
-}
-
-interface EmpleadoOption {
-  id_empleado: number;
-  nombre: string;
-}
-
-interface ServicioActivo {
-  id_servicio_maestro: number;
-  nombre: string;
-  descripcion: string | null;
-  tipo: string;
-  prioridad: number;
-  intervalos: { id_precio: number; precio_por_kg: number; min_weight_kg: number; max_weight_kg: number | null }[];
-}
-
-function SpecSelect({
-  value,
-  onChange,
-  options,
-  placeholder,
-  id,
-  "aria-describedby": ariaDescribedby,
-  "aria-invalid": ariaInvalid,
-}: {
-  value: string;
-  onChange: (val: string) => void;
-  options: string[];
-  placeholder: string;
-  id?: string;
-  "aria-describedby"?: string;
-  "aria-invalid"?: boolean;
-}) {
-  const [otro, setOtro] = useState(!options.includes(value) && value ? value : "");
-  const isOtro = value === "__OTRO__" || (!options.includes(value) && !!value);
-
-  return (
-    <div className="space-y-2">
-      <Select value={options.includes(value) ? value : value ? "__OTRO__" : ""} onValueChange={(v) => v && onChange(v)}>
-        <SelectTrigger
-          id={id}
-          aria-describedby={ariaDescribedby}
-          aria-invalid={ariaInvalid}
-          className="h-12 md:h-10 text-base"
-        >
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="">{placeholder}</SelectItem>
-          {options.map((opt) => (
-            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-          ))}
-          <SelectItem value="__OTRO__" className="text-amber-600 font-medium">Otro</SelectItem>
-        </SelectContent>
-      </Select>
-      {isOtro && (
-        <Input
-          id={id}
-          aria-describedby={ariaDescribedby}
-          aria-invalid={ariaInvalid}
-          value={otro}
-          onChange={(e) => {
-            setOtro(e.target.value);
-            onChange(e.target.value);
-          }}
-          placeholder="Especificar..."
-          className="h-12 md:h-10 text-base"
-          autoFocus
-        />
-      )}
-    </div>
-  );
-}
+// El resumen de confirmación solo se necesita al enviar: se carga bajo demanda.
+const ConfirmarOrdenDialog = dynamic(
+  () => import("./components/ConfirmarOrdenDialog").then((m) => m.ConfirmarOrdenDialog),
+  { ssr: false, loading: () => null }
+);
 
 export default function NuevaOrdenPage() {
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
-  const [clientes, setClientes] = useState<ClienteOption[]>([]);
-  const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
-  const [serviciosActivos, setServiciosActivos] = useState<ServicioActivo[]>([]);
-  const [fincasOrden, setFincasOrden] = useState<Array<{ id_finca: number; nombre: string; altura: number; cliente_id: number }>>([]);
-  const [lotesOrden, setLotesOrden] = useState<Array<{ id_lote: number; nlote: string; clientes: { nombre_completo: string } | null; fincas: { nombre: string } | null }>>([]);
-  const [nuevaFincaOpen, setNuevaFincaOpen] = useState(false);
-  const [nuevaFincaNombre, setNuevaFincaNombre] = useState("");
-  const [nuevaFincaAltura, setNuevaFincaAltura] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-
-  const form = useForm({
-    resolver: zodResolver(crearOrdenSchema),
-    defaultValues: {
-      id_cliente: 0,
-      id_finca: null,
-      lotes: [],
-      descripcion_producto: "",
-      proceso_cafe: "",
-      porcentaje_humedad_entrada: null,
-      firma_aprobacion_cliente: false,
-      servicios: [],
-      tipo_tueste: "",
-      tipo_molienda: "",
-      tipo_empaque: "",
-      observaciones: "",
-      id_empleado_recibe: undefined,
-    },
-  });
-
-  const { watch } = form;
-
-  const { fields, append, remove } = useFieldArray({ control: form.control, name: "servicios" });
-
-  // Fincas (tabla fincas) y lotes en acopio para esta orden.
-  useEffect(() => {
-    fetch("/api/fincas?pageSize=100&page=1")
-      .then((r) => r.json())
-      .then((j) => setFincasOrden(j.data ?? []))
-      .catch(() => {});
-    fetch("/api/lotes?pageSize=100&page=1")
-      .then((r) => r.json())
-      .then((j) => setLotesOrden(j.data ?? []))
-      .catch(() => {});
-  }, []);
-
-  const toggleLote = (id: number, on: boolean) => {
-    const actuales = (form.getValues("lotes") ?? []) as number[];
-    const next = on ? Array.from(new Set([...actuales, id])) : actuales.filter((x) => x !== id);
-    form.setValue("lotes", next, { shouldValidate: true });
-  };
-
-  const crearFincaOrden = async () => {
-    const clienteId = form.getValues("id_cliente");
-    if (!clienteId) {
-      toast.error("Seleccioná un cliente primero");
-      return;
-    }
-    const altura = Number(nuevaFincaAltura);
-    if (!nuevaFincaNombre.trim()) {
-      toast.error("El nombre de la finca es obligatorio");
-      return;
-    }
-    if (!Number.isFinite(altura) || altura < 0) {
-      toast.error("La altura (msnm) es obligatoria");
-      return;
-    }
-    const res = await fetch("/api/fincas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cliente_id: clienteId, nombre: nuevaFincaNombre.trim(), altura }),
-    });
-    const result = await res.json();
-    if (!res.ok) {
-      toast.error("Error al crear finca: " + (result.error?.message || "Error desconocido"));
-      return;
-    }
-    toast.success("Finca creada");
-    setFincasOrden((prev) => [...prev, result.data]);
-    form.setValue("id_finca", result.data.id_finca, { shouldValidate: true });
-    setNuevaFincaOpen(false);
-    setNuevaFincaNombre("");
-    setNuevaFincaAltura("");
-  };
-
-  useEffect(() => {
-    const load = async () => {
-      const [{ data: cli }, { data: emp }, resServicios] = await Promise.all([
-        supabase.from("clientes").select("id_cliente, nombre_completo").order("nombre_completo"),
-        supabase.from("empleados").select("id_empleado, nombre").eq("activo", true).order("nombre"),
-        fetch("/api/servicios-activos"),
-      ]);
-      if (cli) setClientes(cli);
-      if (emp) setEmpleados(emp);
-
-      if (resServicios.ok) {
-        const { data } = await resServicios.json();
-        setServiciosActivos(data?.servicios || []);
-      }
-    };
-    load();
-  }, [supabase]);
-
-  const serviciosSeleccionados = watch("servicios") as CrearOrdenInput["servicios"];
-  const idsSeleccionados = new Set(serviciosSeleccionados.map((s) => s.servicio_id));
-
-  const serviciosInfo = serviciosSeleccionados
-    .map((s) => serviciosActivos.find((sa) => sa.id_servicio_maestro === s.servicio_id))
-    .filter((s): s is ServicioActivo => Boolean(s));
-
-  const hayTueste = tieneTipoTueste(serviciosInfo);
-  const hayEmpaque = tieneTipoEmpacado(serviciosInfo);
-  const hayMolido = tieneMolido(serviciosInfo);
-  const hayHumedad = requiereHumedad(serviciosInfo);
-
-  useEffect(() => {
-    if (hayMolido) return;
-    const actual = form.getValues("tipo_molienda") ?? "";
-    const objetivo = hayTueste ? MOLIENDA_DEFAULT : "";
-    if (actual !== objetivo) {
-      form.setValue("tipo_molienda", objetivo);
-    }
-  }, [hayTueste, hayMolido, form]);
-
-  const addServicio = (servicioId: number) => {
-    const servicio = serviciosActivos.find((s) => s.id_servicio_maestro === servicioId);
-    if (!servicio || idsSeleccionados.has(servicioId)) return;
-    append({
-      servicio_id: servicio.id_servicio_maestro,
-      tipo_servicio: servicio.nombre,
-    });
-  };
-
-  const removeServicio = (index: number) => {
-    remove(index);
-  };
-
-  const [pendingValues, setPendingValues] = useState<CrearOrdenInput | null>(null);
-
-  const onSubmit = (values: CrearOrdenInput) => {
-    if (!values.id_cliente || values.id_cliente <= 0) {
-      form.setError("id_cliente", { message: "Debe seleccionar un cliente" });
-      toast.error("Debe seleccionar un cliente");
-      return;
-    }
-
-    if (values.servicios.length === 0) {
-      form.setError("servicios", { message: "Agregue al menos un servicio" });
-      toast.error("Debe agregar al menos un servicio");
-      return;
-    }
-
-    if (!values.id_empleado_recibe) {
-      form.setError("id_empleado_recibe", { message: "Debe seleccionar un responsable" });
-      toast.error("Debe seleccionar un responsable");
-      return;
-    }
-
-    setPendingValues(values);
-    setConfirmOpen(true);
-  };
-
-  const confirmSubmit = async () => {
-    if (!pendingValues) return;
-
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/ordenes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pendingValues),
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        const flattenedIssues = result.error?.issues;
-        const fieldErrors = flattenedIssues?.fieldErrors || {};
-        const messages = Object.values(fieldErrors).flat() as string[];
-        const errorMessage = messages.length > 0
-          ? messages.join(", ")
-          : (flattenedIssues?.formErrors?.join(", ") || result.error?.message || "Error desconocido");
-
-        Object.entries(fieldErrors).forEach(([key, value]) => {
-          const msg = Array.isArray(value) ? value.join(", ") : String(value);
-          if (msg) form.setError(key as any, { message: msg });
-        });
-
-        toast.error("Error al crear orden: " + errorMessage);
-        setConfirmOpen(false);
-        return;
-      }
-
-      toast.success("Orden creada exitosamente");
-      setConfirmOpen(false);
-      router.push("/ordenes");
-      router.refresh();
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const form = useOrdenFormulario();
+  const { flags, ...orden } = useNuevaOrden(form);
 
   return (
     <div className="max-w-3xl mx-auto space-y-4 md:space-y-6 pb-32 pt-12 lg:pt-0">
       <h1 className="text-xl md:text-2xl font-bold">Nueva Orden de Trabajo</h1>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
-          {/* Cliente */}
-          <Card>
-            <CardHeader><CardTitle className="text-base md:text-lg">Datos del Cliente</CardTitle></CardHeader>
-            <CardContent className="space-y-3 md:space-y-4">
-              <FormField
-                control={form.control}
-                name="id_cliente"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cliente *</FormLabel>
-                    <FormControl>
-                      <ClienteAutocomplete
-                        clientes={clientes}
-                        value={field.value}
-                        onChange={field.onChange}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="id_finca"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center justify-between">
-                      <FormLabel>Finca</FormLabel>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => setNuevaFincaOpen((v) => !v)}
-                      >
-                        + Crear finca
-                      </Button>
-                    </div>
-                    <FormControl>
-                      <Select
-                        value={field.value ? String(field.value) : ""}
-                        onValueChange={(v) => field.onChange(v ? Number(v) : null)}
-                      >
-                        <SelectTrigger className="h-12 md:h-10 text-base">
-                          <SelectValue placeholder="Seleccionar finca..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fincasOrden.map((f) => (
-                            <SelectItem key={f.id_finca} value={String(f.id_finca)}>
-                              {f.nombre} — {f.altura} msnm
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        <form
+          onSubmit={form.handleSubmit(orden.solicitarConfirmacion)}
+          className="space-y-4 md:space-y-6"
+        >
+          <SeccionCliente form={form} clientes={orden.clientes} />
 
-              {nuevaFincaOpen && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-md border p-3">
-                  <Input
-                    placeholder="Nombre de la finca"
-                    value={nuevaFincaNombre}
-                    onChange={(e) => setNuevaFincaNombre(e.target.value)}
-                  />
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="Altura (msnm)"
-                    value={nuevaFincaAltura}
-                    onChange={(e) => setNuevaFincaAltura(e.target.value)}
-                  />
-                  <div className="flex gap-2">
-                    <Button type="button" size="sm" onClick={crearFincaOrden}>Crear</Button>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setNuevaFincaOpen(false)}>
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <SeccionLotes
+            lotes={orden.lotesOrden}
+            seleccionados={orden.lotesSeleccionados}
+            onAlternar={orden.alternarLote}
+          />
 
-          {/* Lotes */}
-          <Card>
-            <CardHeader><CardTitle className="text-base md:text-lg">Lotes a procesar (opcional)</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {lotesOrden.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No hay lotes en acopio.</p>
-              ) : (
-                <div className="max-h-56 overflow-auto rounded-md border divide-y">
-                  {lotesOrden.map((l) => {
-                    const seleccionados = (watch("lotes") ?? []) as number[];
-                    const checked = seleccionados.includes(l.id_lote);
-                    return (
-                      <label key={l.id_lote} className="flex items-center gap-3 p-2 text-sm cursor-pointer hover:bg-zinc-50">
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(c) => toggleLote(l.id_lote, Boolean(c))}
-                        />
-                        <span className="font-mono">{l.nlote}</span>
-                        <span className="text-muted-foreground">
-                          {l.clientes?.nombre_completo ?? "-"} · {l.fincas?.nombre ?? "-"}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <SeccionServicios
+            form={form}
+            fields={orden.fields}
+            serviciosActivos={orden.serviciosActivos}
+            idsSeleccionados={orden.idsSeleccionados}
+            onAgregar={orden.agregarServicio}
+            onQuitar={orden.quitarServicio}
+          />
 
-          {/* Servicios */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base md:text-lg">Servicios</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 md:space-y-4">
-              {fields.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {fields.map((field, index) => (
-                    <div
-                      key={field.id}
-                      className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/50"
-                    >
-                      <span className="font-medium">{field.tipo_servicio}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => removeServicio(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
+          {flags.hayHumedad && <SeccionHumedad form={form} />}
 
-              <Select
-                onValueChange={(v) => {
-                  const id = Number(v);
-                  if (id) addServicio(id);
-                }}
-              >
-                <SelectTrigger className="h-14 md:h-12 text-base">
-                  <Plus className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Agregar servicio..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {serviciosActivos
-                    .filter((s) => !idsSeleccionados.has(s.id_servicio_maestro))
-                    .map((s) => (
-                      <SelectItem key={s.id_servicio_maestro} value={String(s.id_servicio_maestro)}>
-                        {s.nombre}
-                      </SelectItem>
-                    ))}
-                  {serviciosActivos.filter((s) => !idsSeleccionados.has(s.id_servicio_maestro)).length === 0 && (
-                    <SelectItem value="__none__" disabled>
-                      No hay más servicios disponibles
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-              <FormMessage>{form.formState.errors.servicios?.message}</FormMessage>
-            </CardContent>
-          </Card>
+          <SeccionResponsable form={form} empleados={orden.empleados} />
 
-          {/* Humedad de Entrada: solo para servicios de Tueste o Secado */}
-          {hayHumedad && (
-            <Card>
-              <CardHeader><CardTitle className="text-base md:text-lg">Humedad de Entrada</CardTitle></CardHeader>
-              <CardContent className="space-y-3 md:space-y-4">
-                <FormField control={form.control} name="porcentaje_humedad_entrada" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>% Humedad Inicial</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min={0}
-                        max={100}
-                        placeholder="Ej: 12.5"
-                        className="h-12 md:h-10 text-base"
-                        value={(field.value as number | null | undefined) ?? ""}
-                        onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <p className="text-xs text-muted-foreground">
-                  Con cuánta humedad entra el café al proceso (relevante para tueste y secado).
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          <SeccionTuesteEmpaque
+            form={form}
+            hayTueste={flags.hayTueste}
+            hayMolido={flags.hayMolido}
+            hayEmpaque={flags.hayEmpaque}
+          />
 
-          {/* Responsable */}
-          <Card>
-            <CardHeader><CardTitle className="text-base md:text-lg">Responsable</CardTitle></CardHeader>
-            <CardContent className="space-y-3 md:space-y-4">
-              <FormField control={form.control} name="id_empleado_recibe" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Responsable *</FormLabel>
-                  <Select onValueChange={(v) => field.onChange(Number(v))} value={field.value ? String(field.value) : ""}>
-                    <FormControl>
-                      <SelectTrigger className="h-12 md:h-10 text-base"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="">Seleccionar...</SelectItem>
-                      {empleados.map((e) => (
-                        <SelectItem key={e.id_empleado} value={String(e.id_empleado)}>{e.nombre}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </CardContent>
-          </Card>
+          <SeccionEncabezado form={form} />
 
-          {/* Especificaciones de Tueste: solo si se contrató Tueste */}
-          {hayTueste && (
-            <Card>
-              <CardHeader><CardTitle className="text-base md:text-lg">Especificaciones de Tueste</CardTitle></CardHeader>
-              <CardContent className="space-y-3 md:space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                  <FormField control={form.control} name="tipo_tueste" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo de Tueste</FormLabel>
-                      <FormControl>
-                        <SpecSelect
-                          value={field.value || ""}
-                          onChange={field.onChange}
-                          options={OPCIONES_TUESTE}
-                          placeholder="Seleccionar..."
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="tipo_molienda" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        Tipo de Molienda {hayMolido ? "*" : "(default)"}
-                      </FormLabel>
-                      <FormControl>
-                        {hayMolido ? (
-                          <SpecSelect
-                            value={field.value || ""}
-                            onChange={field.onChange}
-                            options={OPCIONES_MOLIENDA}
-                            placeholder="Seleccionar..."
-                          />
-                        ) : (
-                          <Input
-                            value={field.value || MOLIENDA_DEFAULT}
-                            readOnly
-                            disabled
-                            className="h-12 md:h-10 text-base bg-muted"
-                          />
-                        )}
-                      </FormControl>
-                      <FormMessage />
-                      {!hayMolido && (
-                        <p className="text-xs text-muted-foreground">
-                          Por defecto {MOLIENDA_DEFAULT}. Solo se puede cambiar si contrata el servicio Molido.
-                        </p>
-                      )}
-                    </FormItem>
-                  )} />
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <SeccionAprobacion form={form} />
 
-          {/* Tipo de Empaque: solo si se contrató Empaque */}
-          {hayEmpaque && (
-            <Card>
-              <CardHeader><CardTitle className="text-base md:text-lg">Tipo de Empaque</CardTitle></CardHeader>
-              <CardContent>
-                <FormField control={form.control} name="tipo_empaque" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo de Empaque</FormLabel>
-                    <FormControl>
-                      <SpecSelect
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        options={OPCIONES_EMPAQUE}
-                        placeholder="Seleccionar..."
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Encabezado de Orden: al final del proceso */}
-          <Card>
-            <CardHeader><CardTitle className="text-base md:text-lg">Encabezado de Orden</CardTitle></CardHeader>
-            <CardContent className="space-y-3 md:space-y-4">
-              <FormField control={form.control} name="proceso_cafe" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Proceso de Café</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger className="h-12 md:h-10 text-base"><SelectValue placeholder="Sin especificar" /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="">Sin especificar</SelectItem>
-                      {OPCIONES_PROCESO.map((opt) => (
-                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="descripcion_producto" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descripción del Producto</FormLabel>
-                  <FormControl><Input {...field} className="h-12 md:h-10 text-base" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="observaciones" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observaciones</FormLabel>
-                  <FormControl><Textarea {...field} className="text-base" rows={3} /></FormControl>
-                </FormItem>
-              )} />
-            </CardContent>
-          </Card>
-
-          {/* Aprobación */}
-          <Card>
-            <CardHeader><CardTitle className="text-base md:text-lg">Aprobación</CardTitle></CardHeader>
-            <CardContent>
-              <FormField control={form.control} name="firma_aprobacion_cliente" render={({ field }) => (
-                <FormItem className="flex items-center gap-3">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} className="h-5 w-5" />
-                  </FormControl>
-                  <FormLabel className="mb-0 text-base">Firma de aprobación del cliente</FormLabel>
-                </FormItem>
-              )} />
-            </CardContent>
-          </Card>
-
-          {/* Botones */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <Button type="submit" className="flex-1 h-14 md:h-12 text-base md:text-lg font-bold" disabled={submitting}>
-              {submitting ? "Creando..." : "Crear Orden"}
+            <Button
+              type="submit"
+              className="flex-1 h-14 md:h-12 text-base md:text-lg font-bold"
+              disabled={orden.submitting}
+            >
+              {orden.submitting ? "Creando..." : "Crear Orden"}
             </Button>
-            <Button type="button" variant="outline" onClick={() => router.back()} className="h-14 md:h-12">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              className="h-14 md:h-12"
+            >
               Cancelar
             </Button>
           </div>
         </form>
       </Form>
 
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Confirmar creación de orden</DialogTitle>
-            <DialogDescription>
-              Revise los datos esenciales antes de continuar.
-            </DialogDescription>
-          </DialogHeader>
-
-          {pendingValues && (
-            <div className="space-y-4 text-sm">
-              <div className="space-y-1">
-                <p className="font-medium text-amber-700">Datos esenciales</p>
-                <p><span className="text-muted-foreground">Cliente:</span> {clientes.find((c) => c.id_cliente === pendingValues.id_cliente)?.nombre_completo || "No seleccionado"}</p>
-                <p><span className="text-muted-foreground">Responsable:</span> {empleados.find((e) => e.id_empleado === pendingValues.id_empleado_recibe)?.nombre || "No seleccionado"}</p>
-                <p><span className="text-muted-foreground">Servicios:</span> {pendingValues.servicios.map((s) => s.tipo_servicio).join(", ")}</p>
-              </div>
-
-              {(() => {
-                const vacios: string[] = [];
-                if (!pendingValues.proceso_cafe) vacios.push("Proceso de café");
-                if (!pendingValues.descripcion_producto) vacios.push("Descripción del producto");
-                if (hayTueste && !pendingValues.tipo_tueste) vacios.push("Tipo de tueste");
-                if (hayTueste && hayMolido && !pendingValues.tipo_molienda) vacios.push("Tipo de molienda");
-                if (hayEmpaque && !pendingValues.tipo_empaque) vacios.push("Tipo de empaque");
-                if (!pendingValues.observaciones) vacios.push("Observaciones");
-
-                if (vacios.length === 0) return null;
-                return (
-                  <div className="rounded-md bg-amber-50 p-3 border border-amber-200">
-                    <p className="font-medium text-amber-800 mb-1">Campos opcionales sin completar</p>
-                    <p className="text-amber-700">{vacios.join(", ")}</p>
-                    <p className="text-xs text-amber-600 mt-1">Estos datos pueden completarse más tarde desde la edición de la orden.</p>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button type="button" variant="outline" onClick={() => setConfirmOpen(false)} className="w-full sm:w-auto">
-              Revisar formulario
-            </Button>
-            <Button type="button" onClick={confirmSubmit} disabled={submitting} className="w-full sm:w-auto">
-              {submitting ? "Creando..." : "Confirmar creación"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmarOrdenDialog
+        open={orden.confirmOpen}
+        onOpenChange={orden.setConfirmOpen}
+        pending={orden.pendingValues}
+        clientes={orden.clientes}
+        empleados={orden.empleados}
+        flags={{
+          hayTueste: flags.hayTueste,
+          hayMolido: flags.hayMolido,
+          hayEmpaque: flags.hayEmpaque,
+        }}
+        submitting={orden.submitting}
+        onConfirm={orden.confirmar}
+      />
     </div>
   );
 }

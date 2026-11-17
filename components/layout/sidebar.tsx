@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Users, FileText, Flame, BarChart3, LogOut, Coffee, Menu, X, Plus,
-  Package, Box, Boxes, CupSoda,
+  Package, Box, Boxes, CupSoda, MapPin,
 } from "lucide-react";
 import { getCurrentUserRole, type UserRole } from "@/lib/auth-helpers";
 
@@ -16,6 +16,7 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/ordenes", label: "Órdenes", icon: FileText },
   { href: "/lotes", label: "Lotes", icon: Boxes },
+  { href: "/fincas", label: "Fincas", icon: MapPin },
   { href: "/tueste", label: "Tueste", icon: Flame },
   { href: "/cataciones", label: "Catación", icon: CupSoda },
   { href: "/clientes", label: "Clientes", icon: Users },

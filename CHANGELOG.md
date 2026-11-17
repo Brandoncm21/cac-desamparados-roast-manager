@@ -4,6 +4,32 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Changed — Refactor de módulos (M1–M6)
+- **M1 · Cliente HTTP único** (`lib/api/http.ts`): `ApiError` con `status`/`code`/`fieldErrors`/`formErrors`, `leerJson()` (acepta `issues` como ZodError serializado o aplanado) y `detalleDeError()` para toasts. Módulos tipados por recurso: `lib/api/{ordenes,lotes,servicios,perfiles-tueste}.ts`; `lib/fincas.ts` deja de duplicar su `leerJson`.
+- **M2 · Estados y formato** (`lib/estados.ts`, `components/ui/estado-badge.tsx`, `lib/format.ts`): una sola fuente para los mapas de estado — elimina las 4 copias de `estadoBadge()` y el prop-drilling de `clientes/[id]` hacia `OrdenesTab`. Clases Tailwind idénticas: sin cambio visual. `formatearColones/Peso/Porcentaje` unifican el marcador de ausencia.
+- **M3 · Alta de órdenes** (670 → 105 líneas): `hooks/{useOrdenFormulario,useNuevaOrden}.ts` + 9 secciones en `components/`. La carga inicial pasa a una sola tanda paralela y el resumen de confirmación se carga con `next/dynamic`. Las reglas de `onSubmit` y del resumen salen a `lib/services/orden-validacion.ts` (puras y testeadas).
+- **M4 · Flujo de pasos** (562 → 71 líneas): `pasos/{usePasosOrden,PasoCard,DialogoPaso}`. El diálogo se monta solo con una acción activa, así que arranca limpio sin efecto de reinicio. `lib/services/pasos-orden.ts` concentra `seleccionarPasoActual`, `calcularTotalAcumulado` y `prepararEnvioPaso`; `ejecutarAccionPaso()` sustituye el `fetch` suelto.
+- **M5 · Detalle de orden** (541 → 55 líneas): `hooks/useOrdenDetalle.ts` + `components/{AccionesOrden,OrdenImprimible,SeccionTueste,ResumenTueste}`. La cascada `orden → perfil → resumen + métricas` baja de tres a dos rondas porque perfil y resumen son la misma fila: **4 → 3 peticiones** al abrir el detalle. `calcularRendimiento` y `totalServicios` pasan a `lib/services/orden-detalle.ts`.
+- **Tests**: 102 nuevos en 9 archivos (`api-http`, `api-recursos`, `fincas-client`, `estados`, `estado-badge`, `format`, `orden-validacion`, `pasos-orden`, `orden-detalle`). Suite: **200 → 302**.
+- **Docs**: `ARCHITECTURE.md` y `diagrams/system_arch.mmd` ya no citan `lib/services/orquestador.ts`, eliminado en la fusión.
+
+### Fixed — Refactor de módulos
+- **`/ordenes/[id]` · "Peso facturable" mostraba `true kg`**: `paso.peso_facturable_kg ?? paso.peso_inicial_kg != null` se evaluaba como `peso_facturable_kg ?? (peso_inicial_kg != null)`. Ahora usa `formatearPeso(peso_facturable ?? inicial)`.
+
+### Added — Módulo de Fincas y correcciones del alta de lotes (005-fincas-crud)
+- **CRUD de Fincas** en `/fincas` (lista con búsqueda, filtro por productor y paginación), `/fincas/nueva`, `/fincas/[id]` (datos, resumen y lotes de la finca) y `/fincas/[id]/editar`; entrada **Fincas** en el sidebar.
+- **`fincas.ubicacion`** (texto libre ≤ 200) y **`altura` opcional** (0046): antes era `NOT NULL`.
+- **`FincaForm`** con productor, nombre, altura, zona del catálogo (con "+ Nueva zona" inline) y ubicación.
+- **Fuente única de fincas/zonas** (`lib/fincas.ts` + `FincaSelect`): la usan el alta de lote, el alta de orden y el módulo de fincas.
+- **`GET /api/fincas/[id]`** devuelve `lotes[]`, `ordenes_count` y `tiene_dependencias`; `PUT`/`DELETE` responden **409** con lotes u órdenes asociados (no se orfanan datos).
+- **Datos demo** (0047): 5 fincas para los productores 2–5 con zona, ubicación y altura — Cooperativa Los Santos con 2 para mostrar 1 cliente → N fincas. Idempotente y reversible.
+
+### Fixed — Alta de lotes (005)
+- **El trigger de los `Select` mostraba el `id`**: Base UI renderiza el `value` crudo si el Root no recibe `items`. Se pasan `items` en productor, finca, perfil/lote de catación, servicios, responsable y finca de la edición de orden.
+- **"Solo el primer cliente tenía fincas"**: los clientes demo 2–5 no tenían fincas registradas (no era un permiso). El selector ahora avisa, ofrece **+ Crear finca** inline y el módulo `/fincas` permite administrarlas.
+- **Selector de finca reactivo al productor** y con la misma fuente que Crear Órdenes (mismo componente y endpoint).
+- **Altura automática**: al elegir la finca se completa sola (read-only) y viaja en el payload del lote; el API la valida contra `fincas.altura` (400 si no coincide) y la devuelve en el reporte con la finca.
+
 ### Added — Refactor del flujo de lotes (004-refactor-flujo-lotes)
 - **Trazabilidad por `id`**: cadena `cliente → finca → lote → orden → perfil de tueste → catación` (reemplaza el texto libre `nproductor`/`nfinca`/`zona`/`zona_finca`/`zona_procedencia`).
 - **Tabla `fincas`** (0038): finca por cliente con `altura`, zona opcional (`zonas_finca`), UNIQUE parcial por nombre y RLS con 3 policies.
@@ -24,6 +50,13 @@ Todas las notas de versión de SCACR.
 ### Fixed — Refactor del flujo de lotes
 - `CatacionForm` enviaba y reseteaba el formulario con una forma plana que no coincidía con `{ catacion, rondas }`: al editar no se precargaban los campos. Ahora `FormValues` es anidado y `reset` mapea las rondas (`id_catacion_ronda → id`).
 - `guardar_catacion` ya no depende solo de `orden_lotes_externos` para derivar `nlote` (usa `orden_lotes` primero; desde 0045 ya no existe el fallback).
+### Fixed — Correcciones post-fusión (003-correcciones-post-fusion)
+- **DB `0036`**: `CHECK (estado IN ('Pendiente','Completado'))` en `perfiles_tueste` (espejo del enum Zod; última columna de estado sin constraint).
+- **DB `0037`**: eliminados 4 enums huérfanos (`tipo_tueste_enum`, `tipo_molienda_enum`, `tipo_empaque_enum`, `tipo_servicio_enum`; 0 dependencias verificadas).
+- **DB `0033`/`0034`/`0035`**: hardening de `search_path` en 9 funciones; 9 índices de FK + `empleados_lectura_propia` con `(select auth.uid())`; `REVOKE EXECUTE … FROM PUBLIC` de `get_empleado_rol()` (el `REVOKE … FROM anon` de `0026` era inefectivo) y 3 índices redundantes.
+- **`/reportes`**: eliminado el N+1 (una consulta `.in("id_perfil", ids)` + agrupación en memoria).
+- **`/tueste/[perfilId]`**: `RendimientosDialog` y `RegistroConfirmadoDialog` a `next/dynamic` con montaje condicional (chunk bajo demanda).
+- **Fuentes self-hosted**: `next/font/google` (Inter, Montserrat, Geist Mono) → `next/font/local` con variable fonts subset latin en `app/fonts/`; el build deja de depender de Google Fonts.
 
 ### Added — Fusión CoffeeBeanFlow (002-fusion-cbf, Fases 0–4)
 - **Módulo Lotes end-to-end** (0027): `lotes_cafe` (29 columnas, RLS 3 policies, índices incl. `idx_lotes_nlote_trgm`), API `/api/lotes` (GET paginado + búsqueda trgm + filtros, POST→RPC, 23505→409) y `/api/lotes/[id]` (GET con órdenes enlazadas K1, PUT, DELETE soft), UI completa (lista con debounce/estados/badges, nueva, detalle, editar) con RHF+Zod.

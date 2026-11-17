@@ -207,6 +207,13 @@ export default function EditarOrdenPage() {
             <div className="space-y-2">
               <Label htmlFor="id_finca">Finca</Label>
               <Select
+                items={[
+                  { value: SIN_FINCA, label: "Sin especificar" },
+                  ...fincas.map((f) => ({
+                    value: String(f.id_finca),
+                    label: `${f.nombre}${f.altura != null ? ` — ${f.altura} msnm` : ""}`,
+                  })),
+                ]}
                 value={idFinca ? String(idFinca) : SIN_FINCA}
                 onValueChange={(v) => setIdFinca(v && v !== SIN_FINCA ? Number(v) : null)}
                 disabled={saving}
