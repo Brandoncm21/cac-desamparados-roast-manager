@@ -98,7 +98,8 @@ Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/sp
 
 | Objeto | Cambio | Migración |
 |---|---|---|
-| `fincas` | **Tabla nueva**: `id_finca`, `cliente_id → clientes` (RESTRICT), `nombre` (1–150), `zona_id → zonas_finca` (SET NULL), `ubicacion` (texto ≤ 200, 0046), `altura numeric(10,2) ≥ 0` **nullable** desde 0046, `deleted_at`; UNIQUE parcial `(cliente_id, nombre) WHERE deleted_at IS NULL`; RLS 3 policies | 0038 / 0046 |
+| `productores` | **Tabla nueva (0050)**: entidad independiente del flujo de Beneficiado. `id_productor`, `nombre_completo`, `telefono`, `fecha_registro`, `public_id` (conserva el del cliente de origen como conector K2), `external_ref`, `deleted_at`; RLS 3 policies (select `deleted_at IS NULL`, insert/update `Recepción`/`Admin`) | 0050 |
+| `fincas` | **Tabla nueva**: `id_finca`, `cliente_id → clientes` (RESTRICT, **deprecado** desde 0050), `productor_id → productores` (RESTRICT, 0050), `nombre` (1–150), `zona_id → zonas_finca` (SET NULL), `ubicacion` (texto ≤ 200, 0046), `altura numeric(10,2) ≥ 0` **nullable** desde 0046, `deleted_at`; UNIQUE parcial `(productor_id, nombre) WHERE deleted_at IS NULL`; RLS 3 policies | 0038 / 0046 / 0050 |
 | `lotes_cafe.id_cliente` / `id_finca` | FKs al productor y su finca; `id_finca` pasa a NOT NULL tras el backfill (T12) | 0039 / 0041 |
 | `lotes_cafe.proceso_cafe` | Enum `Lavado / Honey / Natural / Otro` (nullable), editable en trilla y bodega. Los 5 booleanos de despulpado se conservan (paridad CBF `FR-010`) | 0039 |
 | `lotes_cafe.enproceso` | CHECK ampliado: `No`, `En Secado`, `En Trilla`, `En Bodega`, **`En Catación`**, **`Vendido`** | 0039 |
