@@ -5,6 +5,8 @@
  * para que los tres muestren exactamente los mismos datos y etiquetas.
  */
 
+import { leerJson } from "./api/http";
+
 export interface ZonaOpcion {
   id_zona: number;
   nombre: string;
@@ -30,17 +32,6 @@ export interface FincaInput {
 }
 
 const PAGE_SIZE = 100;
-
-async function leerJson<T>(res: Response): Promise<T> {
-  const cuerpo = (await res.json().catch(() => ({}))) as {
-    data?: T;
-    error?: { message?: string };
-  };
-  if (!res.ok) {
-    throw new Error(cuerpo.error?.message || `Error HTTP ${res.status}`);
-  }
-  return cuerpo.data as T;
-}
 
 /** Fincas del productor (o todas, paginadas) con cliente y zona embebidos. */
 export async function listarFincas(opts?: {
@@ -87,20 +78,14 @@ export async function obtenerFinca(idFinca: number): Promise<FincaOpcion> {
 
 export async function eliminarFinca(idFinca: number): Promise<void> {
   const res = await fetch(`/api/fincas/${idFinca}`, { method: "DELETE" });
-  if (!res.ok) {
-    const cuerpo = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-    throw new Error(cuerpo.error?.message || "No se pudo eliminar la finca");
-  }
+  await leerJson<{ deleted: boolean }>(res);
 }
 
 /** Catálogo de zonas (`zonas_finca`) para el selector de zona. */
 export async function listarZonas(): Promise<ZonaOpcion[]> {
   const res = await fetch("/api/zonas");
   if (!res.ok) return [];
-  const cuerpo = (await res.json().catch(() => ({}))) as {
-    data?: ZonaOpcion[] | { zonas?: ZonaOpcion[] };
-  };
-  const data = cuerpo.data;
+  const data = await leerJson<ZonaOpcion[] | { zonas?: ZonaOpcion[] }>(res);
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.zonas)) return data.zonas;
   return [];
