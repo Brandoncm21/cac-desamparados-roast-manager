@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ApiError, leerJson, mensajeDeError } from "../api/http";
+import { ApiError, leerJson, mensajeDeError, detalleDeError } from "../api/http";
 
 /** Respuesta mínima: evita depender de `Response` global según el entorno. */
 function respuesta(
@@ -136,6 +136,29 @@ describe("lib/api/http", () => {
     it("debería devolver un texto genérico para valores desconocidos", () => {
       expect(mensajeDeError("boom")).toBe("Error desconocido");
       expect(mensajeDeError(undefined)).toBe("Error desconocido");
+    });
+  });
+
+  describe("detalleDeError", () => {
+    it("debería concatenar los mensajes por campo", () => {
+      const error = new ApiError("Validación fallida", 422, {
+        fieldErrors: { id_cliente: ["Requerido"], servicios: ["Agregue uno"] },
+      });
+
+      expect(detalleDeError(error)).toBe("Requerido, Agregue uno");
+    });
+
+    it("debería usar los errores de formulario si no hay errores por campo", () => {
+      const error = new ApiError("Validación fallida", 422, {
+        formErrors: ["Falla general"],
+      });
+
+      expect(detalleDeError(error)).toBe("Falla general");
+    });
+
+    it("debería caer al mensaje del error cuando no hay detalles", () => {
+      expect(detalleDeError(new ApiError("No autorizado", 401))).toBe("No autorizado");
+      expect(detalleDeError(new Error("sin red"))).toBe("sin red");
     });
   });
 });

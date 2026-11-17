@@ -134,3 +134,16 @@ export function mensajeDeError(error: unknown): string {
   if (error instanceof Error) return error.message;
   return "Error desconocido";
 }
+
+/**
+ * Detalle útil para el usuario: prefiere los mensajes por campo, que son los
+ * accionables, sobre el mensaje genérico del servidor.
+ */
+export function detalleDeError(error: unknown): string {
+  if (error instanceof ApiError) {
+    const porCampo = Object.values(error.fieldErrors).flat();
+    if (porCampo.length > 0) return porCampo.join(", ");
+    if (error.formErrors.length > 0) return error.formErrors.join(", ");
+  }
+  return mensajeDeError(error);
+}
