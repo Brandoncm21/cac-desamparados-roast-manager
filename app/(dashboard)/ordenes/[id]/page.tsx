@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Thermometer, Printer, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PasosPanel } from "@/components/ordenes/pasos-panel";
+import { EstadoBadge } from "@/components/ui/estado-badge";
 import styles from "./page.module.css";
 
 const ESTADOS = ["Pendiente", "En Proceso", "Completado", "Cancelado"];
@@ -213,16 +214,6 @@ export default function OrdenDetallePage() {
     window.print();
   };
 
-  const estadoBadge = (estado: string) => {
-    const colors: Record<string, string> = {
-      Pendiente: "bg-yellow-100 text-yellow-800",
-      "En Proceso": "bg-blue-100 text-blue-800",
-      Completado: "bg-green-100 text-green-800",
-      Cancelado: "bg-red-100 text-red-800",
-    };
-    return colors[estado] || "bg-gray-100 text-gray-800";
-  };
-
   if (!orden) return <p>Cargando...</p>;
 
   const cliente = orden.clientes;
@@ -376,9 +367,7 @@ export default function OrdenDetallePage() {
         <h1 className="text-2xl font-bold">Orden #{orden.numero_factura}</h1>
         <Select value={orden.estado_orden} onValueChange={(value) => value && cambiarEstado(value)}>
           <SelectTrigger className="w-36">
-            <Badge className={estadoBadge(orden.estado_orden)}>
-              {orden.estado_orden}
-            </Badge>
+            <EstadoBadge estado={orden.estado_orden} />
           </SelectTrigger>
           <SelectContent>
             {ESTADOS.map((e) => (
@@ -413,7 +402,7 @@ export default function OrdenDetallePage() {
           <h2 className="text-3xl font-bold">SCACR</h2>
           <p className="text-muted-foreground">Centro Agrícola Cantonal de Desamparados</p>
           <p className="font-mono text-xl mt-2">Orden #{orden.numero_factura}</p>
-          <Badge className={estadoBadge(orden.estado_orden)}>{orden.estado_orden}</Badge>
+          <EstadoBadge estado={orden.estado_orden} />
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 mb-8">

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserRole, canEditOrder, type UserRole } from "@/lib/auth-helpers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { EstadoBadge } from "@/components/ui/estado-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -266,23 +266,6 @@ export function PasosPanel({ idOrden }: { idOrden: number }) {
     }
   };
 
-  const estadoBadge = (estado: EstadoPaso) => {
-    const colors: Record<string, string> = {
-      PENDIENTE: "bg-gray-100 text-gray-600",
-      EN_PROCESO: "bg-blue-100 text-blue-800",
-      COMPLETADO: "bg-green-100 text-green-800",
-      OMITIDO: "bg-orange-100 text-orange-800",
-    };
-    return colors[estado] || "bg-gray-100 text-gray-600";
-  };
-
-  const estadosLabel: Record<EstadoPaso, string> = {
-    PENDIENTE: "Pendiente",
-    EN_PROCESO: "En proceso",
-    COMPLETADO: "Completado",
-    OMITIDO: "Omitido",
-  };
-
   const puedeEjecutar = canEditOrder(userRole);
 
   if (!pasos.length && !loading) return null;
@@ -330,7 +313,7 @@ export function PasosPanel({ idOrden }: { idOrden: number }) {
                             {esTueste && <Flame className="h-4 w-4 text-amber-500 shrink-0" />}
                             {esEmpacado && <Package className="h-4 w-4 text-emerald-600 shrink-0" />}
                           </div>
-                          <Badge className={estadoBadge(paso.estado)}>{estadosLabel[paso.estado]}</Badge>
+                          <EstadoBadge estado={paso.estado} familia="paso" />
                         </div>
                       </div>
 

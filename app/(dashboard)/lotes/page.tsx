@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUserRole, canEditLote, canDeleteLote } from "@/lib/auth-helpers";
+import { resolverEstado } from "@/lib/estados";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -95,18 +96,6 @@ export default function LotesPage() {
     router.refresh();
   };
 
-  const estadoBadge = (estado: string) => {
-    const colors: Record<string, string> = {
-      No: "bg-gray-100 text-gray-800",
-      "En Secado": "bg-amber-100 text-amber-800",
-      "En Trilla": "bg-blue-100 text-blue-800",
-      "En Bodega": "bg-purple-100 text-purple-800",
-      "En Catación": "bg-orange-100 text-orange-800",
-      Vendido: "bg-green-100 text-green-800",
-    };
-    return colors[estado] || "bg-gray-100 text-gray-800";
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mt-6">
@@ -168,7 +157,7 @@ export default function LotesPage() {
                   {lote.disponible != null ? `${lote.disponible} kg` : "-"}
                 </TableCell>
                 <TableCell>
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${estadoBadge(lote.enproceso)}`}>
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${resolverEstado(lote.enproceso, "lote").className}`}>
                     {lote.vendido && lote.enproceso !== "Vendido" ? "Vendido" : lote.enproceso}
                   </span>
                 </TableCell>

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getCurrentUserRole, canEditClient, canDeleteClient } from "@/lib/auth-helpers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { EstadoBadge } from "@/components/ui/estado-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Phone, Pencil, Trash2 } from "lucide-react";
@@ -72,16 +72,6 @@ export default function ClienteDetallePage() {
     router.push("/clientes");
   };
 
-  const estadoBadge = (estado: string) => {
-    const colors: Record<string, string> = {
-      Pendiente: "bg-yellow-100 text-yellow-800",
-      "En Proceso": "bg-blue-100 text-blue-800",
-      Completado: "bg-green-100 text-green-800",
-      Cancelado: "bg-red-100 text-red-800",
-    };
-    return colors[estado] || "bg-gray-100 text-gray-800";
-  };
-
   if (!cliente) return <p>Cargando...</p>;
 
   const pendientes = cliente.historial_ordenes.filter((o) => o.estado_orden !== "Completado" && o.estado_orden !== "Cancelado");
@@ -135,10 +125,10 @@ export default function ClienteDetallePage() {
         </TabsList>
 
         <TabsContent value="pendientes" className="mt-4">
-          <OrdenesTab ordenes={pendientes} estadoBadge={estadoBadge} />
+          <OrdenesTab ordenes={pendientes} />
         </TabsContent>
         <TabsContent value="completadas" className="mt-4">
-          <OrdenesTab ordenes={completadas} estadoBadge={estadoBadge} />
+          <OrdenesTab ordenes={completadas} />
         </TabsContent>
       </Tabs>
     </div>
@@ -147,10 +137,8 @@ export default function ClienteDetallePage() {
 
 function OrdenesTab({
   ordenes,
-  estadoBadge,
 }: {
   ordenes: OrdenResumen[];
-  estadoBadge: (estado: string) => string;
 }) {
   if (ordenes.length === 0) {
     return <p className="text-muted-foreground text-center py-8">No hay órdenes en esta categoría.</p>;
@@ -176,7 +164,7 @@ function OrdenesTab({
                 </TableCell>
                 <TableCell className="break-words min-w-[120px]">{o.fecha_orden}</TableCell>
                 <TableCell className="min-w-[140px]">
-                  <Badge className={estadoBadge(o.estado_orden)}>{o.estado_orden}</Badge>
+                  <EstadoBadge estado={o.estado_orden} />
                 </TableCell>
                 <TableCell className="min-w-[80px]">
                   <Link href={`/ordenes/${o.id_orden}`}>

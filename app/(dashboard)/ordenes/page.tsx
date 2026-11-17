@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, use } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUserRole, canEditOrder, canDeleteOrder } from "@/lib/auth-helpers";
+import { resolverEstado } from "@/lib/estados";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -124,16 +125,6 @@ export default function OrdenesPage({
     router.refresh();
   };
 
-  const estadoBadge = (estado: string) => {
-    const colors: Record<string, string> = {
-      Pendiente: "bg-yellow-100 text-yellow-800",
-      "En Proceso": "bg-blue-100 text-blue-800",
-      Completado: "bg-green-100 text-green-800",
-      Cancelado: "bg-red-100 text-red-800",
-    };
-    return colors[estado] || "bg-gray-100 text-gray-800";
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mt-6">
@@ -192,7 +183,7 @@ export default function OrdenesPage({
                     onValueChange={(v) => v && cambiarEstado(orden.id_orden, v)}
                   >
                     <SelectTrigger className="w-36 h-8 text-xs">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${estadoBadge(orden.estado_orden)}`}>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${resolverEstado(orden.estado_orden, "orden").className}`}>
                         {orden.estado_orden}
                       </span>
                     </SelectTrigger>
