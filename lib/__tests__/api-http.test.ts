@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ApiError, leerJson, mensajeDeError, detalleDeError } from "../api/http";
+import { ApiError, leerJson, leerJsonPaginado, mensajeDeError, detalleDeError } from "../api/http";
 
 /** Respuesta mínima: evita depender de `Response` global según el entorno. */
 function respuesta(
@@ -159,6 +159,45 @@ describe("lib/api/http", () => {
     it("debería caer al mensaje del error cuando no hay detalles", () => {
       expect(detalleDeError(new ApiError("No autorizado", 401))).toBe("No autorizado");
       expect(detalleDeError(new Error("sin red"))).toBe("sin red");
+    });
+  });
+
+  describe("leerJsonPaginado", () => {
+    function respuestaPaginada(data: unknown, pagination: unknown, status = 200): Response {
+      return { ok: status < 400, status, json: async () => ({ data, pagination }) } as unknown as Response;
+    }
+
+    it("debería devolver los elementos y la meta de paginación", async () => {
+      const res = respuestaPaginada([{ id: 1 }, { id: 2 }], {
+        page: 1,
+        pageSize: 10,
+        total: 2,
+        totalPages: 1,
+      });
+
+      await expect(leerJsonPaginado(res)).resolves.toEqual({
+        items: [{ id: 1 }, { id: 2 }],
+        pagination: { page: 1, pageSize: 10, total: 2, totalPages: 1 },
+      });
+    });
+
+    it("debería usar valores por defecto si falta la meta", async () => {
+      const res = respuestaPaginada([], undefined);
+
+      await expect(leerJsonPaginado(res)).resolves.toEqual({
+        items: [],
+        pagination: { page: 1, pageSize: 25, total: 0, totalPages: 1 },
+      });
+    });
+
+    it("debería lanzar ApiError en una respuesta de error", async () => {
+      const res = { ok: false, status: 403, json: async () => ({ error: { message: "Sin permisos" } }) } as unknown as Response;
+
+      const error = await leerJsonPaginado(res).catch((e) => e);
+
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.status).toBe(403);
+      expect(error.message).toBe("Sin permisos");
     });
   });
 });

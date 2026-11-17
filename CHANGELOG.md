@@ -4,6 +4,15 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Changed — Catación mínima: lote + catado + notas (0048–0049)
+- **DB `0048`**: `catacion_tueste` se reduce a `id_catacion_tueste`, `id_lote`, `catado`, `notas_catacion` y auditoría (`created_at`/`updated_at`/`deleted_at`). Se retiran **49 columnas** heredadas de CBF (físico-visual, defectos C1/C2, zarandas, Agtron, `perfil_tueste_ref`, `nlote`, `ffreposo`, `pfinales`, `producto_analizado`) y se dropea la tabla `catacion_rondas`.
+- **Regla de negocio**: `id_lote` pasa a `NOT NULL` con FK `ON DELETE RESTRICT` y un índice único parcial (`WHERE deleted_at IS NULL`): una catación viva por lote. La RPC `guardar_catacion(jsonb)` hace upsert por lote y mueve el lote a `En Catación` (o lo devuelve a `No` al desmarcar).
+- **DB `0049`**: vista `v_lotes_catacion` (`security_invoker`) que devuelve lotes con su estado de catación; es la que alimenta la lista.
+- **API**: `GET /api/cataciones` ahora pagina **lotes** con filtro `estado=todos|si|no` y búsqueda por `nlote`; `POST` y `PUT` validan el schema mínimo.
+- **UI**: la lista se reemplaza por lotes con filtro rápido *Todos / Catados / No catados*; el formulario queda en lote + casilla "El lote fue catado" + notas (máx. 2000).
+- **Tipos**: `lib/schemas/catacion.ts` baja de 48 atributos + rondas a 4 campos; nuevo `lib/api/cataciones.ts`; `leerJsonPaginado()` en `lib/api/http.ts` expone la meta de paginación.
+- **Trazabilidad**: `trazabilidad-panel` lee el nuevo contrato (lote + `catado`) en lugar de `pfinales`.
+
 ### Changed — Refactor de módulos (M1–M6)
 - **M1 · Cliente HTTP único** (`lib/api/http.ts`): `ApiError` con `status`/`code`/`fieldErrors`/`formErrors`, `leerJson()` (acepta `issues` como ZodError serializado o aplanado) y `detalleDeError()` para toasts. Módulos tipados por recurso: `lib/api/{ordenes,lotes,servicios,perfiles-tueste}.ts`; `lib/fincas.ts` deja de duplicar su `leerJson`.
 - **M2 · Estados y formato** (`lib/estados.ts`, `components/ui/estado-badge.tsx`, `lib/format.ts`): una sola fuente para los mapas de estado — elimina las 4 copias de `estadoBadge()` y el prop-drilling de `clientes/[id]` hacia `OrdenesTab`. Clases Tailwind idénticas: sin cambio visual. `formatearColones/Peso/Porcentaje` unifican el marcador de ausencia.

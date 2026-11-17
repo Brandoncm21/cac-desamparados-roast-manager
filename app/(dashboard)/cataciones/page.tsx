@@ -2,44 +2,42 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Pencil, Plus, Search } from "lucide-react";
+import { toast } from "sonner";
+
 import { getCurrentUserRole } from "@/lib/auth-helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { EstadoBadge } from "@/components/ui/estado-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
-import { Plus, Search, Pencil } from "lucide-react";
-import { toast } from "sonner";
+import { detalleDeError } from "@/lib/api/http";
+import { listarLotesCatacion, type FiltroCatado, type LoteCatacion } from "@/lib/api/cataciones";
 
-interface Catacion {
-  id_catacion_tueste: number;
-  nlote: string | null;
-  pfinales: number | null;
-  ffreposo: string | null;
-  created_at: string;
-  perfiles_tueste: {
-    id_orden: number | null;
-    numero_lote: string | null;
-    nombre_cafe: string | null;
-    estado: string;
-  } | null;
-  lotes_cafe: {
-    id_lote: number;
-    nlote: string;
-    enproceso: string | null;
-    clientes: { nombre_completo: string } | null;
-    fincas: { nombre: string; altura: number | null } | null;
-  } | null;
-}
+const FILTROS: { valor: FiltroCatado; etiqueta: string }[] = [
+  { valor: "todos", etiqueta: "Todos" },
+  { valor: "si", etiqueta: "Catados" },
+  { valor: "no", etiqueta: "No catados" },
+];
 
 const can = (rol: string | null) => rol === "Tostador" || rol === "Admin";
 
+/**
+ * Lista de lotes enfocada en el estado de catación.
+ *
+ * La pregunta que responde la pantalla es "¿este lote se cató?", por eso las
+ * filas son lotes y no registros de catación.
+ */
 export default function CatacionesPage() {
-  const [cataciones, setCataciones] = useState<Catacion[]>([]);
+  const [lotes, setLotes] = useState<LoteCatacion[]>([]);
+  const [filtro, setFiltro] = useState<FiltroCatado>("todos");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,28 +48,41 @@ export default function CatacionesPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const loadCataciones = async () => {
-    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
-
-    const res = await fetch(`/api/cataciones?${params}`);
-    const result = await res.json();
-    if (!res.ok) {
-      toast.error("Error al cargar cataciones: " + (result.error?.message || "Error desconocido"));
-      return;
-    }
-    setCataciones(result.data ?? []);
-    setTotalItems(result.data?.total ?? 0);
-  };
-
-  useEffect(() => {
-    loadCataciones();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, page, pageSize]);
-
   useEffect(() => {
     getCurrentUserRole().then(setUserRole);
   }, []);
+
+  useEffect(() => {
+    let vigente = true;
+
+    const cargar = async () => {
+      try {
+        const { lotes: filas, pagination } = await listarLotesCatacion({
+          page,
+          pageSize,
+          estado: filtro,
+          search: debouncedSearch,
+        });
+        if (!vigente) return;
+        setLotes(filas);
+        setTotalItems(pagination.total);
+        setTotalPages(pagination.totalPages);
+      } catch (error) {
+        if (vigente) toast.error("Error al cargar cataciones: " + detalleDeError(error));
+      }
+    };
+
+    cargar();
+
+    return () => {
+      vigente = false;
+    };
+  }, [filtro, debouncedSearch, page, pageSize]);
+
+  const cambiarFiltro = (nuevo: FiltroCatado) => {
+    setFiltro(nuevo);
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
@@ -87,69 +98,84 @@ export default function CatacionesPage() {
         )}
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por lote..."
-          className="pl-10"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <div className="flex flex-wrap gap-2">
+          {FILTROS.map((opcion) => (
+            <Button
+              key={opcion.valor}
+              type="button"
+              size="sm"
+              variant={filtro === opcion.valor ? "default" : "outline"}
+              onClick={() => cambiarFiltro(opcion.valor)}
+            >
+              {opcion.etiqueta}
+            </Button>
+          ))}
+        </div>
+
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por lote..."
+            className="pl-10"
+            value={search}
+            onChange={(evento) => setSearch(evento.target.value)}
+          />
+        </div>
       </div>
 
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Perfil Cataado</TableHead>
               <TableHead>Lote</TableHead>
-              <TableHead>Puntaje Final</TableHead>
-              <TableHead className="hidden md:table-cell">Fecha Reposo</TableHead>
-              <TableHead className="hidden md:table-cell">Registro</TableHead>
+              <TableHead className="hidden md:table-cell">Productor</TableHead>
+              <TableHead className="hidden md:table-cell">Finca</TableHead>
+              <TableHead>Etapa</TableHead>
+              <TableHead>Catado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {cataciones.length === 0 && (
+            {lotes.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  Sin cataciones registradas. El pipeline acopio→trilla→orden→tueste alimenta esta tabla.
+                  No hay lotes para este filtro.
                 </TableCell>
               </TableRow>
             )}
-            {cataciones.map((c) => (
-              <TableRow key={c.id_catacion_tueste}>
+            {lotes.map((lote) => (
+              <TableRow key={lote.id_lote}>
+                <TableCell className="font-mono">{lote.nlote}</TableCell>
+                <TableCell className="hidden md:table-cell">{lote.cliente ?? "—"}</TableCell>
+                <TableCell className="hidden md:table-cell">{lote.finca ?? "—"}</TableCell>
                 <TableCell>
-                  {c.perfiles_tueste?.numero_lote || c.perfiles_tueste?.nombre_cafe || `Perfil #${c.perfiles_tueste?.id_orden ?? "-"}`}
+                  <EstadoBadge estado={lote.enproceso} familia="lote" />
                 </TableCell>
                 <TableCell>
-                  <div className="font-mono">{c.nlote || "-"}</div>
-                  {(c.lotes_cafe?.fincas?.nombre || c.lotes_cafe?.clientes?.nombre_completo) && (
-                    <div className="text-xs text-muted-foreground">
-                      {c.lotes_cafe?.fincas?.nombre ?? "-"} · {c.lotes_cafe?.clientes?.nombre_completo ?? "-"}
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {c.pfinales != null ? (
-                    <span className="font-semibold">{c.pfinales}</span>
+                  {lote.catado ? (
+                    <Badge className="bg-green-100 text-green-800">Sí</Badge>
                   ) : (
-                    "-"
+                    <Badge className="bg-gray-100 text-gray-800">No</Badge>
                   )}
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {c.ffreposo ? new Date(c.ffreposo).toLocaleDateString() : "-"}
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {new Date(c.created_at).toLocaleDateString()}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <Link href={`/cataciones/${c.id_catacion_tueste}`}>
-                      <Button variant="ghost" size="sm">Ver</Button>
-                    </Link>
+                    {lote.id_catacion_tueste ? (
+                      <Link href={`/cataciones/${lote.id_catacion_tueste}`}>
+                        <Button variant="ghost" size="sm">
+                          Ver
+                        </Button>
+                      </Link>
+                    ) : null}
                     {can(userRole) && (
-                      <Link href={`/cataciones/${c.id_catacion_tueste}/editar`}>
+                      <Link
+                        href={
+                          lote.id_catacion_tueste
+                            ? `/cataciones/${lote.id_catacion_tueste}/editar`
+                            : `/cataciones/nueva?lote=${lote.id_lote}`
+                        }
+                      >
                         <Button variant="outline" size="sm">
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -165,11 +191,14 @@ export default function CatacionesPage() {
 
       <Pagination
         currentPage={page}
-        totalPages={Math.ceil(totalItems / pageSize)}
+        totalPages={totalPages}
         pageSize={pageSize}
         totalItems={totalItems}
         onPageChange={setPage}
-        onPageSizeChange={setPageSize}
+        onPageSizeChange={(nuevo) => {
+          setPageSize(nuevo);
+          setPage(1);
+        }}
       />
     </div>
   );
