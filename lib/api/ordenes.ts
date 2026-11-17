@@ -67,6 +67,25 @@ export async function cambiarEstadoOrden(
   return leerJson<{ id_orden: number; estado_orden: string }>(res);
 }
 
+/**
+ * Ejecuta una transición de un paso (`iniciar`, `cerrar`, `confirmar-tueste`).
+ *
+ * El cuerpo lo arma `prepararEnvioPaso()` en `lib/services/pasos-orden.ts`.
+ */
+export async function ejecutarAccionPaso(
+  idOrden: number,
+  idPaso: number,
+  sufijo: string,
+  body: Record<string, unknown>
+): Promise<PasoOrden> {
+  const res = await fetch(`/api/ordenes/${idOrden}/pasos/${idPaso}/${sufijo}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return leerJson<PasoOrden>(res);
+}
+
 export async function eliminarOrden(idOrden: number): Promise<void> {
   const res = await fetch(`/api/ordenes/${idOrden}`, { method: "DELETE" });
   await leerJson<{ deleted: boolean }>(res);

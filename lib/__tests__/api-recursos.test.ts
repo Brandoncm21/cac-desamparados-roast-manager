@@ -5,6 +5,7 @@ import { listarServiciosActivos } from "../api/servicios";
 import {
   cambiarEstadoOrden,
   crearOrden,
+  ejecutarAccionPaso,
   eliminarOrden,
   listarPasosOrden,
 } from "../api/ordenes";
@@ -133,6 +134,29 @@ describe("lib/api/ordenes", () => {
     expect(urlLlamada()).toBe("/api/ordenes/7/estado");
     expect(initLlamada().method).toBe("PATCH");
     expect(JSON.parse(String(initLlamada().body))).toEqual({ estado_orden: "Completado" });
+  });
+
+  it("debería ejecutar una acción sobre un paso con POST", async () => {
+    fetchMock.mockResolvedValue(respuestaOk({ id_paso: 9, estado: "EN_PROCESO" }));
+
+    await ejecutarAccionPaso(7, 9, "iniciar", { peso_inicial_kg: 12.5 });
+
+    expect(urlLlamada()).toBe("/api/ordenes/7/pasos/9/iniciar");
+    expect(initLlamada().method).toBe("POST");
+    expect(initLlamada().headers).toEqual({ "Content-Type": "application/json" });
+    expect(JSON.parse(String(initLlamada().body))).toEqual({ peso_inicial_kg: 12.5 });
+  });
+
+  it("debería lanzar ApiError cuando la acción del paso es rechazada", async () => {
+    fetchMock.mockResolvedValue(
+      respuestaError({ message: "El paso no está en proceso" }, 409)
+    );
+
+    const error = await ejecutarAccionPaso(7, 9, "cerrar", {}).catch((e) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.status).toBe(409);
+    expect(error.message).toBe("El paso no está en proceso");
   });
 
   it("debería eliminar con DELETE al id correcto", async () => {
