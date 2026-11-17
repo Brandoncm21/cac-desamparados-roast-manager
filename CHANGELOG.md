@@ -4,6 +4,18 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Changed — Refactor de módulos (M1–M6)
+- **M1 · Cliente HTTP único** (`lib/api/http.ts`): `ApiError` con `status`/`code`/`fieldErrors`/`formErrors`, `leerJson()` (acepta `issues` como ZodError serializado o aplanado) y `detalleDeError()` para toasts. Módulos tipados por recurso: `lib/api/{ordenes,lotes,servicios,perfiles-tueste}.ts`; `lib/fincas.ts` deja de duplicar su `leerJson`.
+- **M2 · Estados y formato** (`lib/estados.ts`, `components/ui/estado-badge.tsx`, `lib/format.ts`): una sola fuente para los mapas de estado — elimina las 4 copias de `estadoBadge()` y el prop-drilling de `clientes/[id]` hacia `OrdenesTab`. Clases Tailwind idénticas: sin cambio visual. `formatearColones/Peso/Porcentaje` unifican el marcador de ausencia.
+- **M3 · Alta de órdenes** (670 → 105 líneas): `hooks/{useOrdenFormulario,useNuevaOrden}.ts` + 9 secciones en `components/`. La carga inicial pasa a una sola tanda paralela y el resumen de confirmación se carga con `next/dynamic`. Las reglas de `onSubmit` y del resumen salen a `lib/services/orden-validacion.ts` (puras y testeadas).
+- **M4 · Flujo de pasos** (562 → 71 líneas): `pasos/{usePasosOrden,PasoCard,DialogoPaso}`. El diálogo se monta solo con una acción activa, así que arranca limpio sin efecto de reinicio. `lib/services/pasos-orden.ts` concentra `seleccionarPasoActual`, `calcularTotalAcumulado` y `prepararEnvioPaso`; `ejecutarAccionPaso()` sustituye el `fetch` suelto.
+- **M5 · Detalle de orden** (541 → 55 líneas): `hooks/useOrdenDetalle.ts` + `components/{AccionesOrden,OrdenImprimible,SeccionTueste,ResumenTueste}`. La cascada `orden → perfil → resumen + métricas` baja de tres a dos rondas porque perfil y resumen son la misma fila: **4 → 3 peticiones** al abrir el detalle. `calcularRendimiento` y `totalServicios` pasan a `lib/services/orden-detalle.ts`.
+- **Tests**: 102 nuevos en 9 archivos (`api-http`, `api-recursos`, `fincas-client`, `estados`, `estado-badge`, `format`, `orden-validacion`, `pasos-orden`, `orden-detalle`). Suite: **200 → 302**.
+- **Docs**: `ARCHITECTURE.md` y `diagrams/system_arch.mmd` ya no citan `lib/services/orquestador.ts`, eliminado en la fusión.
+
+### Fixed — Refactor de módulos
+- **`/ordenes/[id]` · "Peso facturable" mostraba `true kg`**: `paso.peso_facturable_kg ?? paso.peso_inicial_kg != null` se evaluaba como `peso_facturable_kg ?? (peso_inicial_kg != null)`. Ahora usa `formatearPeso(peso_facturable ?? inicial)`.
+
 ### Added — Módulo de Fincas y correcciones del alta de lotes (005-fincas-crud)
 - **CRUD de Fincas** en `/fincas` (lista con búsqueda, filtro por productor y paginación), `/fincas/nueva`, `/fincas/[id]` (datos, resumen y lotes de la finca) y `/fincas/[id]/editar`; entrada **Fincas** en el sidebar.
 - **`fincas.ubicacion`** (texto libre ≤ 200) y **`altura` opcional** (0046): antes era `NOT NULL`.

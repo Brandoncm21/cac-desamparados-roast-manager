@@ -6,7 +6,7 @@ graph TB
     Browser[Browser<br/>React 19 / Next.js App Router]
     Middleware[Middleware<br/>middleware.ts<br/>Auth + Cookies + Cache-Control]
     API[API Routes<br/>app/api/**<br/>requireAuth / requireRole + Zod]
-    Services[Services<br/>lib/services/**<br/>resolver-tarifa, empacado, orquestador]
+    Services[Services<br/>lib/services/**<br/>resolver-tarifa, empacado, validacion]
     Schemas[Schemas<br/>lib/schemas/**<br/>Zod validation]
     SupabaseClient[Supabase Client<br/>lib/supabase/client.ts<br/>Browser - anon key]
     SupabaseServer[Supabase Server<br/>lib/supabase/server.ts<br/>SSR - anon key + cookies]

@@ -12,7 +12,7 @@ graph TB
     Browser[Browser - React 19 / Next.js App Router]
     Middleware[Middleware - Auth + Cookies]
     API[API Routes - requireAuth/requireRole + Zod]
-    Services[Services - resolver-tarifa, empacado, orquestador]
+    Services[Services - resolver-tarifa, empacado, validacion]
     DB[(PostgreSQL - RLS + Triggers)]
     SupabaseClient[Supabase Browser Client - anon]
     OfflineDB[(IndexedDB - idb)]
@@ -31,7 +31,7 @@ Fuente editable: [`docs/diagrams/system_arch.mmd`](./diagrams/system_arch.mmd) �
 | **Client (Browser)** | `app/(dashboard)/**`, `components/**` | Renderizado React 19, formularios con RHF+Zod, gráficos `recharts` (code-split), PDF `jspdf`/`html-to-image` bajo demanda | [`app/layout.tsx:50-72`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/layout.tsx#L50-L72), [`app/(dashboard)/tueste/[perfilId]/hooks/usePDF.ts:47`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/(dashboard)/tueste/[perfilId]/hooks/usePDF.ts#L47) |
 | **Middleware** | [`middleware.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/middleware.ts) | `createServerClient` con `applySecureCookies`; `getUser()` server-side; redirección `!auth → /login` y `auth + /login → /`; headers `Cache-Control: private, no-store` | [`middleware.ts:8-48`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/middleware.ts#L8-L48) |
 | **API Routes** | `app/api/**` (38 route files; 9 de la fusión CBF) | `withErrorHandler`, `requireAuth`/`requireRole`, validación Zod, `createClient` o `createAdminClientWithRoleCheck`; escrituras compuestas vía RPC | [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/api-helpers.ts#L57-L87), [`docs/API_REFERENCE.md`](./API_REFERENCE.md) §2.6 |
-| **Services** | `lib/services/**` | Lógica de dominio pura: `resolverTarifaPorPeso` (intervalo `[min,max)`), `calcularEmpaques` (normalización gramos→kg), `orquestador` (orden estable por `prioridad, id`) | [`lib/services/resolver-tarifa.ts:9-20`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/services/resolver-tarifa.ts#L9-L20), [`lib/services/orquestador.ts:21-25`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/services/orquestador.ts#L21-L25) |
+| **Services** | `lib/services/**` | Lógica de dominio pura: `resolverTarifaPorPeso` (intervalo `[min,max)`), `calcularEmpaques` (normalización gramos→kg), reglas del alta de orden (`orden-validacion`), del flujo de pasos (`pasos-orden`) y del detalle (`orden-detalle`) | [`lib/services/resolver-tarifa.ts:9-20`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/services/resolver-tarifa.ts#L9-L20), [`lib/services/orden-validacion.ts`](../lib/services/orden-validacion.ts), [`lib/services/pasos-orden.ts`](../lib/services/pasos-orden.ts), [`lib/services/orden-detalle.ts`](../lib/services/orden-detalle.ts) |
 | **Schemas** | `lib/schemas/**` | Contratos Zod: `crearOrdenSchema`, `crearServicioSchema` (intervalos + anti-solape), `bulkTemperaturasSchema` | [`lib/schemas/servicios-maestro.ts:12-64`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/schemas/servicios-maestro.ts#L12-L64) |
 | **Supabase** | `lib/supabase/**`, `supabase/**` | `client.ts` (browser anon), `server.ts` (SSR anon+cookies), `service-role.ts` (`server-only`, service_role), `admin.ts` (`requireRole` + service_role) | [`lib/supabase/service-role.ts:1-15`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/service-role.ts#L1-L15) |
 | **Offline** | `lib/offline/**` | IndexedDB (`idb`) para cola de temperaturas/hitos/métricas; `POST /api/sync` con `upsert` | [`lib/offline/db.ts`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/offline/db.ts), [`lib/offline/sync.ts:6-44`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/offline/sync.ts#L6-L44) |
@@ -48,7 +48,7 @@ Fuente editable: [`docs/diagrams/system_arch.mmd`](./diagrams/system_arch.mmd) �
    → si user && /login → 307 /
    → set Cache-Control: private, no-store
 3. Route Handler (ej. GET /api/ordenes): requireRole(['Admin','Recepción','Tostador']) → supabase.from('ordenes_trabajo').select() [RLS: TO authenticated USING (deleted_at IS NULL)]
-4. Services (si aplica): resolverTarifaPorPeso() / calcularEmpaques() / ordenarPorPrioridadEstable()
+4. Services (si aplica): resolverTarifaPorPeso() / calcularEmpaques() / validarOrdenParaConfirmar()
 5. Response JSON → Browser render
 ```
 
