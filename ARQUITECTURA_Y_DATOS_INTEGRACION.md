@@ -948,9 +948,13 @@ CBF cubre acopio→trilla→catación con datos ricos (48 columnas de catación,
 | Secado | `secado_lote` + series `secado_humedad`, `secado_ambiente`, `secado_temperatura`, `secado_camas` | Recepción, Admin | `POST/PUT /api/lotes/[id]/secado` | **RPC** `guardar_secado` (upsert, no replace-all — disp. 16) | detalle de lote |
 | Bodega | `bodega_lote` + puente `secado_bodega` (ex-`guardar_cafe`) | Recepción, Admin | `POST/PUT /api/lotes/[id]/bodega`; vínculos vía RPC | **RPC** `guardar_bodega` | detalle de lote |
 | Trilla | `trilla_lote` + `peso_verde_trilla` (1:1) | Recepción, Admin | `POST/PUT /api/lotes/[id]/trilla` | **RPC** `guardar_trilla` | detalle de lote |
-| Catación | `catacion_tueste` + `catacion_rondas` + `perfil_tueste_ref` (K3) | Tostador, Admin | `POST/PUT /api/cataciones` (+rondas) | **RPC** `guardar_catacion` | módulo de catación nuevo en SCACR |
+| Catación | ~~`catacion_tueste` + `catacion_rondas` + `perfil_tueste_ref` (K3)~~ → desde `0048`/`0052`: `catacion_tueste` 1:1 con el lote (`catado`, `notas_catacion`); `catacion_rondas` eliminada | Tostador, Admin | `PUT /api/recibido/[id]/catacion` | **RPC** `guardar_catacion(jsonb)` | `/beneficio/catacion` |
 
 Notas de porteo: (1) el nombre de las tablas nuevas es **propuesta** — la decisión fina de nomenclatura corresponde al diseño del feature de fusión; (2) cada tabla nueva hereda `created_at/updated_at` (trigger) y soft-delete donde aplique (regla 4); (3) todas las FK al lote usan `id_lote` interno, manteniendo `nlote` como campo de negocio; (4) `enproceso`/`vendido` de CBF se derivan del pipeline (§4.7), no se portan como columnas independientes.
+
+> **Superado por el pivote `0050`–`0053`:** el acopio vive ahora en `/beneficio/recibido` y `/api/recibido/**`;
+> `lotes_cafe` se rediseñó (nace en Recibido, cuelga de `productores`) y `catacion_rondas` fue eliminada.
+> Ver `docs/DB_SCHEMA.md` §3quinquies y `docs/ARCHITECTURE.md` §4.4bis.
 
 ## 4.5 Catálogo de APIs CafeTrack (47 handlers / 29 archivos) y contrato comparado
 
