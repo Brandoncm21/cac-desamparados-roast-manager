@@ -37,6 +37,33 @@ export function apiValidationError(errors: ZodError | ZodFlattenedError) {
   );
 }
 
+/**
+ * Traduce SQLSTATE de Postgres/PostgREST al status HTTP del contrato.
+ * Las RPCs del flujo de beneficio usan 42501 (rol), P0002 (no existe),
+ * 22023 (payload inválido) y 55000 (estado no permite la operación).
+ */
+export function statusDeCodigoPg(code?: string): number {
+  switch (code) {
+    case "42501":
+      return 403;
+    case "P0002":
+      return 404;
+    case "22023":
+      return 422;
+    case "55000":
+      return 409;
+    case "23505":
+    case "23P01":
+      return 409;
+    case "23503":
+      return 400;
+    case "23514":
+      return 422;
+    default:
+      return 500;
+  }
+}
+
 export function withErrorHandler<
   H extends (req: NextRequest, ...args: any[]) => Promise<NextResponse>
 >(handler: H): H {

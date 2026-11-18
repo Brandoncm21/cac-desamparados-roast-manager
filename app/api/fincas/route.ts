@@ -17,24 +17,32 @@ async function get(request: NextRequest) {
   const to = page * pageSize - 1;
   const busqueda = sanitizarBusqueda(searchParams.get("search"));
 
-  // Filtro opcional por cliente (para el combobox productor → fincas).
-  const clienteIdRaw = searchParams.get("cliente_id");
-  let clienteId: number | null = null;
-  if (clienteIdRaw) {
-    const parsed = Number(clienteIdRaw);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      return apiError("cliente_id inválido", 422);
-    }
-    clienteId = parsed;
-  }
+  // Filtros opcionales: `productor_id` (flujo Beneficiado) o `cliente_id`
+  // (flujo legacy de órdenes, retirado en F5).
+  const enteroPositivo = (clave: string): number | null => {
+    const raw = searchParams.get(clave);
+    if (!raw) return null;
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed <= 0) return Number.NaN;
+    return parsed;
+  };
+
+  const productorId = enteroPositivo("productor_id");
+  const clienteId = enteroPositivo("cliente_id");
+
+  if (Number.isNaN(productorId)) return apiError("productor_id inválido", 422);
+  if (Number.isNaN(clienteId)) return apiError("cliente_id inválido", 422);
 
   let query = supabase
     .from("fincas")
-    .select("*, clientes(nombre_completo), zonas_finca(nombre)", { count: "exact" })
+    .select("*, clientes(nombre_completo), productores(nombre_completo), zonas_finca(nombre)", {
+      count: "exact",
+    })
     .is("deleted_at", null)
     .order("nombre")
     .range(from, to);
 
+  if (productorId) query = query.eq("productor_id", productorId);
   if (clienteId) query = query.eq("cliente_id", clienteId);
   if (busqueda) query = query.ilike("nombre", `%${busqueda}%`);
 

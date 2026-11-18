@@ -8,17 +8,27 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Users, FileText, Flame, BarChart3, LogOut, Coffee, Menu, X, Plus,
-  Package, Box, Boxes, CupSoda, MapPin,
+  Package, Box, Boxes, CupSoda, MapPin, FlaskConical, Sun, Warehouse, ChevronDown,
 } from "lucide-react";
 import { getCurrentUserRole, type UserRole } from "@/lib/auth-helpers";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/ordenes", label: "Órdenes", icon: FileText },
-  { href: "/lotes", label: "Lotes", icon: Boxes },
+];
+
+const beneficioNavItems = [
+  { href: "/beneficio/recibido", label: "Recibido de Café", icon: Package },
+  { href: "/beneficio/caracterizacion", label: "Caracterización", icon: FlaskConical },
+  { href: "/beneficio/secado", label: "Secado", icon: Sun },
+  { href: "/beneficio/bodegaje", label: "Bodegaje", icon: Warehouse },
+  { href: "/beneficio/trilla", label: "Trilla", icon: Boxes },
+  { href: "/beneficio/catacion", label: "Catación", icon: CupSoda },
   { href: "/fincas", label: "Fincas", icon: MapPin },
+];
+
+const navItemsFinales = [
   { href: "/tueste", label: "Tueste", icon: Flame },
-  { href: "/cataciones", label: "Catación", icon: CupSoda },
   { href: "/clientes", label: "Clientes", icon: Users },
   { href: "/reportes", label: "Reportes", icon: BarChart3 },
 ];
@@ -34,6 +44,7 @@ export function Sidebar() {
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [beneficioAbierto, setBeneficioAbierto] = useState(true);
 
   useEffect(() => {
     getCurrentUserRole().then(setUserRole);
@@ -56,6 +67,20 @@ export function Sidebar() {
     router.push("/login");
     router.refresh();
   };
+
+  const esActivo = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
+
+  const claseEnlace = (activo: boolean) =>
+    cn(
+      "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all min-h-[48px] active:scale-95",
+      activo
+        ? "bg-secondary-container text-on-secondary-container"
+        : "text-muted-foreground hover:bg-surface-container-high hover:text-on-surface"
+    );
+
+  const beneficioActivo = beneficioNavItems.some((item) => esActivo(item.href));
+  const beneficioVisible = beneficioAbierto || beneficioActivo;
 
   return (
     <>
@@ -100,18 +125,61 @@ export function Sidebar() {
         <nav className="flex-1 space-y-1 px-4 py-4 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all min-h-[48px] active:scale-95",
-                  isActive
-                    ? "bg-secondary-container text-on-secondary-container"
-                    : "text-muted-foreground hover:bg-surface-container-high hover:text-on-surface"
-                )}
-              >
+              <Link key={item.href} href={item.href} className={claseEnlace(esActivo(item.href))}>
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            );
+          })}
+
+          {/* Grupo Beneficiado / Acopio */}
+          <button
+            type="button"
+            onClick={() => setBeneficioAbierto((prev) => !prev)}
+            aria-expanded={beneficioVisible}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all min-h-[48px] active:scale-95",
+              beneficioActivo && !beneficioAbierto
+                ? "bg-secondary-container text-on-secondary-container"
+                : "text-muted-foreground hover:bg-surface-container-high hover:text-on-surface"
+            )}
+          >
+            <Coffee className="h-5 w-5 shrink-0" />
+            <span className="truncate">Beneficiado / Acopio</span>
+            <ChevronDown
+              className={cn(
+                "ml-auto h-4 w-4 shrink-0 transition-transform",
+                beneficioVisible ? "rotate-0" : "-rotate-90"
+              )}
+            />
+          </button>
+
+          {beneficioVisible && (
+            <div className="space-y-1 pl-3">
+              {beneficioNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      claseEnlace(esActivo(item.href)),
+                      "py-2.5 min-h-[42px] text-[13px]"
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {navItemsFinales.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} className={claseEnlace(esActivo(item.href))}>
                 <Icon className="h-5 w-5 shrink-0" />
                 <span className="truncate">{item.label}</span>
               </Link>
@@ -125,17 +193,11 @@ export function Sidebar() {
               </div>
               {adminNavItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all min-h-[48px] active:scale-95",
-                      isActive
-                        ? "bg-secondary-container text-on-secondary-container"
-                        : "text-muted-foreground hover:bg-surface-container-high hover:text-on-surface"
-                    )}
+                    className={claseEnlace(esActivo(item.href))}
                   >
                     <Icon className="h-5 w-5 shrink-0" />
                     <span className="truncate">{item.label}</span>

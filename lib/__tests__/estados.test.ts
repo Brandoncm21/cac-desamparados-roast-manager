@@ -66,9 +66,19 @@ describe("lib/estados", () => {
       );
     });
 
-    it("debería conservar los seis estados de lote del dominio", () => {
+    it("debería cubrir los estados de lote del flujo Beneficiado (005)", () => {
       expect(Object.keys(ESTADOS_LOTE).sort()).toEqual(
-        ["En Bodega", "En Catación", "En Secado", "En Trilla", "No", "Vendido"].sort()
+        [
+          "No",
+          "Recibido",
+          "En Caracterización",
+          "En Secado",
+          "En Bodega",
+          "En Trilla",
+          "En Catación",
+          "Catado",
+          "Vendido",
+        ].sort()
       );
     });
 
