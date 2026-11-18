@@ -106,6 +106,10 @@ Tablas CBF portadas → sus consumidores actuales (a verificar antes de cualquie
 | `orden_pasos` | `app/api/ordenes/**` | `cerrar_paso_orden`, `confirmar_tueste_paso` | `iniciarPaso`, `cerrar*`, `confirmarTueste` | — |
 | `ordenes_trabajo` | `app/api/ordenes/**` | `crear_orden_completa` | `crearOrdenSchema` | — |
 
+> **Superado por el pivote `0050`–`0053`:** las rutas de lote son ahora `app/api/recibido/**`
+> (`/api/lotes/**` y `/api/cataciones/**` fueron retiradas), `catacion_rondas` ya no existe y
+> `catacion_tueste` es 1:1 con el lote (`catado`, `notas_catacion`). Ver `docs/DB_SCHEMA.md` §3quinquies.
+
 **Regla de seguridad antes de cada DDL:** la tabla afectada se busca por nombre **y por columna**
 en `app/`, `lib/`, `supabase/migrations/` y `specs/`; si aparece en una ruta API, se valida su Zod;
 si aparece en `lib/offline/`, se valida que el store de IndexedDB no espere la columna.

@@ -68,8 +68,8 @@ Portado desde CoffeeBeanFlow (CBF, ASP.NET Core + EF Core, 19 entidades). Las ta
 | `secado_bodega` | N:M secado↔bodega | `(id_secado, id_bodega)` | `cantidad_sacos` (validación de pertenencia en RPC) | 0030 |
 | `trilla_lote` | Trilla (rendimientos y clasificación) | `id_trilla` | `hinicial/hfinal`, `rfinal_*`, `rteorico_*`, `wverde_teorico/final`, 9 porcentajes (`psegundas`…`pinferiores`), `ffinal_reposo`, `deleted_at` | 0031 |
 | `peso_verde_trilla` | 1:1 con trilla (peso verde) | `id_trilla` | `winferiores`, `wfinal`, `wfinal_inferiores`, `deleted_at` (toggle off ⇒ soft-delete) | 0031 |
-| `catacion_tueste` | Catación (48 atributos del snapshot real de CBF) | `id_catacion_tueste` | `pfinales`, `rtostado` (rendimiento), `dfueste` (g/ml), `nlote`, `id_lote`, **K3** `perfil_tueste_ref → perfiles_tueste(public_id)`, defectos `c1*`/`c2*`, `tonagton_*`, `deleted_at` | 0032 |
-| `catacion_rondas` | Rondas de catación (solo calidad) | `id_catacion_ronda` | `catacion_id`, `valor_calidad` (0–100), `deleted_at` | 0032 |
+| `catacion_tueste` | ~~Catación con los 48 atributos de CBF~~ → **reducida en 0048** a `id_catacion_tueste`, `id_lote` (NOT NULL), `catado`, `notas_catacion` y auditoría. Modelo vigente en §3quinquies | `id_catacion_tueste` | `id_lote`, `catado`, `notas_catacion`, `deleted_at` | 0032 → 0048 / 0052 |
+| `catacion_rondas` | ~~Rondas de calidad~~ → **tabla eliminada en 0048** junto con los 48 atributos | — | — | 0032 → 0048 (DROP) |
 
 **RPCs de la fusión** (todas `SECURITY INVOKER`, `EXECUTE` solo `authenticated`, rol verificado con `get_empleado_rol()`):
 
@@ -81,14 +81,15 @@ Portado desde CoffeeBeanFlow (CBF, ASP.NET Core + EF Core, 19 entidades). Las ta
 | `upsert_serie_camas` | `(p_id_secado int, p_items jsonb) → void` | helper interno |
 | `guardar_bodega` | `(p_id_lote int, p_bodega jsonb, p_secados_guardados jsonb DEFAULT NULL) → jsonb` | bodega + N:M |
 | `guardar_trilla` | `(p_id_lote int, p_trilla jsonb) → jsonb` | trilla + peso verde 1:1 |
-| `guardar_catacion` | `(p_catacion jsonb, p_rondas jsonb DEFAULT NULL) → jsonb` | catación + rondas; autoderiva `nlote` vía K1 y, desde 0042, vía `orden_lotes` (ver 3quater); exige perfil `Completado` **solo si** se envía `perfil_tueste_ref` |
+| `guardar_catacion` | `(p_catacion jsonb, p_rondas jsonb DEFAULT NULL) → jsonb` | ~~catación + rondas~~; **vigente desde 0048: `(p_catacion jsonb)` — upsert por lote, sin rondas ni `perfil_tueste_ref`** (§3quinquies) |
 | `crear_orden_desde_trilla` | `(p_id_trilla int) → jsonb` | **e1**: trilla → orden + 7 `orden_pasos` + K1; idempotente (K5 `reused:true`), K4 concilia productor→cliente |
 
 > `lotes_cafe` se crea/edita por inserción directa vía API (no hay `guardar_lote`); RLS restringe la escritura a `Admin/Recepción`.
 
-**Conectores:** K1 `orden_lotes_externos` (hasta 0043; desde 0044 el puente es `orden_lotes`, por id) · K2 `public_id` en `ordenes_trabajo`/`perfiles_tueste`/`clientes` · K3 `catacion_tueste.perfil_tueste_ref` · K4 `clientes.external_ref` (resuelto por `lotes_cafe.id_cliente` desde 0039).
+**Conectores:** K1 `orden_lotes` (por id; `orden_lotes_externos` existió hasta 0044) · K2 `public_id` en `ordenes_trabajo`/`perfiles_tueste`/`clientes`/`productores` · ~~K3 `catacion_tueste.perfil_tueste_ref`~~ **eliminado en 0048** · K4 `productores.external_ref` (antes `clientes.external_ref`, resuelto por `lotes_cafe.id_cliente` hasta 0051; hoy por `lotes_cafe.productor_id`).
 
 **Índices nuevos:** `idx_lotes_nlote_trgm`, `idx_lotes_activos_fecha`, `idx_lotes_enproceso`, `idx_ole_origen_nlote` (eliminado con su tabla en 0044), `idx_caracterizacion_lote_idx`, `idx_caracterizacion_rc_caract`, `idx_secado_lote_idx`, `idx_secado_humedad_idx`, `idx_secado_ambiente_idx`, `idx_secado_temperatura_idx`, `idx_secado_camas_idx`, `idx_bodega_lote_idx`, `idx_secado_bodega_bodega`, `idx_trilla_lote_idx`, `idx_trilla_pesos_verdes`, `idx_catacion_ref`, `idx_catacion_lote`, `idx_catacion_nlote`, `idx_catacion_rondas_idx`. Nota: `idx_lotes_nproductor_trgm` se eliminó junto con la columna en 0044 y su equivalente para el combobox es `idx_fincas_nombre_trgm`.
+> **Vigencia:** de esta lista sobreviven los índices de las tablas 1:1 del flujo (caracterización, secado, bodega, trilla). Los de `lotes_cafe` y catación se recrearon en `0052`; `idx_catacion_rondas_idx` desapareció con su tabla en `0048` e `idx_catacion_ref`/`idx_catacion_nlote` con `perfil_tueste_ref`/`nlote`.
 
 ## 3quater. Refactor del flujo de lotes (0033–0043, rama `feat/flujo-lotes`)
 

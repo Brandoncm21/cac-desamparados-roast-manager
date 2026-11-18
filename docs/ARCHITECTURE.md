@@ -102,6 +102,10 @@ Respuesta {data: {accepted: [{tempId, recordId}], rejected: [{tempId, code, mess
 
 ### 4.4 Pipeline de fusión CBF (0026–0032, rama `002-fusion-cbf`)
 
+> ⚠️ **Sección histórica.** Describe cómo se cableó la fusión CBF en esa rama. El estado vigente
+> del flujo (pivote Beneficiado/Acopio, migraciones `0048`–`0053`) está en **§4.4bis**. En particular
+> ya no existen `app/(dashboard)/lotes/**`, `app/api/lotes/**`, `catacion_rondas` ni el conector K3.
+
 Módulos portados de CoffeeBeanFlow y su conexión con el flujo de producción de CafeTrack:
 
 ```text
@@ -124,6 +128,32 @@ ordenes_trabajo (+ id_finca, 7 orden_pasos) ── perfiles_tueste (K2 public_id
 - **API:** `app/api/lotes/**` (lote + 4 etapas + e1) y `app/api/cataciones/**`; esquemas en `lib/schemas/lotes.ts|etapas.ts|catacion.ts`.
 - **Atomicidad:** `guardar_caracterizacion|secado|bodega|trilla|catacion` + `crear_orden_desde_trilla` (`SECURITY INVOKER`, `EXECUTE` solo `authenticated`); upsert por id y soft-delete dirigido — sin `replace-all`.
 - **Conectores:** K1 `orden_lotes` (por id, desde 0040/0044), K2 `public_id`, K3 `catacion_tueste.perfil_tueste_ref`, K4 resuelto por `lotes_cafe.id_cliente`; detalle en [`ARQUITECTURA_Y_DATOS_INTEGRACION.md`](../ARQUITECTURA_Y_DATOS_INTEGRACION.md) §4.3 y §4.7, y en [`DB_SCHEMA.md`](./DB_SCHEMA.md) §3quater.
+
+### 4.4bis Flujo vigente: Beneficiado / Acopio (0050–0053)
+
+El lote **nace en Recibido de Café** y cuelga de un **productor** (entidad separada de `clientes`).
+`clientes` queda confinado al flujo de Órdenes.
+
+```text
+productores ── fincas (0050: fincas.productor_id)
+     │
+     └── lotes_cafe (0052: numero_lote, numero_recibo, varietal, cajuelas,
+                     % flote/broca/vano/verde/secos, ph_miel, proceso,
+                     enproceso: Recibido → En Caracterización → En Secado
+                     → En Bodega → En Trilla → Catado → Vendido)
+             │
+             ├── caracterizacion_lote  (1:1, 0052)
+             ├── secado_lote + 4 series (1:1, 0052)
+             ├── bodega_lote           (1:1, 0052)
+             ├── trilla_lote + peso verde (1:1, 0052)
+             ├── catacion_tueste       (1:1, 0048/0052: catado + notas)
+             └── orden_lotes           (N:M sin peso_kg, 0052)
+```
+
+- **UI:** `app/(dashboard)/beneficio/{recibido,caracterizacion,secado,bodegaje,trilla,catacion,calificacion}/**`; grupo colapsable *Beneficiado / Acopio* en el sidebar. `/lotes/**` redirige a `/beneficio/recibido`.
+- **API:** `app/api/recibido/**` (lote + las 5 etapas), `app/api/productores`, `app/api/fincas`. **Retiradas** `/api/lotes/**` y `/api/cataciones/**`.
+- **RPCs:** `guardar_caracterizacion|secado|bodega|trilla` (`SECURITY INVOKER`) y `guardar_catacion(jsonb)` (`SECURITY DEFINER` con chequeo de rol); helpers `_ben_*` y avance de estado solo hacia adelante.
+- **Conectores:** K1 `orden_lotes` · K2 `public_id` (incl. `productores.public_id`, heredado de `clientes` al separar las entidades) · ~~K3 `perfil_tueste_ref`~~ **eliminado en 0048** · K4 `productores.external_ref`, resuelto por `lotes_cafe.productor_id`.
 
 ### 4.5 Hidratación y Cookies
 - **Hidratación:** script inline en [`app/layout.tsx:50-72`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/app/layout.tsx#L50-L72) elimina `bis_skin_checked` (extensión Bitdefender) con `MutationObserver({attributes:true, attributeFilter:["bis_skin_checked"]})`.
