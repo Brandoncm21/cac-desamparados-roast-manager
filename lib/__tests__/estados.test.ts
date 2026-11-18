@@ -18,9 +18,20 @@ describe("lib/estados", () => {
     });
 
     it("debería resolver un estado de lote", () => {
+      expect(resolverEstado("Catado", "lote")).toEqual({
+        label: "Catado",
+        className: "bg-orange-100 text-orange-800",
+      });
+    });
+
+    it("debería caer al neutro con los estados retirados del flujo viejo", () => {
       expect(resolverEstado("En Catación", "lote")).toEqual({
         label: "En Catación",
-        className: "bg-orange-100 text-orange-800",
+        className: NEUTRO.className,
+      });
+      expect(resolverEstado("No", "lote")).toEqual({
+        label: "No",
+        className: NEUTRO.className,
       });
     });
 
@@ -69,13 +80,11 @@ describe("lib/estados", () => {
     it("debería cubrir los estados de lote del flujo Beneficiado (005)", () => {
       expect(Object.keys(ESTADOS_LOTE).sort()).toEqual(
         [
-          "No",
           "Recibido",
           "En Caracterización",
           "En Secado",
           "En Bodega",
           "En Trilla",
-          "En Catación",
           "Catado",
           "Vendido",
         ].sort()
