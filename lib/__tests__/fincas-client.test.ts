@@ -7,8 +7,8 @@ import {
   listarFincas,
   listarZonas,
   obtenerFinca,
-  opcionesCliente,
   opcionesFinca,
+  opcionesProductor,
 } from "../fincas";
 
 function respuestaOk(data: unknown, status = 200): Response {
@@ -41,12 +41,12 @@ afterEach(() => {
 });
 
 describe("lib/fincas · transporte", () => {
-  it("debería listar fincas de un cliente con búsqueda normalizada", async () => {
+  it("debería listar fincas de un productor con búsqueda normalizada", async () => {
     fetchMock.mockResolvedValue(respuestaOk([{ id_finca: 1, nombre: "El Roble" }]));
 
-    const fincas = await listarFincas({ clienteId: 3, search: "  roble  ", pageSize: 50 });
+    const fincas = await listarFincas({ productorId: 3, search: "  roble  ", pageSize: 50 });
 
-    expect(urlLlamada()).toBe("/api/fincas?page=1&pageSize=50&cliente_id=3&search=roble");
+    expect(urlLlamada()).toBe("/api/fincas?page=1&pageSize=50&productor_id=3&search=roble");
     expect(fincas).toEqual([{ id_finca: 1, nombre: "El Roble" }]);
   });
 
@@ -61,12 +61,12 @@ describe("lib/fincas · transporte", () => {
   it("debería crear una finca con POST y cuerpo JSON", async () => {
     fetchMock.mockResolvedValue(respuestaOk({ id_finca: 9 }, 201));
 
-    await crearFinca({ cliente_id: 2, nombre: "La Loma", altura: 1200 });
+    await crearFinca({ productor_id: 2, nombre: "La Loma", altura: 1200 });
 
     expect(urlLlamada()).toBe("/api/fincas");
     expect(initLlamada().method).toBe("POST");
     expect(JSON.parse(String(initLlamada().body))).toEqual({
-      cliente_id: 2,
+      productor_id: 2,
       nombre: "La Loma",
       altura: 1200,
     });
@@ -143,10 +143,10 @@ describe("lib/fincas · presentación", () => {
     expect(etiquetaFinca({ nombre: "El Roble", altura: null, zonas_finca: null })).toBe("El Roble");
   });
 
-  it("debería mapear fincas y clientes a opciones de Select", () => {
-    const fincas = [{ id_finca: 7, cliente_id: 1, nombre: "La Loma", altura: null }];
+  it("debería mapear fincas y productores a opciones de Select", () => {
+    const fincas = [{ id_finca: 7, productor_id: 1, nombre: "La Loma", altura: null }];
     expect(opcionesFinca(fincas)).toEqual([{ value: "7", label: "La Loma" }]);
-    expect(opcionesCliente([{ id_cliente: 1, nombre_completo: "Ana" }])).toEqual([
+    expect(opcionesProductor([{ id_productor: 1, nombre_completo: "Ana" }])).toEqual([
       { value: "1", label: "Ana" },
     ]);
   });

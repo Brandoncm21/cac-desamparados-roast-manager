@@ -99,7 +99,7 @@ Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/sp
 | Objeto | Cambio | Migración |
 |---|---|---|
 | `productores` | **Tabla nueva (0050)**: entidad independiente del flujo de Beneficiado. `id_productor`, `nombre_completo`, `telefono`, `fecha_registro`, `public_id` (conserva el del cliente de origen como conector K2), `external_ref`, `deleted_at`; RLS 3 policies (select `deleted_at IS NULL`, insert/update `Recepción`/`Admin`) | 0050 |
-| `fincas` | **Tabla nueva**: `id_finca`, `cliente_id → clientes` (RESTRICT, **deprecado** desde 0050), `productor_id → productores` (RESTRICT, 0050), `nombre` (1–150), `zona_id → zonas_finca` (SET NULL), `ubicacion` (texto ≤ 200, 0046), `altura numeric(10,2) ≥ 0` **nullable** desde 0046, `deleted_at`; UNIQUE parcial `(productor_id, nombre) WHERE deleted_at IS NULL`; RLS 3 policies | 0038 / 0046 / 0050 |
+| `fincas` | **Tabla nueva**: `id_finca`, `cliente_id → clientes` (RESTRICT, **deprecado** desde 0050 y **eliminado en 0053**), `productor_id → productores` (RESTRICT, 0050), `nombre` (1–150), `zona_id → zonas_finca` (SET NULL), `ubicacion` (texto ≤ 200, 0046), `altura numeric(10,2) ≥ 0` **nullable** desde 0046, `deleted_at`; UNIQUE parcial `(productor_id, nombre) WHERE deleted_at IS NULL`; RLS 3 policies | 0038 / 0046 / 0050 / 0053 |
 | `lotes_cafe.id_cliente` / `id_finca` | FKs al productor y su finca; `id_finca` pasa a NOT NULL tras el backfill (T12) | 0039 / 0041 |
 | `lotes_cafe.proceso_cafe` | Enum `Lavado / Honey / Natural / Otro` (nullable), editable en trilla y bodega. Los 5 booleanos de despulpado se conservan (paridad CBF `FR-010`) | 0039 |
 | `lotes_cafe.enproceso` | CHECK ampliado: `No`, `En Secado`, `En Trilla`, `En Bodega`, **`En Catación`**, **`Vendido`** | 0039 |
@@ -128,6 +128,24 @@ Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/sp
 > **Eliminado en `0044`** (T12): `lotes_cafe.nproductor`, `nfinca`, `zona`, `altura`,
 > `ordenes_trabajo.zona_finca`, `clientes.zona_procedencia` y la tabla `orden_lotes_externos`.
 > El esquema queda **solo por `id`**; la altura vive únicamente en `fincas.altura` (D8).
+
+## 3quinquies. Beneficiado / Acopio (0050–0053, rama `feat/005-beneficiado-acopio`)
+
+Pivote del dominio: el lote nace en **Recibido de Café**, los productores dejan de ser clientes y las fincas cuelgan del productor. `0051` eliminó las vistas/funciones legacy y `DROP TABLE lotes_cafe`; `0053` eliminó `fincas.cliente_id`.
+
+| Objeto | Cambio | Migración |
+|---|---|---|
+| `productores` | Tabla propia (`id_productor`, `nombre_completo`, `telefono`, `public_id`, `external_ref`, `deleted_at`); 6 filas migradas desde `clientes` conservando `public_id` (conector K2) | 0050 |
+| `fincas.productor_id` | FK `RESTRICT`; 8 fincas backfilled; `cliente_id` eliminada | 0050 / 0053 |
+| `lotes_cafe` | **Rediseñada**: `public_id uuid UNIQUE`, `numero_lote` UNIQUE, `numero_recibo`, `factura`, `productor_id`/`finca_id` FK `RESTRICT`, `varietal`, `cajuelas`/`cuartillos`, `% flote/broca/vano/verde/secos`, `ph_miel numeric(4,2)`, `puro_impuro`/`limpio_sucio`, `rango_objetivo`/`rango_sobre_objetivo`/`rango`, `proceso` CHECK `Lavado/Honey/Natural/Otro`, `enproceso` CHECK `Recibido/En Caracterización/En Secado/En Bodega/En Trilla/Catado/Vendido`, `disponible`/`vendido`, `fecha_recibido timestamptz NOT NULL DEFAULT now()`, `deleted_at`; `CHECK NOT (vendido AND disponible)` | 0052 |
+| `caracterizacion_lote`, `secado_lote`, `bodega_lote`, `trilla_lote` | 1:1 con el lote (`id_lote` FK `RESTRICT`); UNIQUE parcial `(id_lote) WHERE deleted_at IS NULL`; RLS 3 políticas + trigger `update_updated_at()` | 0052 |
+| `catacion_tueste` | 1:1 con el lote; `catado bool`, `notas_catacion text` | 0052 |
+| `orden_lotes` | Recreada **sin `peso_kg`**: `(id_orden_lote, id_orden, id_lote, created_at, deleted_at)` | 0052 |
+| RPCs | `guardar_caracterizacion`, `guardar_secado`, `guardar_bodega`, `guardar_trilla` (`SECURITY INVOKER`), `guardar_catacion` (`SECURITY DEFINER` + chequeo de rol); helpers `_ben_text/_num/_int/_date/_ts/_bool/_avanzar/_lote_editable`; sólo avanzan el estado hacia adelante | 0052b |
+| Hardening | `SET search_path`, `REVOKE` a `anon`, RLS en las 7 tablas | 0052c |
+| Legacy | `0051` elimina `v_lotes_catacion`, 8 funciones y `lotes_cafe`; 10 tablas huérfanas (hijas del CASCADE) borradas explícitamente | 0051 |
+
+> **Nota PostgreSQL:** `DROP TABLE ... CASCADE` no elimina tablas hijas; por eso `0051` las borra de forma explícita.
 
 ## 4. Row Level Security (RLS)
 

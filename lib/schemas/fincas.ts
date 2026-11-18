@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-/** Finca de un productor (cliente). `zona` es el catálogo `zonas_finca`; `ubicacion` es texto libre. */
+/** Finca de un productor. `zona` es el catálogo `zonas_finca`; `ubicacion` es texto libre. */
 export const crearFincaSchema = z.object({
-  cliente_id: z.number().int().positive("El cliente es obligatorio"),
+  productor_id: z.number().int().positive("El productor es obligatorio"),
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(150),
   zona_id: z.number().int().positive().nullable().optional(),
   ubicacion: z.string().trim().max(200).optional().nullable().or(z.literal("")),

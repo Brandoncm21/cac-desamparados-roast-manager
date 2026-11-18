@@ -13,21 +13,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Pagination } from "@/components/ui/pagination";
 import { Plus, Search, Pencil, Trash2, Mountain, MapPin } from "lucide-react";
 import { toast } from "sonner";
-import { eliminarFinca, type FincaOpcion } from "@/lib/fincas";
-
-interface ClienteOpcion {
-  id_cliente: number;
-  nombre_completo: string;
-}
+import { eliminarFinca, opcionesProductor, type FincaOpcion } from "@/lib/fincas";
+import { listarProductores, type ProductorResumen } from "@/lib/api/beneficio";
 
 const TODOS = "__todos__";
 
 export default function FincasPage() {
   const [fincas, setFincas] = useState<FincaOpcion[]>([]);
-  const [clientes, setClientes] = useState<ClienteOpcion[]>([]);
+  const [productores, setProductores] = useState<ProductorResumen[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [clienteFiltro, setClienteFiltro] = useState<number | null>(null);
+  const [productorFiltro, setProductorFiltro] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
@@ -37,9 +33,8 @@ export default function FincasPage() {
 
   useEffect(() => {
     getCurrentUserRole().then(setUserRole);
-    fetch("/api/clientes?pageSize=100&page=1")
-      .then((r) => r.json())
-      .then((j) => setClientes(j.data ?? []))
+    listarProductores()
+      .then(setProductores)
       .catch(() => undefined);
   }, []);
 
@@ -54,7 +49,7 @@ export default function FincasPage() {
   const cargar = useCallback(async () => {
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
-    if (clienteFiltro) params.set("cliente_id", String(clienteFiltro));
+    if (productorFiltro) params.set("productor_id", String(productorFiltro));
 
     const res = await fetch(`/api/fincas?${params}`);
     const result = await res.json();
@@ -64,7 +59,7 @@ export default function FincasPage() {
     }
     setFincas(result.data ?? []);
     setTotalItems(result.pagination?.total ?? 0);
-  }, [debouncedSearch, clienteFiltro, page, pageSize]);
+  }, [debouncedSearch, productorFiltro, page, pageSize]);
 
   useEffect(() => {
     cargar();
@@ -112,13 +107,10 @@ export default function FincasPage() {
         </div>
         <div className="sm:w-64">
           <Select
-            items={[
-              { value: TODOS, label: "Todos los productores" },
-              ...clientes.map((c) => ({ value: String(c.id_cliente), label: c.nombre_completo })),
-            ]}
-            value={clienteFiltro ? String(clienteFiltro) : TODOS}
+            items={[{ value: TODOS, label: "Todos los productores" }, ...opcionesProductor(productores)]}
+            value={productorFiltro ? String(productorFiltro) : TODOS}
             onValueChange={(v) => {
-              setClienteFiltro(v && v !== TODOS ? Number(v) : null);
+              setProductorFiltro(v && v !== TODOS ? Number(v) : null);
               setPage(1);
             }}
           >
@@ -127,9 +119,9 @@ export default function FincasPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={TODOS}>Todos los productores</SelectItem>
-              {clientes.map((c) => (
-                <SelectItem key={c.id_cliente} value={String(c.id_cliente)}>
-                  {c.nombre_completo}
+              {productores.map((p) => (
+                <SelectItem key={p.id_productor} value={String(p.id_productor)}>
+                  {p.nombre_completo}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -165,7 +157,7 @@ export default function FincasPage() {
                   </Link>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {f.clientes?.nombre_completo ?? "-"}
+                  {f.productores?.nombre_completo ?? "-"}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {f.zonas_finca?.nombre ? (

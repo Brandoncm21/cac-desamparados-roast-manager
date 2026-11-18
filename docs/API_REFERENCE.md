@@ -47,31 +47,29 @@ Helpers: [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desampa
 | 35 | GET/POST | `/api/admin/empaques` | **Admin** | Listar/crear empaque |
 | 36 | GET/PUT/DELETE | `/api/admin/empaques/[id]` | **Admin** | Obtener/actualizar/desactivar empaque |
 | 37 | GET/POST | `/api/admin/empaques/[id]/precios` | **Admin** | Historial / nuevo precio versionado |
-| 38 | GET | `/api/lotes` | `Recepción, Tostador, Admin` | Listar lotes (paginado, `?search=`, filtros `enproceso/desde/hasta`) |
-| 39 | POST | `/api/lotes` | `Recepción, Admin` | Crear lote (`guardarLoteSchema`) |
-| 40 | GET | `/api/lotes/[id]` | `Recepción, Tostador, Admin` | Detalle del lote + órdenes enlazadas (`orden_lotes`) |
-| 41 | PUT | `/api/lotes/[id]` | `Recepción, Admin` | Actualizar lote |
-| 42 | DELETE | `/api/lotes/[id]` | `Recepción, Admin` | Soft delete (`deleted_at`) |
-| 43 | GET | `/api/lotes/[id]/caracterizacion` | `Recepción, Tostador, Admin` | Caracterizaciones + series RC |
-| 44 | PUT | `/api/lotes/[id]/caracterizacion` | `Recepción, Admin` | Upsert → `guardar_caracterizacion` |
-| 45 | GET | `/api/lotes/[id]/secado` | `Recepción, Tostador, Admin` | Secados + 4 series |
-| 46 | PUT | `/api/lotes/[id]/secado` | `Recepción, Admin` | Upsert → `guardar_secado` |
-| 47 | GET | `/api/lotes/[id]/bodega` | `Recepción, Tostador, Admin` | Bodegas + N:M `secado_bodega` |
-| 48 | PUT | `/api/lotes/[id]/bodega` | `Recepción, Admin` | Upsert → `guardar_bodega` |
-| 49 | GET | `/api/lotes/[id]/trilla` | `Recepción, Tostador, Admin` | Trilla + peso verde 1:1 |
-| 50 | PUT | `/api/lotes/[id]/trilla` | `Recepción, Admin` | Upsert → `guardar_trilla` |
-| 51 | POST | `/api/lotes/[id]/trilla/enviar-proceso` | `Recepción, Admin` | **e1** trilla → orden (`crear_orden_desde_trilla`) |
-| 52 | GET | `/api/cataciones` | `Recepción, Tostador, Admin` | Listar cataciones (paginado, embed perfil K3) |
-| 53 | POST | `/api/cataciones` | `Tostador, Admin` | Crear → `guardar_catacion` |
-| 54 | GET | `/api/cataciones/[id]` | `Recepción, Tostador, Admin` | Detalle + rondas |
-| 55 | PUT | `/api/cataciones/[id]` | `Tostador, Admin` | Actualizar → `guardar_catacion` |
-| 56 | GET | `/api/fincas` | `Recepción, Tostador, Admin` | Listar fincas (`cliente_id`, `search`, paginado) |
-| 57 | POST | `/api/fincas` | `Recepción, Admin` | Crear finca (`crearFincaSchema`) |
-| 58 | GET | `/api/fincas/[id]` | `Recepción, Tostador, Admin` | Detalle de finca |
-| 59 | PUT | `/api/fincas/[id]` | `Recepción, Admin` | Actualizar finca |
-| 60 | DELETE | `/api/fincas/[id]` | `Recepción, Admin` | Soft delete (`deleted_at`) |
+| 38 | GET | `/api/productores` | `Recepción, Tostador, Admin` | Listar productores (paginado, `?search=`) |
+| 39 | GET | `/api/recibido` | `Recepción, Tostador, Admin` | Listar lotes recibidos (`enproceso`, `productor_id`, `finca_id`, `desde/hasta`, `search`) |
+| 40 | POST | `/api/recibido` | `Recepción, Admin` | Registrar lote recibido (`crearRecibidoSchema`) |
+| 41 | GET | `/api/recibido/[id]` | `Recepción, Tostador, Admin` | Detalle del lote + `etapas` |
+| 42 | PUT | `/api/recibido/[id]` | `Recepción, Admin` | Actualizar cabecera del lote |
+| 43 | DELETE | `/api/recibido/[id]` | `Recepción, Admin` | Soft delete (`deleted_at`) |
+| 44 | GET | `/api/recibido/[id]/caracterizacion` | `Recepción, Tostador, Admin` | Fila de caracterización |
+| 45 | PUT | `/api/recibido/[id]/caracterizacion` | `Recepción, Admin` | Upsert → `guardar_caracterizacion` |
+| 46 | GET | `/api/recibido/[id]/secado` | `Recepción, Tostador, Admin` | Fila de secado |
+| 47 | PUT | `/api/recibido/[id]/secado` | `Recepción, Admin` | Upsert → `guardar_secado` |
+| 48 | GET | `/api/recibido/[id]/bodegaje` | `Recepción, Tostador, Admin` | Fila de bodega |
+| 49 | PUT | `/api/recibido/[id]/bodegaje` | `Recepción, Admin` | Upsert → `guardar_bodega` |
+| 50 | GET | `/api/recibido/[id]/trilla` | `Recepción, Tostador, Admin` | Fila de trilla |
+| 51 | PUT | `/api/recibido/[id]/trilla` | `Recepción, Admin` | Upsert → `guardar_trilla` (`peso_verde_final` > 0) |
+| 52 | GET | `/api/recibido/[id]/catacion` | `Recepción, Tostador, Admin` | Fila de catación/tueste |
+| 53 | PUT | `/api/recibido/[id]/catacion` | `Tostador, Admin` | Upsert → `guardar_catacion` |
+| 54 | GET | `/api/fincas` | `Recepción, Tostador, Admin` | Listar fincas (`productor_id`, `search`, paginado) |
+| 55 | POST | `/api/fincas` | `Recepción, Admin` | Crear finca (`crearFincaSchema`) |
+| 56 | GET | `/api/fincas/[id]` | `Recepción, Tostador, Admin` | Detalle de finca |
+| 57 | PUT | `/api/fincas/[id]` | `Recepción, Admin` | Actualizar finca |
+| 58 | DELETE | `/api/fincas/[id]` | `Recepción, Admin` | Soft delete (`deleted_at`) |
 
-> **Fusión CBF:** las rutas 38–55 se detallan en §2.6 y usan el mismo contrato `{ data, pagination }` / `{ error: { code, message, issues } }`. Las rutas 56–60 (`fincas`) son del refactor 004 y siguen el mismo contrato.
+> **Beneficiado / Acopio (spec 005):** las rutas 38–53 se detallan en §2.6 y usan el mismo contrato `{ data, pagination }` / `{ error: { code, message, issues } }`. Las rutas 54–58 (`fincas`) siguen el mismo contrato.
 
 > **Admin-only:** rutas 33-37 usan `createAdminClientWithRoleCheck(["Admin"])` que bypassa RLS con `service_role` ([`lib/supabase/admin.ts:19`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/admin.ts#L19)).
 
@@ -170,38 +168,35 @@ GET /api/ordenes?page=2&pageSize=10&estado=Pendiente&search=juan
 - Response 200: `{data: {accepted: [{tempId, recordId}], rejected: [{tempId, code, message}]}}` con `code` en `VALIDATION_ERROR|CONFLICT|FOREIGN_KEY|CHECK_VIOLATION|NOT_NULL|DB_ERROR`.
 - Idempotencia: reprocesar el mismo batch no duplica (upsert sobre UNIQUEs existentes).
 
-### 2.6 Fusión CBF — Lotes, Etapas y Catación (0026–0032)
+### 2.6 Beneficiado / Acopio (spec 005)
 
-Módulo portado de CoffeeBeanFlow. Todas las escrituras compuestas pasan por RPC transaccional (no hay `replace-all`); los `PUT` de etapas envían el estado completo del formulario y la RPC hace upsert por id + soft-delete de lo omitido.
+Dominio nuevo tras las migraciones `0050`–`0053`: el lote nace en **Recibido de Café**, el productor es una entidad propia (`productores`) y las fincas cuelgan del productor. Se retiraron `/api/lotes/**` y `/api/cataciones/**` (F2/F5); `/lotes/**` redirige a `/beneficio/recibido`.
 
-**`GET /api/lotes`** — paginado (§2.0); `search` sanitizado sobre `nlote`; filtros Zod `enproceso`, `id_finca`, `desde`/`hasta` (`YYYY-MM-DD`); embebe `clientes(nombre_completo)` y `fincas(nombre, altura, zonas_finca(nombre))`; orden `fecha_acopio DESC, id_lote DESC`; `deleted_at IS NULL`.
+**Estados (`enproceso`):** `Recibido → En Caracterización → En Secado → En Bodega → En Trilla → Catado → Vendido`. Las RPCs sólo avanzan hacia adelante (desmarcar catación devuelve el lote a `En Trilla`). `disponible` y `vendido` son flags; `CHECK NOT (vendido AND disponible)`.
 
-**`POST /api/lotes`** — `crearLoteSchema` ([`lib/schemas/lotes.ts`](../../lib/schemas/lotes.ts)); exige `id_cliente` + `id_finca` (FKs, spec 004) e inserción directa en `lotes_cafe` (RLS `Admin/Recepción`); `nlote` UNIQUE → **409** en duplicado y `23503` → **400**. Acepta `altura` (derivada de la finca): se valida contra `fincas.altura` (**400** si no coincide), no se persiste (D8) y el reporte del lote la devuelve con la finca. La finca debe existir y pertenecer al productor.
+**`GET /api/productores`** — paginado; `search` sobre `nombre_completo`; `deleted_at IS NULL`; orden por nombre.
 
-**`GET /api/lotes/[id]`** — lote + embed de cliente/finca + órdenes enlazadas desde `orden_lotes` (N:M, `peso_kg`). **`PUT`/`DELETE`** actualizan o hacen soft-delete.
+**`GET /api/recibido`** — paginado; filtros Zod `enproceso`, `productor_id`, `finca_id`, `desde`/`hasta` (`YYYY-MM-DD`); `search` sobre `numero_lote`/`numero_recibo`; embebe `productores(nombre_completo)` y `fincas(nombre, altura, zonas_finca(nombre))`; orden `fecha_recibido DESC`.
 
-**`/api/fincas`** — fincas del productor (spec 005): `GET` paginado con `cliente_id` + `search` (`ilike nombre`), embebe `clientes(nombre_completo)` y `zonas_finca(nombre)`; `POST` (`crearFincaSchema`: `cliente_id`, `nombre`, `zona_id?`, `ubicacion?`, `altura?` —opcional desde 0046—; `23505`→**409**, `23503`→**400**) y `[id]` `GET` (incluye `lotes[]`, `ordenes_count` y `tiene_dependencias`), `PUT` y `DELETE` soft. `PUT` que cambie `cliente_id` y `DELETE` con lotes/órdenes asociados → **409**.
+**`POST /api/recibido`** — `crearRecibidoSchema` ([`lib/schemas/beneficio.ts`](../../lib/schemas/beneficio.ts)); exige `productor_id` + `finca_id` coherentes (la finca debe pertenecer al productor → **400**); `numero_lote` UNIQUE → **409** (`23505`); `puro_impuro`/`limpio_sucio` por defecto `true`. Crea el lote en `Recibido`.
 
-**Etapas** (`GET` devuelve la colección de la etapa con sus series; `PUT` llama a la RPC):
+**`GET /api/recibido/[id]`** — lote + `etapas` (`caracterizacion`, `secado`, `bodegaje`, `trilla`, `catacion`), consultadas en paralelo. **`PUT`** actualiza la cabecera (parcial, sin defaults para no pisar columnas). **`DELETE`** hace soft delete.
+
+**Etapas** (`GET` devuelve la fila 1:1; `PUT` llama a la RPC y responde `{data: {<etapa>: row, enproceso}}`):
 
 | Ruta | Body (Zod) | RPC |
 |---|---|---|
-| `PUT /api/lotes/[id]/caracterizacion` | `guardarCaracterizacionBodySchema` (`caracterizacion`, `rcs[]`) | `guardar_caracterizacion(p_id_lote, p_datos, p_rcs)` |
-| `PUT /api/lotes/[id]/secado` | `guardarSecadoBodySchema` (`secado`, `humedades[]`, `ambientes[]`, `temperaturas[]`, `camas[]`) | `guardar_secado(p_id_lote, p_secado, …)` |
-| `PUT /api/lotes/[id]/bodega` | `guardarBodegaBodySchema` (`bodega`, `secados[]`) | `guardar_bodega(p_id_lote, p_bodega, p_secados_guardados)` |
-| `PUT /api/lotes/[id]/trilla` | `guardarTrillaBodySchema` (`trilla`, `peso_verde`) | `guardar_trilla(p_id_lote, p_trilla)` |
+| `PUT /api/recibido/[id]/caracterizacion` | `caracterizacionSchema` | `guardar_caracterizacion(p_id_lote, p_datos)` |
+| `PUT /api/recibido/[id]/secado` | `secadoSchema` (fechas coherentes) | `guardar_secado(p_id_lote, p_secado)` |
+| `PUT /api/recibido/[id]/bodegaje` | `bodegajeSchema` | `guardar_bodega(p_id_lote, p_bodega)` |
+| `PUT /api/recibido/[id]/trilla` | `trillaSchema` (`peso_verde_final` > 0) | `guardar_trilla(p_id_lote, p_trilla)` |
+| `PUT /api/recibido/[id]/catacion` | `guardarCatacionSchema` (`catado`, `notas_catacion`) | `guardar_catacion(p_catacion)` |
 
-- Los strings vacíos se omiten antes de enviar (`limpiar`) y el esquema aplica el patrón preprocess (`""`→null, `"1,5"`→`1.5`).
-- `PUT /api/lotes/[id]/trilla` con `peso_verde` nulo hace soft-delete del 1:1 (`peso_verde_trilla.deleted_at`).
+- Escritura de etapas: `Admin`/`Recepción`; catación: `Tostador`/`Admin`. `GET`: `Admin`/`Recepción`/`Tostador`.
+- Trilla sin `peso_verde_final` > 0 → **422**. `guardar_catacion` es `SECURITY DEFINER` con chequeo de rol; desmarcar `catado` revierte a `En Trilla`.
+- Mapeo de errores RPC: `P0002`→**404**, `42501`→**403**, `55000`→**409**, `22023`→**422**.
 
-**`POST /api/lotes/[id]/trilla/enviar-proceso`** — **e1** ([`crear_orden_desde_trilla`](../../supabase/migrations/0032_catacion_pipeline.sql)): requiere trilla con `wverde_final > 0`; crea orden + 7 `orden_pasos` (proceso derivado, FR-010) + puente K1 con `peso_inicial_kg = wverde_final`.
-- Idempotente por lote (**K5**): si el lote ya está enlazado a una orden en `orden_lotes` responde `200 { data: { reused: true, ... } }`.
-- **K4 resuelto por id:** usa `lotes_cafe.id_cliente`/`id_finca` (ya no concilia por `nproductor`); si el lote no tiene cliente → **400**.
-- Trilla incompleta/sin peso verde → **422** `VALIDATION_ERROR`.
-
-**`GET /api/cataciones`** — paginado; `search` sobre `nlote`; embed del perfil K3 (`perfiles_tueste!catacion_tueste_perfil_tueste_ref_fkey`); orden `created_at DESC`.
-**`POST` / `PUT /api/cataciones[/id]`** — `guardarCatacionBodySchema` (`catacion` + `rondas[]` con `valor_calidad` 0–100) → `guardar_catacion(p_catacion, p_rondas)`; el perfil `Completado` es opcional si se envía `id_lote` (FR-012); con lote, el lote pasa a `En Catación` y a `Vendido` con `finalizada: true` (FR-004).
-**`GET /api/cataciones/[id]`** — catación + `rondas` vivas (`deleted_at IS NULL`); 404 si no existe o está eliminada.
+**`/api/fincas`** — fincas del productor: `GET` paginado con `productor_id` + `search` (`ilike nombre`), embebe `productores(nombre_completo)` y `zonas_finca(nombre)`; `POST` (`crearFincaSchema`: `productor_id`, `nombre`, `zona_id?`, `ubicacion?`, `altura?`; `23505`→**409**, `23503`→**400**) y `[id]` `GET` (incluye `lotes[]` del nuevo dominio, `ordenes_count` y `tiene_dependencias`), `PUT` y `DELETE` soft. `PUT` que cambie `productor_id` y `DELETE` con lotes/órdenes asociados → **409**. `fincas.cliente_id` fue eliminada en `0053`.
 
 ## 3. Códigos de Error Comunes
 

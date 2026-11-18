@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { ApiError, detalleDeError } from "@/lib/api/http";
 import { crearOrden } from "@/lib/api/ordenes";
-import { listarLotes, type LoteResumen } from "@/lib/api/lotes";
+import { listarRecibidos, type RecibidoLote } from "@/lib/api/beneficio";
 import { listarServiciosActivos, type ServicioActivo } from "@/lib/api/servicios";
 import {
   MOLIENDA_DEFAULT,
@@ -37,7 +37,7 @@ export function useNuevaOrden(form: OrdenForm) {
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
   const [empleados, setEmpleados] = useState<EmpleadoOption[]>([]);
   const [serviciosActivos, setServiciosActivos] = useState<ServicioActivo[]>([]);
-  const [lotesOrden, setLotesOrden] = useState<LoteResumen[]>([]);
+  const [lotesOrden, setLotesOrden] = useState<RecibidoLote[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingValues, setPendingValues] = useState<CrearOrdenInput | null>(null);
@@ -52,7 +52,9 @@ export function useNuevaOrden(form: OrdenForm) {
         supabase.from("clientes").select("id_cliente, nombre_completo").order("nombre_completo"),
         supabase.from("empleados").select("id_empleado, nombre").eq("activo", true).order("nombre"),
         listarServiciosActivos().catch(() => null),
-        listarLotes().catch(() => [] as LoteResumen[]),
+        listarRecibidos({ pageSize: 100 })
+          .then((r) => r.items)
+          .catch(() => [] as RecibidoLote[]),
       ]);
 
       if (!vigente) return;

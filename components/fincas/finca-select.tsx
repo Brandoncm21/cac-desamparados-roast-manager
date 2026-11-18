@@ -16,20 +16,20 @@ import {
 const SIN_ZONA = "__sin_zona__";
 
 interface FincaSelectProps {
-  /** Productor seleccionado: las fincas se cargan solo para él. */
-  clienteId: number | null;
+  /** Si viene, sólo se listan las fincas de ese productor. */
+  productorId?: number | null;
   value: number | null;
   /** Devuelve la finca completa (nombre, altura, zona) para autopoblar el formulario. */
   onChange: (finca: FincaOpcion | null) => void;
   onFincasChange?: (fincas: FincaOpcion[]) => void;
   disabled?: boolean;
   error?: string;
-  /** Muestra el alta rápida de finca (nombre + altura + zona). */
+  /** Muestra el alta rápida de finca (nombre + altura + zona). Requiere productorId. */
   permitirCrear?: boolean;
 }
 
 export function FincaSelect({
-  clienteId,
+  productorId = null,
   value,
   onChange,
   onFincasChange,
@@ -58,7 +58,7 @@ export function FincaSelect({
     };
   }, []);
 
-  // Callbacks y valor vigente en refs: el fetch solo depende de `clienteId`,
+  // Callbacks y valor vigente en refs: el fetch solo depende de `productorId`,
   // así seleccionar una finca no vuelve a pedir la lista (sin bucles).
   const vigenteRef = useRef({ onChange, onFincasChange, value });
   useEffect(() => {
@@ -67,13 +67,8 @@ export function FincaSelect({
 
   useEffect(() => {
     let activo = true;
-    if (!clienteId) {
-      setFincas([]);
-      vigenteRef.current.onFincasChange?.([]);
-      return;
-    }
     setCargando(true);
-    listarFincas({ clienteId })
+    listarFincas({ productorId })
       .then((lista) => {
         if (!activo) return;
         setFincas(lista);
@@ -94,7 +89,7 @@ export function FincaSelect({
     return () => {
       activo = false;
     };
-  }, [clienteId]);
+  }, [productorId]);
 
   const seleccionar = (valor: string | null) => {
     if (!valor) {
@@ -106,7 +101,7 @@ export function FincaSelect({
   };
 
   const crear = async () => {
-    if (!clienteId) {
+    if (!productorId) {
       toast.error("Seleccioná un productor primero");
       return;
     }
@@ -122,7 +117,7 @@ export function FincaSelect({
     setGuardando(true);
     try {
       const creada = await crearFinca({
-        cliente_id: clienteId,
+        productor_id: productorId,
         nombre: nuevaNombre.trim(),
         altura,
         zona_id: nuevaZona,
@@ -132,7 +127,7 @@ export function FincaSelect({
       setNuevaAltura("");
       setNuevaZona(null);
       setCrearOpen(false);
-      const lista = await listarFincas({ clienteId });
+      const lista = await listarFincas({ productorId });
       setFincas(lista);
       onFincasChange?.(lista);
       onChange(lista.find((f) => f.id_finca === creada.id_finca) ?? creada);
@@ -143,26 +138,24 @@ export function FincaSelect({
     }
   };
 
-  const sinFincas = Boolean(clienteId) && !cargando && fincas.length === 0;
-  const placeholder = !clienteId
-    ? "Elegí un productor primero"
-    : cargando
-      ? "Cargando fincas…"
-      : fincas.length === 0
-        ? "Este productor no tiene fincas"
-        : "Seleccionar finca";
+  const sinFincas = !cargando && fincas.length === 0;
+  const placeholder = cargando
+    ? "Cargando fincas…"
+    : fincas.length === 0
+      ? "No hay fincas registradas"
+      : "Seleccionar finca";
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <Label>Finca *</Label>
-        {permitirCrear && (
+        <Label>Finca</Label>
+        {permitirCrear && productorId != null && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
             className="h-6 px-2 text-xs"
-            disabled={!clienteId || disabled || guardando}
+            disabled={disabled || guardando}
             onClick={() => setCrearOpen((v) => !v)}
           >
             + Crear finca
@@ -174,7 +167,7 @@ export function FincaSelect({
         items={opcionesFinca(fincas)}
         value={value != null ? String(value) : null}
         onValueChange={seleccionar}
-        disabled={!clienteId || disabled || cargando || fincas.length === 0}
+        disabled={disabled || cargando || fincas.length === 0}
       >
         <SelectTrigger>
           <SelectValue placeholder={placeholder} />
@@ -190,12 +183,14 @@ export function FincaSelect({
 
       {sinFincas && !crearOpen && (
         <p className="text-xs text-muted-foreground">
-          Este productor todavía no tiene fincas. Usá <strong>+ Crear finca</strong> para registrar la primera.
+          {productorId != null
+            ? "Este productor todavía no tiene fincas. Usá + Crear finca para registrar la primera."
+            : "Todavía no hay fincas registradas."}
         </p>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {crearOpen && (
+      {crearOpen && productorId != null && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-md border p-3">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="nf-nombre">Nombre de la finca *</Label>

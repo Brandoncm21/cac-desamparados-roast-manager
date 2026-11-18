@@ -18,7 +18,7 @@ interface SeccionClienteProps {
   clientes: ClienteOption[];
 }
 
-/** Cliente y finca del productor: el primer bloque del formulario. */
+/** Cliente y finca de la orden: el primer bloque del formulario. */
 export function SeccionCliente({ form, clientes }: SeccionClienteProps) {
   return (
     <Card>
@@ -46,7 +46,8 @@ export function SeccionCliente({ form, clientes }: SeccionClienteProps) {
             <FormItem>
               <FormControl>
                 <FincaSelect
-                  clienteId={form.watch("id_cliente") || null}
+                  productorId={null}
+                  permitirCrear={false}
                   value={field.value ?? null}
                   onChange={(finca) => field.onChange(finca?.id_finca ?? null)}
                   error={form.formState.errors.id_finca?.message}

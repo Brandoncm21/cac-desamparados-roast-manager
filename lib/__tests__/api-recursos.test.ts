@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ApiError } from "../api/http";
-import { listarLotes } from "../api/lotes";
 import { listarServiciosActivos } from "../api/servicios";
 import {
   cambiarEstadoOrden,
@@ -42,26 +41,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-});
-
-describe("lib/api/lotes", () => {
-  it("debería pedir la primera página con el pageSize indicado", async () => {
-    fetchMock.mockResolvedValue(respuestaOk([{ id_lote: 1, nlote: "L-001" }]));
-
-    const lotes = await listarLotes();
-
-    expect(urlLlamada()).toBe("/api/lotes?page=1&pageSize=100");
-    expect(initLlamada().method).toBeUndefined();
-    expect(lotes).toEqual([{ id_lote: 1, nlote: "L-001" }]);
-  });
-
-  it("debería respetar un pageSize explícito", async () => {
-    fetchMock.mockResolvedValue(respuestaOk([]));
-
-    await listarLotes({ pageSize: 25, page: 2 });
-
-    expect(urlLlamada()).toBe("/api/lotes?page=2&pageSize=25");
-  });
 });
 
 describe("lib/api/servicios", () => {
