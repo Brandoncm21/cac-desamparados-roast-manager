@@ -1,8 +1,8 @@
 /**
- * Fuente única de fincas y zonas para la UI (spec 005).
+ * Fuente única de fincas y zonas para la UI.
  *
- * La usan el alta/edición de lotes, el alta de órdenes y el módulo de fincas,
- * para que los tres muestren exactamente los mismos datos y etiquetas.
+ * La usan el alta de fincas, el flujo de recibido y los formularios que
+ * necesitan el catálogo, para que todos muestren los mismos datos y etiquetas.
  */
 
 import { leerJson } from "./api/http";
@@ -14,17 +14,17 @@ export interface ZonaOpcion {
 
 export interface FincaOpcion {
   id_finca: number;
-  cliente_id: number;
+  productor_id: number;
   nombre: string;
   altura: number | null;
   ubicacion?: string | null;
   zona_id?: number | null;
   zonas_finca?: { nombre: string } | null;
-  clientes?: { nombre_completo: string } | null;
+  productores?: { nombre_completo: string } | null;
 }
 
 export interface FincaInput {
-  cliente_id: number;
+  productor_id: number;
   nombre: string;
   zona_id?: number | null;
   ubicacion?: string | null;
@@ -33,9 +33,9 @@ export interface FincaInput {
 
 const PAGE_SIZE = 100;
 
-/** Fincas del productor (o todas, paginadas) con cliente y zona embebidos. */
+/** Fincas del productor (o todas, paginadas) con productor y zona embebidos. */
 export async function listarFincas(opts?: {
-  clienteId?: number | null;
+  productorId?: number | null;
   search?: string;
   pageSize?: number;
 }): Promise<FincaOpcion[]> {
@@ -43,7 +43,7 @@ export async function listarFincas(opts?: {
     page: "1",
     pageSize: String(opts?.pageSize ?? PAGE_SIZE),
   });
-  if (opts?.clienteId) params.set("cliente_id", String(opts.clienteId));
+  if (opts?.productorId) params.set("productor_id", String(opts.productorId));
   if (opts?.search?.trim()) params.set("search", opts.search.trim());
 
   const res = await fetch(`/api/fincas?${params}`);
@@ -107,8 +107,8 @@ export function opcionesFinca(fincas: FincaOpcion[]): Array<{ value: string; lab
   return fincas.map((f) => ({ value: String(f.id_finca), label: etiquetaFinca(f) }));
 }
 
-export function opcionesCliente(
-  clientes: Array<{ id_cliente: number; nombre_completo: string }>
+export function opcionesProductor(
+  productores: Array<{ id_productor: number; nombre_completo: string }>
 ): Array<{ value: string; label: string }> {
-  return clientes.map((c) => ({ value: String(c.id_cliente), label: c.nombre_completo }));
+  return productores.map((p) => ({ value: String(p.id_productor), label: p.nombre_completo }));
 }

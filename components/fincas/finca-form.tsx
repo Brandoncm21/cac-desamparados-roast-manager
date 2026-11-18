@@ -12,13 +12,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  actualizarFinca, crearFinca, listarZonas, opcionesCliente, type FincaOpcion, type ZonaOpcion,
+  actualizarFinca, crearFinca, listarZonas, opcionesProductor, type FincaOpcion, type ZonaOpcion,
 } from "@/lib/fincas";
+import { listarProductores, type ProductorResumen } from "@/lib/api/beneficio";
 
 const SIN_ZONA = "__sin_zona__";
 
 const fincaFormSchema = z.object({
-  cliente_id: z.number().int().positive("El productor es obligatorio"),
+  productor_id: z.number().int().positive("El productor es obligatorio"),
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(150),
   zona_id: z.number().int().positive().nullable().optional(),
   ubicacion: z.string().trim().max(200).optional().nullable().or(z.literal("")),
@@ -32,21 +33,16 @@ const fincaFormSchema = z.object({
 
 type FincaFormValues = z.infer<typeof fincaFormSchema>;
 
-interface ClienteOpcion {
-  id_cliente: number;
-  nombre_completo: string;
-}
-
 interface FincaFormProps {
   /** Si viene, el formulario edita esa finca; si no, crea una nueva. */
   finca?: FincaOpcion | null;
   /** Sólo lectura del productor (la finca ya tiene lotes u órdenes asociadas). */
-  clienteBloqueado?: boolean;
+  productorBloqueado?: boolean;
 }
 
-export function FincaForm({ finca, clienteBloqueado = false }: FincaFormProps) {
+export function FincaForm({ finca, productorBloqueado = false }: FincaFormProps) {
   const router = useRouter();
-  const [clientes, setClientes] = useState<ClienteOpcion[]>([]);
+  const [productores, setProductores] = useState<ProductorResumen[]>([]);
   const [zonas, setZonas] = useState<ZonaOpcion[]>([]);
   const [nuevaZonaOpen, setNuevaZonaOpen] = useState(false);
   const [nuevaZonaNombre, setNuevaZonaNombre] = useState("");
@@ -61,7 +57,7 @@ export function FincaForm({ finca, clienteBloqueado = false }: FincaFormProps) {
   } = useForm<FincaFormValues>({
     resolver: zodResolver(fincaFormSchema) as never,
     defaultValues: {
-      cliente_id: finca?.cliente_id ?? (undefined as unknown as number),
+      productor_id: finca?.productor_id ?? (undefined as unknown as number),
       nombre: finca?.nombre ?? "",
       zona_id: finca?.zona_id ?? null,
       ubicacion: finca?.ubicacion ?? "",
@@ -69,15 +65,14 @@ export function FincaForm({ finca, clienteBloqueado = false }: FincaFormProps) {
     },
   });
 
-  const clienteId = watch("cliente_id");
+  const productorId = watch("productor_id");
   const zonaId = watch("zona_id");
 
   useEffect(() => {
     let activo = true;
-    fetch("/api/clientes?pageSize=100&page=1")
-      .then((r) => r.json())
-      .then((j) => {
-        if (activo) setClientes(j.data ?? []);
+    listarProductores()
+      .then((p) => {
+        if (activo) setProductores(p);
       })
       .catch(() => toast.error("No se pudieron cargar los productores"));
     listarZonas()
@@ -120,7 +115,7 @@ export function FincaForm({ finca, clienteBloqueado = false }: FincaFormProps) {
     setSaving(true);
     try {
       const payload = {
-        cliente_id: values.cliente_id,
+        productor_id: values.productor_id,
         nombre: values.nombre.trim(),
         zona_id: values.zona_id ?? null,
         ubicacion: values.ubicacion?.trim() || null,
@@ -151,30 +146,30 @@ export function FincaForm({ finca, clienteBloqueado = false }: FincaFormProps) {
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2 md:col-span-2">
-            <Label>Productor (cliente) *</Label>
+            <Label>Productor *</Label>
             <Select
-              items={opcionesCliente(clientes)}
-              value={clienteId ? String(clienteId) : null}
-              onValueChange={(v) => setValue("cliente_id", Number(v ?? 0), { shouldValidate: true })}
-              disabled={clienteBloqueado}
+              items={opcionesProductor(productores)}
+              value={productorId ? String(productorId) : null}
+              onValueChange={(v) => setValue("productor_id", Number(v ?? 0), { shouldValidate: true })}
+              disabled={productorBloqueado}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar productor" />
               </SelectTrigger>
               <SelectContent>
-                {clientes.map((c) => (
-                  <SelectItem key={c.id_cliente} value={String(c.id_cliente)}>
-                    {c.nombre_completo}
+                {productores.map((p) => (
+                  <SelectItem key={p.id_productor} value={String(p.id_productor)}>
+                    {p.nombre_completo}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {clienteBloqueado && (
+            {productorBloqueado && (
               <p className="text-xs text-muted-foreground">
                 No se puede cambiar el productor: la finca ya tiene lotes u órdenes asociadas.
               </p>
             )}
-            {errors.cliente_id && <p className="text-sm text-red-600">{String(errors.cliente_id.message)}</p>}
+            {errors.productor_id && <p className="text-sm text-red-600">{String(errors.productor_id.message)}</p>}
           </div>
 
           <div className="space-y-2">

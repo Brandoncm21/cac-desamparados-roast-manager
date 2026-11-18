@@ -14,21 +14,21 @@ import { eliminarFinca } from "@/lib/fincas";
 
 interface LoteDeFinca {
   id_lote: number;
-  nlote: string;
+  numero_lote: string;
   enproceso: string | null;
-  fecha_acopio: string | null;
-  disponible: number | null;
+  fecha_recibido: string | null;
+  disponible: boolean;
 }
 
 interface FincaDetalle {
   id_finca: number;
-  cliente_id: number;
+  productor_id: number;
   nombre: string;
   altura: number | null;
   ubicacion: string | null;
   zona_id: number | null;
   zonas_finca?: { nombre: string } | null;
-  clientes?: { nombre_completo: string } | null;
+  productores?: { nombre_completo: string } | null;
   lotes: LoteDeFinca[];
   ordenes_count: number;
   tiene_dependencias: boolean;
@@ -88,7 +88,7 @@ export default function FincaDetallePage() {
           <div>
             <h1 className="text-2xl font-bold">{finca.nombre}</h1>
             <p className="text-sm text-muted-foreground">
-              {finca.clientes?.nombre_completo ?? "Sin productor"}
+              {finca.productores?.nombre_completo ?? "Sin productor"}
               {finca.zonas_finca?.nombre ? ` · ${finca.zonas_finca.nombre}` : ""}
             </p>
           </div>
@@ -117,9 +117,7 @@ export default function FincaDetallePage() {
           <CardContent className="space-y-3 text-sm">
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Productor</span>
-              <Link href={`/clientes/${finca.cliente_id}`} className="font-medium hover:underline">
-                {finca.clientes?.nombre_completo ?? "-"}
-              </Link>
+              <span className="font-medium">{finca.productores?.nombre_completo ?? "-"}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">Zona</span>
@@ -178,7 +176,7 @@ export default function FincaDetallePage() {
                 <TableRow>
                   <TableHead>Lote</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead className="hidden md:table-cell">Acopio</TableHead>
+                  <TableHead className="hidden md:table-cell">Recibido</TableHead>
                   <TableHead className="text-right">Disponible (kg)</TableHead>
                 </TableRow>
               </TableHeader>
@@ -193,17 +191,17 @@ export default function FincaDetallePage() {
                 {finca.lotes.map((l) => (
                   <TableRow key={l.id_lote}>
                     <TableCell>
-                      <Link href={`/lotes/${l.id_lote}`} className="font-mono hover:underline">
-                        {l.nlote}
+                      <Link href={`/beneficio/recibido/${l.id_lote}`} className="font-mono hover:underline">
+                        {l.numero_lote}
                       </Link>
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">{l.enproceso ?? "No"}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
-                      {l.fecha_acopio ? new Date(l.fecha_acopio).toLocaleDateString() : "-"}
+                      {l.fecha_recibido ? new Date(l.fecha_recibido).toLocaleDateString() : "-"}
                     </TableCell>
-                    <TableCell className="text-right">{l.disponible ?? "-"}</TableCell>
+                    <TableCell className="text-right">{l.disponible ? "Sí" : "No"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

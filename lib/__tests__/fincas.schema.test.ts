@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { crearFincaSchema, actualizarFincaSchema } from "@/lib/schemas/fincas";
 
 const base = {
-  cliente_id: 1,
+  productor_id: 1,
   nombre: "Finca La Esperanza",
   altura: 1200,
 };
@@ -21,10 +21,10 @@ describe("fincas schema (spec 005)", () => {
     }
   });
 
-  it("exige el productor (cliente_id)", () => {
-    const sinCliente = crearFincaSchema.safeParse({ nombre: "X", altura: 800 });
-    const cero = crearFincaSchema.safeParse({ ...base, cliente_id: 0 });
-    expect(sinCliente.success).toBe(false);
+  it("exige el productor (productor_id)", () => {
+    const sinProductor = crearFincaSchema.safeParse({ nombre: "X", altura: 800 });
+    const cero = crearFincaSchema.safeParse({ ...base, productor_id: 0 });
+    expect(sinProductor.success).toBe(false);
     expect(cero.success).toBe(false);
   });
 
@@ -39,7 +39,7 @@ describe("fincas schema (spec 005)", () => {
   });
 
   it("la altura es opcional (0046) y no admite negativos ni > 4000", () => {
-    const sinAltura = crearFincaSchema.safeParse({ cliente_id: 1, nombre: "Sin altura" });
+    const sinAltura = crearFincaSchema.safeParse({ productor_id: 1, nombre: "Sin altura" });
     const nula = crearFincaSchema.safeParse({ ...base, altura: null });
     const negativa = crearFincaSchema.safeParse({ ...base, altura: -5 });
     const excesiva = crearFincaSchema.safeParse({ ...base, altura: 4500 });

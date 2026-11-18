@@ -34,7 +34,7 @@ async function get(
 
   const { data: finca, error } = await supabase
     .from("fincas")
-    .select("*, clientes(nombre_completo), zonas_finca(nombre)")
+    .select("*, productores(nombre_completo), zonas_finca(nombre)")
     .eq("id_finca", fincaId)
     .is("deleted_at", null)
     .single();
@@ -44,10 +44,10 @@ async function get(
   const [{ data: lotes }, deps] = await Promise.all([
     supabase
       .from("lotes_cafe")
-      .select("id_lote, nlote, enproceso, fecha_acopio, disponible")
+      .select("id_lote, numero_lote, enproceso, fecha_recibido, disponible")
       .eq("id_finca", fincaId)
       .is("deleted_at", null)
-      .order("fecha_acopio", { ascending: false }),
+      .order("fecha_recibido", { ascending: false }),
     dependencias(supabase, fincaId),
   ]);
 
@@ -73,17 +73,17 @@ async function put(
   const parsed = actualizarFincaSchema.safeParse(body);
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
-  // Cambiar de productor dejaría lotes con `id_cliente` y finca incoherentes.
-  if (parsed.data.cliente_id != null) {
+  // Cambiar de productor dejaría lotes con `productor_id` y finca incoherentes.
+  if (parsed.data.productor_id != null) {
     const { data: actual } = await supabase
       .from("fincas")
-      .select("cliente_id")
+      .select("productor_id")
       .eq("id_finca", fincaId)
       .is("deleted_at", null)
       .maybeSingle();
     if (!actual) return apiError("Finca no encontrada", 404);
 
-    if (actual.cliente_id !== parsed.data.cliente_id) {
+    if (actual.productor_id !== parsed.data.productor_id) {
       const deps = await dependencias(supabase, fincaId);
       if (deps.lotes + deps.ordenes > 0) {
         return apiError(
@@ -99,7 +99,7 @@ async function put(
     .update(parsed.data)
     .eq("id_finca", fincaId)
     .is("deleted_at", null)
-    .select("*, clientes(nombre_completo), zonas_finca(nombre)")
+    .select("*, productores(nombre_completo), zonas_finca(nombre)")
     .maybeSingle();
 
   if (error) {

@@ -17,25 +17,25 @@ async function get(request: NextRequest) {
   const to = page * pageSize - 1;
   const busqueda = sanitizarBusqueda(searchParams.get("search"));
 
-  // Filtro opcional por cliente (para el combobox productor → fincas).
-  const clienteIdRaw = searchParams.get("cliente_id");
-  let clienteId: number | null = null;
-  if (clienteIdRaw) {
-    const parsed = Number(clienteIdRaw);
+  // Filtro opcional por productor (combobox productor → fincas).
+  const productorIdRaw = searchParams.get("productor_id");
+  let productorId: number | null = null;
+  if (productorIdRaw) {
+    const parsed = Number(productorIdRaw);
     if (!Number.isInteger(parsed) || parsed <= 0) {
-      return apiError("cliente_id inválido", 422);
+      return apiError("productor_id inválido", 422);
     }
-    clienteId = parsed;
+    productorId = parsed;
   }
 
   let query = supabase
     .from("fincas")
-    .select("*, clientes(nombre_completo), zonas_finca(nombre)", { count: "exact" })
+    .select("*, productores(nombre_completo), zonas_finca(nombre)", { count: "exact" })
     .is("deleted_at", null)
     .order("nombre")
     .range(from, to);
 
-  if (clienteId) query = query.eq("cliente_id", clienteId);
+  if (productorId) query = query.eq("productor_id", productorId);
   if (busqueda) query = query.ilike("nombre", `%${busqueda}%`);
 
   const { data, count, error } = await query;
@@ -54,7 +54,7 @@ async function post(request: NextRequest) {
   const { data, error } = await supabase
     .from("fincas")
     .insert(parsed.data)
-    .select("*, clientes(nombre_completo), zonas_finca(nombre)")
+    .select("*, productores(nombre_completo), zonas_finca(nombre)")
     .single();
 
   if (error) {

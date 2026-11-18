@@ -31,10 +31,13 @@ export const ESTADOS_ORDEN: MapaEstados = {
 
 export const ESTADOS_LOTE: MapaEstados = {
   No: { label: "No", className: "bg-gray-100 text-gray-800" },
+  Recibido: { label: "Recibido", className: "bg-gray-100 text-gray-800" },
+  "En Caracterización": { label: "En Caracterización", className: "bg-amber-100 text-amber-800" },
   "En Secado": { label: "En Secado", className: "bg-amber-100 text-amber-800" },
   "En Trilla": { label: "En Trilla", className: "bg-blue-100 text-blue-800" },
   "En Bodega": { label: "En Bodega", className: "bg-purple-100 text-purple-800" },
   "En Catación": { label: "En Catación", className: "bg-orange-100 text-orange-800" },
+  Catado: { label: "Catado", className: "bg-orange-100 text-orange-800" },
   Vendido: { label: "Vendido", className: "bg-green-100 text-green-800" },
 };
 

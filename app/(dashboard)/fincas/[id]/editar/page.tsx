@@ -48,7 +48,7 @@ export default function EditarFincaPage() {
         </div>
       </div>
 
-      <FincaForm finca={finca} clienteBloqueado={Boolean(finca.tiene_dependencias)} />
+      <FincaForm finca={finca} productorBloqueado={Boolean(finca.tiene_dependencias)} />
     </div>
   );
 }
