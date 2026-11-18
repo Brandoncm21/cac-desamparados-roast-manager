@@ -4,6 +4,17 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Changed — Pivote Beneficiado / Acopio (005, fases F0–F6)
+- **DB `0050`**: nueva tabla `productores` (6 filas migradas desde `clientes` conservando `public_id` como conector K2) y `fincas.productor_id`; `fincas.cliente_id` queda deprecada.
+- **DB `0051`**: se elimina el dominio legacy de lotes (`v_lotes_catacion`, 8 funciones y `DROP TABLE lotes_cafe CASCADE`). Nota: `CASCADE` no borra tablas hijas; las 10 huérfanas se borran explícitamente.
+- **DB `0052`**: `lotes_cafe` rediseñada (nacimiento en **Recibido de Café**, `numero_lote`/`numero_recibo`, productor y finca, varietal, cajuelas/cuartillos, % flote/broca/vano/verde/secos, `ph_miel`, `proceso`, `enproceso` con 7 estados, `disponible`/`vendido`, `fecha_recibido`) + 1:1 `caracterizacion_lote`, `secado_lote`, `bodega_lote`, `trilla_lote`, `catacion_tueste` y `orden_lotes` sin `peso_kg`.
+- **DB `0052b`/`0052c`**: RPCs `guardar_caracterizacion`, `guardar_secado`, `guardar_bodega`, `guardar_trilla` y `guardar_catacion` (con chequeo de rol), helpers internos, avance de estado solo hacia adelante y hardening (`SET search_path`, `REVOKE` a `anon`).
+- **DB `0053`**: se elimina `fincas.cliente_id` y sus índices; quedan `productor_id` + UNIQUE `(productor_id, nombre)`.
+- **API**: nuevas rutas `/api/recibido` (GET/POST), `/api/recibido/[id]` (GET/PUT/DELETE), las 5 etapas (`GET` fila / `PUT` RPC) y `/api/productores`; `/api/fincas` pasa a `productor_id`. Se retiran `/api/lotes/**` y `/api/cataciones/**`.
+- **UI**: módulos `/beneficio/{recibido,caracterizacion,secado,bodegaje,trilla,catacion,calificacion}` y grupo colapsable **Beneficiado / Acopio** en el sidebar; `/lotes/**` redirige a `/beneficio/recibido`. El dashboard y el alta de órdenes consumen el nuevo catálogo (`numero_lote`, `productores`).
+- **Fincas**: formulario, listado, detalle y selector migrados a `productor_id`; el alta de órdenes usa el selector sin filtro de productor (la finca de la orden sigue siendo opcional).
+- **Verificación**: `typecheck` 0 · `lint` 0 errores · 301 tests · `build` OK · `check-secrets` OK · cobertura 85.44% stmts / 79.06% branches / 82.95% funcs / 86.14% lines.
+
 ### Changed — Catación mínima: lote + catado + notas (0048–0049)
 - **DB `0048`**: `catacion_tueste` se reduce a `id_catacion_tueste`, `id_lote`, `catado`, `notas_catacion` y auditoría (`created_at`/`updated_at`/`deleted_at`). Se retiran **49 columnas** heredadas de CBF (físico-visual, defectos C1/C2, zarandas, Agtron, `perfil_tueste_ref`, `nlote`, `ffreposo`, `pfinales`, `producto_analizado`) y se dropea la tabla `catacion_rondas`.
 - **Regla de negocio**: `id_lote` pasa a `NOT NULL` con FK `ON DELETE RESTRICT` y un índice único parcial (`WHERE deleted_at IS NULL`): una catación viva por lote. La RPC `guardar_catacion(jsonb)` hace upsert por lote y mueve el lote a `En Catación` (o lo devuelve a `No` al desmarcar).
