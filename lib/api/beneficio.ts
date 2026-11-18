@@ -8,6 +8,7 @@
 import type {
   ActualizarRecibidoInput,
   BodegajeInput,
+  CalificacionInput,
   CaracterizacionInput,
   CatacionInput,
   CrearRecibidoInput,
@@ -76,7 +77,8 @@ export type EtapaBeneficioNombre =
   | "secado"
   | "bodegaje"
   | "trilla"
-  | "catacion";
+  | "catacion"
+  | "calificacion";
 
 export interface ListarRecibidosParams {
   page?: number;
@@ -166,7 +168,8 @@ export type CuerpoEtapa =
   | SecadoInput
   | BodegajeInput
   | TrillaInput
-  | CatacionInput;
+  | CatacionInput
+  | CalificacionInput;
 
 /** Lo que devuelven las RPCs: la fila guardada y el estado resultante del lote. */
 export interface ResultadoEtapa {
@@ -176,6 +179,7 @@ export interface ResultadoEtapa {
   bodega?: EtapaFila;
   trilla?: EtapaFila;
   catacion?: EtapaFila;
+  calificacion?: EtapaFila;
 }
 
 export async function obtenerEtapa(

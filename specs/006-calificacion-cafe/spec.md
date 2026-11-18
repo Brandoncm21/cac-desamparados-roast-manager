@@ -2,7 +2,7 @@
 
 **Feature Branch**: `feat/006-calificacion-cafe`
 **Created**: 2026-11-17
-**Status**: Borrador — pendiente de aprobación de 3 decisiones (ver §Decisiones abiertas)
+**Status**: Implementado (migraciones `0054`/`0054b`, spec aprobada el 2026-11-17)
 
 ## Contexto
 
@@ -117,13 +117,13 @@ Como operación, el lote refleja que ya fue calificado, para saber qué está li
   campo, sin tocar la base.
 - **SC-004**: la suite sigue verde (`typecheck` 0, `lint` 0 errores, tests nuevos para el schema).
 
-## Decisiones abiertas (bloquean el plan)
+## Decisiones cerradas (2026-11-17)
 
-| # | Pregunta | Propuesta por defecto |
-|---|---|---|
-| **D1** | ¿Qué campos exactos lleva cada bloque? | **Verde**: humedad %, densidad g/ml, defectos primarios y secundarios (conteo), `% verde`. **Tostado**: puntaje SCA 0–100 y 5 atributos 1–10 (fragancia, acidez, cuerpo, dulzor, balance) |
-| **D2** | ¿Calificación de a **una** evaluación por lote (verde+tostado en la misma fila) o **dos filas** separadas? | Una sola fila con dos bloques: menos tablas y el tostado depende del verde |
-| **D3** | ¿Se agrega el estado `Calificado` entre `Catado` y `Vendido`? | Sí: implica migrar el `CHECK` de `lotes_cafe.enproceso` y la UI de estados |
+| # | Decisión |
+|---|---|
+| **D1** | Campos aprobados: **verde** humedad %, densidad g/ml, defectos primarios/secundarios y `% verde`; **tostado** puntaje SCA 0–100 + fragancia, acidez, cuerpo, dulzor y balance (1–10), más notas |
+| **D2** | Una sola fila (`calificacion_lote`) 1:1 con el lote, con los dos bloques; el tostado exige el verde cargado |
+| **D3** | Estado `Calificado` agregado entre `Catado` y `Vendido` (CHECK migrado en `0054`) |
 
 ## Assumptions
 

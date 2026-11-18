@@ -41,6 +41,7 @@ export const ESTADOS_BENEFICIO = [
   "En Bodega",
   "En Trilla",
   "Catado",
+  "Calificado",
   "Vendido",
 ] as const;
 
@@ -52,6 +53,7 @@ export const ETAPAS_BENEFICIO = [
   "bodegaje",
   "trilla",
   "catacion",
+  "calificacion",
 ] as const;
 
 export type EtapaBeneficio = (typeof ETAPAS_BENEFICIO)[number];
@@ -233,12 +235,70 @@ export const guardarCatacionSchema = catacionSchema.extend({
   id_lote: z.number().int().positive("La catación debe estar vinculada a un lote"),
 });
 
+// ── Calificación (verde + tostado) ──────────────────────────────────────────
+/** Atributos sensoriales: enteros de 1 a 10. */
+const atributo = z.preprocess(
+  (v) => ((typeof v === "number" && Number.isNaN(v)) || v === "" ? null : v),
+  z
+    .number()
+    .int("El atributo debe ser un entero de 1 a 10")
+    .min(1, "El atributo mínimo es 1")
+    .max(10, "El atributo máximo es 10")
+    .optional()
+    .nullable()
+);
+
+const calificacionCampos = {
+  // Bloque verde: análisis físico del café verde.
+  humedad: porcentaje,
+  densidad: z.preprocess(
+    (v) => ((typeof v === "number" && Number.isNaN(v)) || v === "" ? null : v),
+    z
+      .number()
+      .positive("La densidad debe ser mayor que 0")
+      .optional()
+      .nullable()
+  ),
+  defectos_primarios: enteroOpcional,
+  defectos_secundarios: enteroOpcional,
+  porcentaje_verde: porcentaje,
+  // Bloque tostado: puntaje y atributos sensoriales.
+  puntaje_sca: porcentaje,
+  fragancia: atributo,
+  acidez: atributo,
+  cuerpo: atributo,
+  dulzor: atributo,
+  balance: atributo,
+  notas: textoOpcional(2000),
+};
+
+/** El tostado solo se califica si el verde ya está cargado (FR-003). */
+const verdeAntesQueTostado = {
+  message: "Registre primero el análisis del café verde (humedad)",
+  path: ["puntaje_sca"] as string[],
+};
+
+const exigeVerde = (v: { puntaje_sca?: number | null; humedad?: number | null }) =>
+  v.puntaje_sca == null || v.humedad != null;
+
+export const calificacionSchema = z
+  .object(calificacionCampos)
+  .refine(exigeVerde, verdeAntesQueTostado);
+
+export const guardarCalificacionSchema = z
+  .object({
+    ...calificacionCampos,
+    id_lote: z.number().int().positive("La calificación debe estar vinculada a un lote"),
+  })
+  .refine(exigeVerde, verdeAntesQueTostado);
+
 export const ETAPA_SCHEMAS = {
   caracterizacion: caracterizacionSchema,
   secado: secadoSchema,
   bodegaje: bodegajeSchema,
   trilla: trillaSchema,
   catacion: catacionSchema,
+  calificacion: calificacionSchema,
 } as const;
 
 export type CrearRecibidoInput = z.infer<typeof crearRecibidoSchema>;
@@ -251,3 +311,4 @@ export type SecadoInput = z.infer<typeof secadoSchema>;
 export type BodegajeInput = z.infer<typeof bodegajeSchema>;
 export type TrillaInput = z.infer<typeof trillaSchema>;
 export type CatacionInput = z.infer<typeof catacionSchema>;
+export type CalificacionInput = z.infer<typeof calificacionSchema>;
