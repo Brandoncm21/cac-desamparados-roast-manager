@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Users, FileText, Flame, BarChart3, LogOut, Coffee, Menu, X, Plus,
-  Package, Box, Boxes, CupSoda, MapPin, FlaskConical, Sun, Warehouse, ChevronDown,
+  Package, Box, Boxes, CupSoda, MapPin, FlaskConical, Sun, Warehouse, ChevronDown, Award,
 } from "lucide-react";
 import { getCurrentUserRole, type UserRole } from "@/lib/auth-helpers";
 
@@ -24,6 +24,7 @@ const beneficioNavItems = [
   { href: "/beneficio/bodegaje", label: "Bodegaje", icon: Warehouse },
   { href: "/beneficio/trilla", label: "Trilla", icon: Boxes },
   { href: "/beneficio/catacion", label: "Catación", icon: CupSoda },
+  { href: "/beneficio/calificacion", label: "Calificación", icon: Award },
   { href: "/fincas", label: "Fincas", icon: MapPin },
 ];
 
