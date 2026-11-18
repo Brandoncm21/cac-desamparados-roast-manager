@@ -106,26 +106,67 @@ export function extraerErrores(
  * Un cuerpo ilegible (HTML de un 502, cuerpo vacío) no debe romper la UI:
  * se degrada a un mensaje con el status.
  */
-export async function leerJson<T>(res: Response): Promise<T> {
-  let cuerpo: unknown;
+async function cuerpoDe(res: Response): Promise<unknown> {
   try {
-    cuerpo = await res.json();
+    return await res.json();
   } catch {
-    cuerpo = undefined;
+    return undefined;
   }
+}
 
-  if (res.ok) {
-    return (cuerpo as { data?: T } | undefined)?.data as T;
-  }
-
+/** Construye el `ApiError` a partir del sobre `{ error }` del servidor. */
+function errorDeRespuesta(res: Response, cuerpo: unknown): ApiError {
   const error = (cuerpo as CuerpoError | undefined)?.error;
   const { fieldErrors, formErrors } = extraerErrores(error?.issues);
 
-  throw new ApiError(error?.message || `Error HTTP ${res.status}`, res.status, {
+  return new ApiError(error?.message || `Error HTTP ${res.status}`, res.status, {
     ...(error?.code ? { code: error.code } : {}),
     fieldErrors,
     formErrors,
   });
+}
+
+/**
+ * Lee el cuerpo de una respuesta y devuelve `data`, o lanza `ApiError`.
+ *
+ * Un cuerpo ilegible (HTML de un 502, cuerpo vacío) no debe romper la UI:
+ * se degrada a un mensaje con el status.
+ */
+export async function leerJson<T>(res: Response): Promise<T> {
+  const cuerpo = await cuerpoDe(res);
+  if (!res.ok) throw errorDeRespuesta(res, cuerpo);
+  return (cuerpo as { data?: T } | undefined)?.data as T;
+}
+
+export interface PaginacionApi {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+/**
+ * Variante para endpoints paginados (`apiPaginado`), que devuelven además la
+ * meta necesaria para pintar el paginador.
+ */
+export async function leerJsonPaginado<T>(
+  res: Response
+): Promise<{ items: T[]; pagination: PaginacionApi }> {
+  const cuerpo = await cuerpoDe(res);
+  if (!res.ok) throw errorDeRespuesta(res, cuerpo);
+
+  const sobre = cuerpo as { data?: T[]; pagination?: Partial<PaginacionApi> } | undefined;
+  const meta = sobre?.pagination;
+
+  return {
+    items: sobre?.data ?? [],
+    pagination: {
+      page: meta?.page ?? 1,
+      pageSize: meta?.pageSize ?? 25,
+      total: meta?.total ?? 0,
+      totalPages: meta?.totalPages ?? 1,
+    },
+  };
 }
 
 /** Mensaje apto para un toast a partir de cualquier error capturado. */

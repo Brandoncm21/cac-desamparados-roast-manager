@@ -20,7 +20,7 @@ interface Resumen {
   trillaWfinal: number | null;
   ordenes: Array<{ id_orden: number; origen: string; estado_orden?: string }>;
   perfiles: Array<{ id_perfil: number; estado: string; numero_lote: string | null }>;
-  cataciones: Array<{ id_catacion_tueste: number; pfinales: number | null }>;
+  cataciones: Array<{ id_catacion_tueste: number; catado: boolean; notas_catacion: string | null }>;
   lote: { nlote: string; enproceso: string; vendido: boolean };
 }
 
@@ -67,7 +67,11 @@ export function TrazabilidadPanel({ loteId }: { loteId: string }) {
 
         // Resumen de tueste: perfiles ligados a las órdenes de este lote (via supabase client)
         let perfiles: Array<{ id_perfil: number; estado: string; numero_lote: string | null }> = [];
-        let cataciones: Array<{ id_catacion_tueste: number; pfinales: number | null }> = [];
+        let cataciones: Array<{
+          id_catacion_tueste: number;
+          catado: boolean;
+          notas_catacion: string | null;
+        }> = [];
 
         const ole: Array<{ id_orden: number; origen: string }> = Array.isArray(lote?.ordenes_vinculadas)
           ? lote.ordenes_vinculadas
@@ -75,14 +79,24 @@ export function TrazabilidadPanel({ loteId }: { loteId: string }) {
 
         const nlote: string | undefined = lote?.nlote;
         if (nlote) {
-          const catList = cat?.data?.data ?? cat?.data ?? [];
-          cataciones = Array.isArray(catList)
-            ? catList.filter((c: { nlote: string | null }) => c.nlote === nlote)
-                .map((c: { id_catacion_tueste: number; pfinales: number | null }) => ({
-                  id_catacion_tueste: c.id_catacion_tueste,
-                  pfinales: c.pfinales,
-                }))
-            : [];
+          // `/api/cataciones` devuelve lotes con su catación (vista v_lotes_catacion).
+          const catList = Array.isArray(cat?.data) ? cat.data : [];
+          cataciones = catList
+            .filter((c: { id_lote: number }) => c.id_lote === Number(loteId))
+            .map(
+              (c: {
+                id_catacion_tueste: number | null;
+                catado: boolean;
+                notas_catacion: string | null;
+              }) => ({
+                id_catacion_tueste: c.id_catacion_tueste as number,
+                catado: c.catado,
+                notas_catacion: c.notas_catacion,
+              })
+            )
+            .filter(
+              (c: { id_catacion_tueste: number | null }) => c.id_catacion_tueste != null
+            );
         }
 
         // Tueste: perfiles ligados a las órdenes enlazadas de este lote
@@ -214,7 +228,7 @@ export function TrazabilidadPanel({ loteId }: { loteId: string }) {
                     <Link key={c.id_catacion_tueste} href={`/cataciones/${c.id_catacion_tueste}`}>
                       <Button variant="link" className="h-auto p-0">
                         Catación #{c.id_catacion_tueste}
-                        {c.pfinales != null ? ` — ${c.pfinales}` : ""}
+                        {c.catado ? " — catado" : " — sin catar"}
                       </Button>
                     </Link>
                   ))}
