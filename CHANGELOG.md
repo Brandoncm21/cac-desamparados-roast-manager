@@ -11,9 +11,16 @@ Todas las notas de versión de SCACR.
 - **DB `0052b`/`0052c`**: RPCs `guardar_caracterizacion`, `guardar_secado`, `guardar_bodega`, `guardar_trilla` y `guardar_catacion` (con chequeo de rol), helpers internos, avance de estado solo hacia adelante y hardening (`SET search_path`, `REVOKE` a `anon`).
 - **DB `0053`**: se elimina `fincas.cliente_id` y sus índices; quedan `productor_id` + UNIQUE `(productor_id, nombre)`.
 - **API**: nuevas rutas `/api/recibido` (GET/POST), `/api/recibido/[id]` (GET/PUT/DELETE), las 5 etapas (`GET` fila / `PUT` RPC) y `/api/productores`; `/api/fincas` pasa a `productor_id`. Se retiran `/api/lotes/**` y `/api/cataciones/**`.
-- **UI**: módulos `/beneficio/{recibido,caracterizacion,secado,bodegaje,trilla,catacion,calificacion}` y grupo colapsable **Beneficiado / Acopio** en el sidebar; `/lotes/**` redirige a `/beneficio/recibido`. El dashboard y el alta de órdenes consumen el nuevo catálogo (`numero_lote`, `productores`).
+- **UI**: módulos `/beneficio/{recibido,caracterizacion,secado,bodegaje,trilla,catacion}` y grupo colapsable **Beneficiado / Acopio** en el sidebar; `/lotes/**` redirige a `/beneficio/recibido`. El dashboard y el alta de órdenes consumen el nuevo catálogo (`numero_lote`, `productores`).
 - **Fincas**: formulario, listado, detalle y selector migrados a `productor_id`; el alta de órdenes usa el selector sin filtro de productor (la finca de la orden sigue siendo opcional).
 - **Verificación**: `typecheck` 0 · `lint` 0 errores · 301 tests · `build` OK · `check-secrets` OK · cobertura 85.44% stmts / 79.06% branches / 82.95% funcs / 86.14% lines.
+
+### Added — Calificación de café arábiga (006, verde y tostado)
+- **DB `0054`**: tabla `calificacion_lote` (1:1 con el lote) con bloque verde (humedad, densidad, defectos primarios/secundarios, % verde) y tostado (puntaje SCA 0–100, fragancia, acidez, cuerpo, dulzor, balance, notas). Se agrega el estado `Calificado` al CHECK de `lotes_cafe.enproceso` (entre `Catado` y `Vendido`).
+- **RPC**: `guardar_calificacion(p_id_lote, p_calificacion)` (`SECURITY INVOKER`, `SET search_path`) con chequeo de rol y avance a `Calificado`; el tostado exige humedad del verde (FR-003).
+- **API**: `GET/PUT /api/recibido/[id]/calificacion`; detalle de lote incluye `etapas.calificacion`.
+- **UI**: `/beneficio/calificacion` pasa de placeholder a etapa real (EtapaPage) con campos declarativos verde/tostado.
+- **Verificación**: `typecheck` 0 · `lint` 0 errores · 309 tests · `build` OK.
 
 ### Changed — Catación mínima: lote + catado + notas (0048–0049)
 - **DB `0048`**: `catacion_tueste` se reduce a `id_catacion_tueste`, `id_lote`, `catado`, `notas_catacion` y auditoría (`created_at`/`updated_at`/`deleted_at`). Se retiran **49 columnas** heredadas de CBF (físico-visual, defectos C1/C2, zarandas, Agtron, `perfil_tueste_ref`, `nlote`, `ffreposo`, `pfinales`, `producto_analizado`) y se dropea la tabla `catacion_rondas`.

@@ -77,7 +77,7 @@ describe("lib/estados", () => {
       );
     });
 
-    it("debería cubrir los estados de lote del flujo Beneficiado (005)", () => {
+    it("debería cubrir los estados de lote del flujo Beneficiado (005-006)", () => {
       expect(Object.keys(ESTADOS_LOTE).sort()).toEqual(
         [
           "Recibido",
@@ -86,6 +86,7 @@ describe("lib/estados", () => {
           "En Bodega",
           "En Trilla",
           "Catado",
+          "Calificado",
           "Vendido",
         ].sort()
       );

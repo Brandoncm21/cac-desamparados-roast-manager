@@ -31,7 +31,8 @@ export type EtapaNombre =
   | "secado"
   | "bodegaje"
   | "trilla"
-  | "catacion";
+  | "catacion"
+  | "calificacion";
 
 export const TITULO_ETAPA: Record<EtapaNombre, string> = {
   caracterizacion: "Caracterización de la materia prima",
@@ -39,6 +40,7 @@ export const TITULO_ETAPA: Record<EtapaNombre, string> = {
   bodegaje: "Bodegaje",
   trilla: "Trilla",
   catacion: "Catación",
+  calificacion: "Calificación de café arábiga",
 };
 
 export const DESCRIPCION_ETAPA: Record<EtapaNombre, string> = {
@@ -48,6 +50,8 @@ export const DESCRIPCION_ETAPA: Record<EtapaNombre, string> = {
   bodegaje: "Reposo, humedad, densidad y condiciones ambientales.",
   trilla: "Rendimientos, peso en verde y clasificación de la exportación.",
   catacion: "Resultado de taza del lote (catado sí/no y notas).",
+  calificacion:
+    "Evaluación final: análisis físico del café verde y puntaje sensorial del tostado.",
 };
 
 const S = {
@@ -234,6 +238,36 @@ export const CAMPOS_ETAPA: Record<EtapaNombre, CampoEtapa[]> = {
       ayuda: "Al marcarlo, el lote pasa a Catado.",
     },
     { key: "notas_catacion", label: "Notas de catación", tipo: "textarea", seccion: S.resultado },
+  ],
+
+  calificacion: [
+    // Bloque verde (análisis físico)
+    numero("humedad", "Humedad", "Café verde", {
+      unidad: "%",
+      step: "0.01",
+      min: 0,
+      max: 100,
+    }),
+    numero("densidad", "Densidad", "Café verde", {
+      unidad: "g/ml",
+      step: "0.001",
+      min: 0,
+    }),
+    numero("defectos_primarios", "Defectos primarios", "Café verde", { step: "1", min: 0 }),
+    numero("defectos_secundarios", "Defectos secundarios", "Café verde", { step: "1", min: 0 }),
+    porcentaje("porcentaje_verde", "% Café verde", "Café verde"),    // Bloque tostado (físico + sensorial)
+    numero("puntaje_sca", "Puntaje SCA", "Café tostado", {
+      step: "0.1",
+      min: 0,
+      max: 100,
+      ayuda: "Escala 0–100. Al guardarlo, el lote pasa a Calificado.",
+    }),
+    numero("fragancia", "Fragancia", "Café tostado", { step: "1", min: 1, max: 10 }),
+    numero("acidez", "Acidez", "Café tostado", { step: "1", min: 1, max: 10 }),
+    numero("cuerpo", "Cuerpo", "Café tostado", { step: "1", min: 1, max: 10 }),
+    numero("dulzor", "Dulzor", "Café tostado", { step: "1", min: 1, max: 10 }),
+    numero("balance", "Balance", "Café tostado", { step: "1", min: 1, max: 10 }),
+    { key: "notas", label: "Notas de calificación", tipo: "textarea", seccion: "Café tostado" },
   ],
 };
 
