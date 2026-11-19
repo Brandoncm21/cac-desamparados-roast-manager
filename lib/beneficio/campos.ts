@@ -101,38 +101,34 @@ const porcentaje = (
 
 const rango = (prefijo: string, desde: number, hasta: number): CampoEtapa[] =>
   Array.from({ length: hasta - desde + 1 }, (_, i) => desde + i).map((n) =>
-    numero(`${prefijo}_${n}`, `${prefijo === "semimadura" ? "Semimadura" : prefijo === "madura" ? "Madura" : "Sobremadura"} ${n}`, S.brix, {
-      step: "0.01",
-    })
+    numero(
+      `${prefijo}_${n}`,
+      `${prefijo === "semimadura" ? "Inmadura" : prefijo === "madura" ? "Madura" : "Sobremadura"} ${n}`,
+      S.brix,
+      { step: "0.01", unidad: "°Bx" }
+    )
   );
 
 export const CAMPOS_ETAPA: Record<EtapaNombre, CampoEtapa[]> = {
   caracterizacion: [
     { key: "fecha_hora", label: "Fecha y hora", tipo: "fechaHora", seccion: S.muestra },
     { key: "proceso", label: "Proceso", tipo: "texto", seccion: S.muestra },
-    { key: "escala_maduracion", label: "Escala de maduración", tipo: "texto", seccion: S.muestra },
-    { key: "rango_optimo_madurez", label: "Rango óptimo de madurez", tipo: "texto", seccion: S.muestra },
-    numero("muestreo_tabla", "Muestreo (tabla)", S.muestra, { min: 0 }),
+    { key: "proceso_otro", label: "Proceso (especifique)", tipo: "texto", seccion: S.muestra },
     numero("cerezas_verdes", "Cerezas verdes", S.conteo, { min: 0, step: "1" }),
-    numero("cerezas_semimaduras", "Cerezas semimaduras", S.conteo, { min: 0, step: "1" }),
+    numero("cerezas_semimaduras", "Cerezas inmaduras o semimaduras", S.conteo, { min: 0, step: "1" }),
     numero("cerezas_en_objetivo", "Cerezas en objetivo", S.conteo, { min: 0, step: "1" }),
     numero("cerezas_sobremaduras", "Cerezas sobremaduras", S.conteo, { min: 0, step: "1" }),
     numero("cerezas_secas", "Cerezas secas", S.conteo, { min: 0, step: "1" }),
     ...rango("semimadura", 1, 5),
-    numero("semimadura_bx_promedio", "Promedio semimadura (°Bx)", S.brix, { step: "0.01" }),
+    numero("semimadura_bx_promedio", "Promedio inmaduras (°Bx)", S.brix, { step: "0.01", unidad: "°Bx" }),
     ...rango("madura", 1, 5),
-    numero("madura_bx_promedio", "Promedio madura (°Bx)", S.brix, { step: "0.01" }),
+    numero("madura_bx_promedio", "Promedio maduras (°Bx)", S.brix, { step: "0.01", unidad: "°Bx" }),
     ...rango("sobremadura", 1, 5),
-    numero("sobremadura_bx_promedio", "Promedio sobremadura (°Bx)", S.brix, { step: "0.01" }),
-    porcentaje("pct_verdes_muestra", "Verdes", S.distribucion),
-    porcentaje("pct_debajo_objetivo_muestra", "Debajo del objetivo", S.distribucion),
-    porcentaje("pct_objetivo_muestra", "En objetivo", S.distribucion),
-    porcentaje("pct_encima_objetivo_muestra", "Encima del objetivo", S.distribucion),
-    porcentaje("pct_secas_muestra", "Secas", S.distribucion),
-    numero("g_vanos", "Vanos", S.defectos, { step: "0.01" }),
-    numero("g_secos", "Secos", S.defectos, { step: "0.01" }),
-    numero("g_broca", "Broca", S.defectos, { step: "0.01" }),
-    numero("densidad_g_ml", "Densidad (g/ml)", S.fisico, { step: "0.001" }),
+    numero("sobremadura_bx_promedio", "Promedio sobremaduras (°Bx)", S.brix, { step: "0.01", unidad: "°Bx" }),
+    numero("g_vanos", "Granos vanos", S.defectos, { step: "0.01", unidad: "g" }),
+    numero("g_secos", "Granos secos", S.defectos, { step: "0.01", unidad: "g" }),
+    numero("g_broca", "Granos con broca", S.defectos, { step: "0.01", unidad: "g" }),
+    numero("densidad_g_ml", "Densidad", S.fisico, { step: "0.001", unidad: "g/ml" }),
     {
       key: "observaciones_aspecto_textura",
       label: "Observaciones de aspecto y textura",

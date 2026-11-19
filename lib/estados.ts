@@ -1,22 +1,12 @@
-/**
- * Fuente única de estados de dominio y su presentación.
- *
- * Antes cada página definía su propio `estadoBadge` con un mapa de colores
- * duplicado. Las clases se conservan tal cual estaban para no cambiar la UI.
- */
-
 export interface DefinicionEstado {
-  /** Texto visible (los estados de paso vienen en MAYÚSCULAS y se muestran legibles). */
   label: string;
-  /** Clases Tailwind del badge. */
   className: string;
 }
 
 export type MapaEstados = Record<string, DefinicionEstado>;
 
-export type FamiliaEstados = "orden" | "lote" | "paso";
+export type FamiliaEstados = "orden" | "lote" | "paso" | "estado_lote";
 
-/** Estado desconocido o vacío: gris y sin inventar etiqueta. */
 export const NEUTRO: DefinicionEstado = {
   label: "",
   className: "bg-gray-100 text-gray-800",
@@ -40,6 +30,12 @@ export const ESTADOS_LOTE: MapaEstados = {
   Vendido: { label: "Vendido", className: "bg-green-100 text-green-800" },
 };
 
+export const ESTADOS_LOTE_COMERCIAL: MapaEstados = {
+  proceso: { label: "En proceso", className: "bg-amber-100 text-amber-800" },
+  disponible: { label: "Disponible", className: "bg-blue-100 text-blue-800" },
+  vendido: { label: "Vendido", className: "bg-green-100 text-green-800" },
+};
+
 export const ESTADOS_PASO: MapaEstados = {
   PENDIENTE: { label: "Pendiente", className: "bg-gray-100 text-gray-600" },
   EN_PROCESO: { label: "En proceso", className: "bg-blue-100 text-blue-800" },
@@ -51,14 +47,9 @@ const MAPAS: Record<FamiliaEstados, MapaEstados> = {
   orden: ESTADOS_ORDEN,
   lote: ESTADOS_LOTE,
   paso: ESTADOS_PASO,
+  estado_lote: ESTADOS_LOTE_COMERCIAL,
 };
 
-/**
- * Devuelve la definición de presentación de un estado.
- *
- * Un estado vacío o ausente devuelve `NEUTRO`; un estado no registrado conserva
- * su texto crudo con el color neutro.
- */
 export function resolverEstado(
   estado: string | null | undefined,
   familia: FamiliaEstados = "orden"

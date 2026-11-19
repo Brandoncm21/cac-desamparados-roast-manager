@@ -2,13 +2,8 @@ import { z } from "zod";
 
 /**
  * Esquemas del flujo Beneficiado / Acopio (spec 005).
- *
- * Unidades: los porcentajes van en 0–100; el pH de miel es numérico (0–14);
- * los pesos en kg; las temperaturas en °C. Los mensajes nombran la unidad para
- * que el 422 sea accionable en la UI.
  */
 
-/** Normaliza "" y NaN (inputs numéricos vacíos de RHF) a null. */
 const numeroOpcional = z.preprocess(
   (v) => ((typeof v === "number" && Number.isNaN(v)) || v === "" ? null : v),
   z.number().optional().nullable()
@@ -22,6 +17,20 @@ const porcentaje = z.preprocess(
 const enteroOpcional = z.preprocess(
   (v) => ((typeof v === "number" && Number.isNaN(v)) || v === "" ? null : v),
   z.number().int("Debe ser un entero").min(0, "No puede ser negativo").optional().nullable()
+);
+
+const enteroRequerido = (mensaje: string) =>
+  z.preprocess(
+    (v) => (v === "" || (typeof v === "number" && Number.isNaN(v)) ? undefined : v),
+    z.number({ error: mensaje }).int("Debe ser un entero").min(0, "No puede ser negativo")
+  );
+
+const textoRequerido = (max: number, mensaje: string) =>
+  z.string().trim().min(1, mensaje).max(max);
+
+const decimalPositivoOpcional = z.preprocess(
+  (v) => ((typeof v === "number" && Number.isNaN(v)) || v === "" ? null : v),
+  z.number().positive("Debe ser mayor que 0").optional().nullable()
 );
 
 const textoOpcional = (max: number) =>
@@ -45,7 +54,9 @@ export const ESTADOS_BENEFICIO = [
   "Vendido",
 ] as const;
 
-export const PROCESOS_BENEFICIO = ["Lavado", "Honey", "Natural", "Otro"] as const;
+export const PROCESOS_BENEFICIO = ["Lavado", "Honey", "Natural", "Miel", "Semilavado", "Anaeróbico", "Otro"] as const;
+
+export const ESTADOS_LOTE_COMERCIAL = ["proceso", "disponible", "vendido"] as const;
 
 export const ETAPAS_BENEFICIO = [
   "caracterizacion",
@@ -60,43 +71,66 @@ export type EtapaBeneficio = (typeof ETAPAS_BENEFICIO)[number];
 
 // ── Recibido de Café (nacimiento del lote) ──────────────────────────────────
 const recibidoCampos = {
-  numero_lote: z.string().trim().min(1, "El número de lote es obligatorio").max(100),
-  numero_recibo: z.string().trim().min(1, "El número de recibo es obligatorio").max(50),
-  factura: textoOpcional(50),
+  numero_lote: textoOpcional(100),
+  numero_recibo: textoOpcional(50),
   productor_id: z.number().int().positive("El productor es obligatorio"),
   finca_id: z.number().int().positive("La finca es obligatoria"),
-  varietal: textoOpcional(100),
-  cajuelas: enteroOpcional,
-  cuartillos: enteroOpcional,
+  varietal: textoRequerido(100, "El varietal es obligatorio"),
+  cajuelas: enteroRequerido("Las cajuelas son obligatorias"),
+  cuartillos: enteroRequerido("Los cuartillos son obligatorios"),
   porcentaje_flote: porcentaje,
   porcentaje_broca: porcentaje,
   porcentaje_vano: porcentaje,
   porcentaje_verde: porcentaje,
   porcentaje_secos: porcentaje,
-  ph_miel: z.preprocess(
-    (v) => ((typeof v === "number" && Number.isNaN(v)) || v === "" ? null : v),
-    z.number().min(0, "El pH mínimo es 0").max(14, "El pH máximo es 14").optional().nullable()
-  ),
-  puro_impuro: z.boolean().optional(),
-  limpio_sucio: z.boolean().optional(),
-  rango_objetivo: enteroOpcional,
-  rango_sobre_objetivo: enteroOpcional,
-  rango: enteroOpcional,
+  porcentaje_segundas: porcentaje,
+  porcentaje_danos_mecanicos: porcentaje,
+  porcentaje_pulpa_pergamino: porcentaje,
+  porcentaje_pergamino_pulpa: porcentaje,
+  densidad_fruta: decimalPositivoOpcional,
+  densidad_pergamino_humedo: decimalPositivoOpcional,
+  porcentaje_puro: porcentaje,
+  porcentaje_impuro: porcentaje,
+  porcentaje_limpio: porcentaje,
+  porcentaje_sucio: porcentaje,
   proceso: z.enum(PROCESOS_BENEFICIO).optional().nullable(),
+  proceso_otro: textoOpcional(100),
+  estado_lote: z.enum(ESTADOS_LOTE_COMERCIAL).optional().nullable(),
   fecha_recibido: z.string().optional().nullable().or(z.literal("")),
 };
 
-export const crearRecibidoSchema = z.object(recibidoCampos).transform((v) => ({
-  ...v,
-  puro_impuro: v.puro_impuro ?? true,
-  limpio_sucio: v.limpio_sucio ?? true,
-}));
+const validarProcesoOtro = (value: { proceso?: string | null; proceso_otro?: string | null }) => {
+  if (value.proceso === "Otro") return Boolean(value.proceso_otro?.trim());
+  return true;
+};
+
+export const crearRecibidoSchema = z.object(recibidoCampos).superRefine((v, ctx) => {
+  if (!validarProcesoOtro(v)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Especifique el proceso",
+      path: ["proceso_otro"],
+    });
+  }
+});
 
 /** PUT parcial: sin defaults para no pisar columnas que no vienen en el body. */
-export const actualizarRecibidoSchema = z.object(recibidoCampos).partial();
+export const actualizarRecibidoSchema = z
+  .object(recibidoCampos)
+  .partial()
+  .superRefine((v, ctx) => {
+    if (v.proceso === "Otro" && !v.proceso_otro?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Especifique el proceso",
+        path: ["proceso_otro"],
+      });
+    }
+  });
 
 export const listarRecibidoFiltrosSchema = z.object({
   enproceso: z.enum(ESTADOS_BENEFICIO).optional().or(z.literal("")),
+  estado_lote: z.enum(ESTADOS_LOTE_COMERCIAL).optional().or(z.literal("")),
   productor_id: z.number().int().positive().optional(),
   finca_id: z.number().int().positive().optional(),
   desde: fechaOpcional,
@@ -104,46 +138,49 @@ export const listarRecibidoFiltrosSchema = z.object({
 });
 
 // ── Caracterización de materia prima ────────────────────────────────────────
-export const caracterizacionSchema = z.object({
-  fecha_hora: z.string().optional().nullable().or(z.literal("")),
-  proceso: textoOpcional(50),
-  cerezas_verdes: enteroOpcional,
-  cerezas_semimaduras: enteroOpcional,
-  cerezas_en_objetivo: enteroOpcional,
-  cerezas_sobremaduras: enteroOpcional,
-  cerezas_secas: enteroOpcional,
-  semimadura_1: numeroOpcional,
-  semimadura_2: numeroOpcional,
-  semimadura_3: numeroOpcional,
-  semimadura_4: numeroOpcional,
-  semimadura_5: numeroOpcional,
-  semimadura_bx_promedio: numeroOpcional,
-  madura_1: numeroOpcional,
-  madura_2: numeroOpcional,
-  madura_3: numeroOpcional,
-  madura_4: numeroOpcional,
-  madura_5: numeroOpcional,
-  madura_bx_promedio: numeroOpcional,
-  sobremadura_1: numeroOpcional,
-  sobremadura_2: numeroOpcional,
-  sobremadura_3: numeroOpcional,
-  sobremadura_4: numeroOpcional,
-  sobremadura_5: numeroOpcional,
-  sobremadura_bx_promedio: numeroOpcional,
-  observaciones_aspecto_textura: textoOpcional(2000),
-  densidad_g_ml: numeroOpcional,
-  escala_maduracion: textoOpcional(50),
-  rango_optimo_madurez: textoOpcional(50),
-  muestreo_tabla: numeroOpcional,
-  pct_verdes_muestra: porcentaje,
-  pct_debajo_objetivo_muestra: porcentaje,
-  pct_objetivo_muestra: porcentaje,
-  pct_encima_objetivo_muestra: porcentaje,
-  pct_secas_muestra: porcentaje,
-  g_vanos: numeroOpcional,
-  g_secos: numeroOpcional,
-  g_broca: numeroOpcional,
-});
+export const caracterizacionSchema = z
+  .object({
+    fecha_hora: z.string().optional().nullable().or(z.literal("")),
+    proceso: z.enum(PROCESOS_BENEFICIO).optional().nullable(),
+    proceso_otro: textoOpcional(100),
+    cerezas_verdes: enteroOpcional,
+    cerezas_semimaduras: enteroOpcional,
+    cerezas_en_objetivo: enteroOpcional,
+    cerezas_sobremaduras: enteroOpcional,
+    cerezas_secas: enteroOpcional,
+    semimadura_1: numeroOpcional,
+    semimadura_2: numeroOpcional,
+    semimadura_3: numeroOpcional,
+    semimadura_4: numeroOpcional,
+    semimadura_5: numeroOpcional,
+    semimadura_bx_promedio: numeroOpcional,
+    madura_1: numeroOpcional,
+    madura_2: numeroOpcional,
+    madura_3: numeroOpcional,
+    madura_4: numeroOpcional,
+    madura_5: numeroOpcional,
+    madura_bx_promedio: numeroOpcional,
+    sobremadura_1: numeroOpcional,
+    sobremadura_2: numeroOpcional,
+    sobremadura_3: numeroOpcional,
+    sobremadura_4: numeroOpcional,
+    sobremadura_5: numeroOpcional,
+    sobremadura_bx_promedio: numeroOpcional,
+    observaciones_aspecto_textura: textoOpcional(2000),
+    densidad_g_ml: numeroOpcional,
+    g_vanos: numeroOpcional,
+    g_secos: numeroOpcional,
+    g_broca: numeroOpcional,
+  })
+  .superRefine((v, ctx) => {
+    if (v.proceso === "Otro" && !v.proceso_otro?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Especifique el proceso",
+        path: ["proceso_otro"],
+      });
+    }
+  });
 
 // ── Secado ──────────────────────────────────────────────────────────────────
 export const secadoSchema = z

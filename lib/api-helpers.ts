@@ -59,6 +59,10 @@ export function statusDeCodigoPg(code?: string): number {
       return 400;
     case "23514":
       return 422;
+    case "PGRST204":
+      return 422;
+    case "PGRST205":
+      return 404;
     default:
       return 500;
   }

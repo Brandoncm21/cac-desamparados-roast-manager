@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { EstadoBadge } from "@/components/ui/estado-badge";
 import { FormularioEtapa } from "@/components/beneficio/formulario-etapa";
+import { FormularioCaracterizacion } from "@/components/beneficio/formulario-caracterizacion";
 import {
   listarRecibidos,
   obtenerEtapa,
@@ -252,14 +253,24 @@ export function EtapaPage({ etapa }: EtapaPageProps) {
               <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : dialogo ? (
-            <FormularioEtapa
-              key={dialogo.lote.id_lote}
-              etapa={etapa}
-              idLote={dialogo.lote.id_lote}
-              initial={dialogo.fila}
-              onSaved={alGuardar}
-              onCancel={cerrar}
-            />
+            etapa === "caracterizacion" ? (
+              <FormularioCaracterizacion
+                key={dialogo.lote.id_lote}
+                lote={dialogo.lote}
+                initial={dialogo.fila}
+                onSaved={alGuardar}
+                onCancel={cerrar}
+              />
+            ) : (
+              <FormularioEtapa
+                key={dialogo.lote.id_lote}
+                etapa={etapa}
+                idLote={dialogo.lote.id_lote}
+                initial={dialogo.fila}
+                onSaved={alGuardar}
+                onCancel={cerrar}
+              />
+            )
           ) : null}
         </DialogContent>
       </Dialog>

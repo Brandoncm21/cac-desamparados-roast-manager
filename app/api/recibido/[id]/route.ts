@@ -101,8 +101,35 @@ async function put(
   if (!parsed.success) return apiValidationError(parsed.error.flatten());
 
   const { fecha_recibido, ...resto } = parsed.data;
+
+  let zona_finca: string | undefined;
+  let altura_finca: number | undefined;
+  if (resto.finca_id) {
+    const { data: finca, error: errorFinca } = await supabase
+      .from("fincas")
+      .select("id_finca, productor_id, altura, zonas_finca(nombre)")
+      .eq("id_finca", resto.finca_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (errorFinca) return apiError(errorFinca.message, 500);
+    if (!finca) return apiError("La finca indicada no existe o fue eliminada", 400);
+    if (resto.productor_id && finca.productor_id !== resto.productor_id) {
+      return apiError("La finca no pertenece al productor seleccionado", 400);
+    }
+    const zonaRelacion: unknown = finca.zonas_finca;
+    const zona = Array.isArray(zonaRelacion) ? (zonaRelacion[0] as { nombre?: string } | undefined)?.nombre : (zonaRelacion as { nombre?: string } | null)?.nombre;
+    if (!zona || finca.altura == null) {
+      return apiError("La finca seleccionada no tiene zona y/o altura registrada", 422);
+    }
+    zona_finca = zona;
+    altura_finca = finca.altura;
+  }
+
   const payload = {
     ...resto,
+    ...(zona_finca !== undefined ? { zona_finca } : {}),
+    ...(altura_finca !== undefined ? { altura_finca } : {}),
     ...(fecha_recibido ? { fecha_recibido } : {}),
   };
 

@@ -38,6 +38,7 @@ async function get(request: NextRequest) {
 
   const filtrosParseo = listarRecibidoFiltrosSchema.safeParse({
     enproceso: searchParams.get("enproceso") ?? "",
+    estado_lote: searchParams.get("estado_lote") ?? "",
     productor_id: numerico("productor_id"),
     finca_id: numerico("finca_id"),
     desde: searchParams.get("desde") ?? "",
@@ -60,11 +61,14 @@ async function get(request: NextRequest) {
     .range(from, to);
 
   if (filtros.enproceso) query = query.eq("enproceso", filtros.enproceso);
+  if (filtros.estado_lote) query = query.eq("estado_lote", filtros.estado_lote);
   if (filtros.productor_id) query = query.eq("productor_id", filtros.productor_id);
   if (filtros.finca_id) query = query.eq("finca_id", filtros.finca_id);
   if (filtros.desde) query = query.gte("fecha_recibido", `${filtros.desde}T00:00:00.000Z`);
   if (filtros.hasta) query = query.lte("fecha_recibido", `${filtros.hasta}T23:59:59.999Z`);
-  if (busqueda) query = query.ilike("numero_lote", `%${busqueda}%`);
+  if (busqueda) {
+    query = query.or(`numero_lote.ilike.%${busqueda}%,numero_recibo.ilike.%${busqueda}%`);
+  }
 
   const { data, count, error } = await query;
   if (error) return apiError(error.message, 500);
@@ -81,10 +85,10 @@ async function post(request: NextRequest) {
 
   const { fecha_recibido, ...resto } = parsed.data;
 
-  // La finca debe pertenecer al productor seleccionado (coherencia del flujo).
+  // La finca debe pertenecer al productor y tener zona/altura completas.
   const { data: finca, error: errorFinca } = await supabase
     .from("fincas")
-    .select("id_finca, productor_id, altura")
+    .select("id_finca, productor_id, altura, zonas_finca(nombre)")
     .eq("id_finca", resto.finca_id)
     .is("deleted_at", null)
     .maybeSingle();
@@ -94,11 +98,16 @@ async function post(request: NextRequest) {
   if (finca.productor_id !== resto.productor_id) {
     return apiError("La finca no pertenece al productor seleccionado", 400);
   }
+  const zonaRelacion: unknown = finca.zonas_finca;
+  const zona = Array.isArray(zonaRelacion) ? (zonaRelacion[0] as { nombre?: string } | undefined)?.nombre : (zonaRelacion as { nombre?: string } | null)?.nombre;
+  if (!zona || finca.altura == null) {
+    return apiError("La finca seleccionada no tiene zona y/o altura registrada", 422);
+  }
 
   const payload = {
     ...resto,
-    factura: resto.factura || null,
-    varietal: resto.varietal || null,
+    zona_finca: zona,
+    altura_finca: finca.altura,
     ...(fecha_recibido ? { fecha_recibido } : {}),
   };
 

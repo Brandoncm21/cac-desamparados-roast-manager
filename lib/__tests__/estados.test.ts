@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   ESTADOS_LOTE,
+  ESTADOS_LOTE_COMERCIAL,
   ESTADOS_ORDEN,
   ESTADOS_PASO,
   NEUTRO,
@@ -61,6 +62,7 @@ describe("lib/estados", () => {
       ["orden", ESTADOS_ORDEN],
       ["lote", ESTADOS_LOTE],
       ["paso", ESTADOS_PASO],
+      ["estado_lote", ESTADOS_LOTE_COMERCIAL],
     ];
 
     it.each(mapas)("el mapa %s debería tener etiqueta y clase en cada entrada", (_nombre, mapa) => {
@@ -92,10 +94,14 @@ describe("lib/estados", () => {
       );
     });
 
-    it("debería conservar los cuatro estados de paso del dominio", () => {
-      expect(Object.keys(ESTADOS_PASO).sort()).toEqual(
-        ["COMPLETADO", "EN_PROCESO", "OMITIDO", "PENDIENTE"].sort()
-      );
-    });
+  it("debería conservar los cuatro estados de paso del dominio", () => {
+    expect(Object.keys(ESTADOS_PASO).sort()).toEqual(
+      ["COMPLETADO", "EN_PROCESO", "OMITIDO", "PENDIENTE"].sort()
+    );
+  });
+
+  it("debería tener los tres estados comerciales del lote", () => {
+    expect(Object.keys(ESTADOS_LOTE_COMERCIAL).sort()).toEqual(["disponible", "proceso", "vendido"].sort());
+  });
   });
 });
