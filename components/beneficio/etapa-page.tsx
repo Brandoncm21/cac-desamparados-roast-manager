@@ -29,6 +29,7 @@ import { FormularioCaracterizacion } from "@/components/beneficio/formulario-car
 import { FormularioSecado } from "@/components/beneficio/formulario-secado";
 import { FormularioBodegaje } from "@/components/beneficio/formulario-bodegaje";
 import { FormularioTrilla } from "@/components/beneficio/formulario-trilla";
+import { FormularioCalificacion } from "@/components/beneficio/formulario-calificacion";
 import {
   listarRecibidos,
   obtenerEtapa,
@@ -98,7 +99,7 @@ export function EtapaPage({ etapa }: EtapaPageProps) {
   }, [cargar]);
 
   const puedeEscribir =
-    etapa === "catacion"
+    etapa === "catacion" || etapa === "calificacion"
       ? userRole === "Admin" || userRole === "Tostador"
       : userRole === "Admin" || userRole === "Recepción";
 
@@ -282,6 +283,14 @@ export function EtapaPage({ etapa }: EtapaPageProps) {
               />
             ) : etapa === "trilla" ? (
               <FormularioTrilla
+                key={dialogo.lote.id_lote}
+                lote={dialogo.lote}
+                initial={dialogo.fila}
+                onSaved={alGuardar}
+                onCancel={cerrar}
+              />
+            ) : etapa === "calificacion" ? (
+              <FormularioCalificacion
                 key={dialogo.lote.id_lote}
                 lote={dialogo.lote}
                 initial={dialogo.fila}

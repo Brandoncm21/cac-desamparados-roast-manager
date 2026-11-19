@@ -4,6 +4,12 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Added — Hoja de calificación SCA verde y tostado (0061)
+- **DB `0061`**: se extiende `calificacion_lote` con datos generales, color, olor, totales y bloque tostado; catálogo `cat_defecto_calificacion` con 16 defectos verdes + Quaker y detalle `calificacion_defecto`. Rollback en `supabase/rollbacks/0061_hoja_calificacion_down.sql`.
+- **UI**: formulario dedicado en 3 cajitas con tablas de defectos, equivalencias y totales calculados, color/olor como combos, Quaker y grados sugeridos/editables.
+- **Grados**: Specialty/Premium/Exchange/Below Standard; el lote avanza a `Calificado` cuando ambos grados están definidos.
+- **Navegación**: la entrada se mueve entre Trilla y Catación con el nombre completo de la hoja.
+
 ### Changed — Trilla compacta en 6 cajitas (0060)
 - **UI**: formulario dedicado con Trilla, Peso teórico, Peso verde sin selección, Mediciones de humedad, Porcentaje en calidades y Peso en verde exportación.
 - **DB `0060`**: se agregan `pruebas_fisicas_trilla` y `peso_en_verde_final_inferior`; `guardar_trilla` las persiste.

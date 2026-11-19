@@ -22,13 +22,20 @@ async function get(
 
   const { data, error } = await supabase
     .from("calificacion_lote")
-    .select("*")
+    .select(
+      "*, calificacion_defecto(id_defecto, numero_defectos, proporcion, equivalencia, cat_defecto_calificacion(nombre, tipo_cafe, categoria, orden))"
+    )
     .eq("id_lote", idLote)
     .is("deleted_at", null)
     .maybeSingle();
 
   if (error) return apiError(error.message, statusDeCodigoPg(error.code));
-  return apiOk(data ?? null);
+  if (!data) return apiOk(null);
+
+  const { calificacion_defecto, ...fila } = data as typeof data & {
+    calificacion_defecto?: unknown[];
+  };
+  return apiOk({ ...fila, defectos: calificacion_defecto ?? [] });
 }
 
 async function put(
@@ -46,9 +53,9 @@ async function put(
 
   const { id_lote, ...calificacion } = parsed.data;
 
-  const { data, error } = await supabase.rpc("guardar_calificacion", {
+  const { data, error } = await supabase.rpc("guardar_hoja_calificacion", {
     p_id_lote: id_lote,
-    p_calificacion: calificacion,
+    p_datos: calificacion,
   });
 
   if (error) return apiError(error.message, statusDeCodigoPg(error.code));

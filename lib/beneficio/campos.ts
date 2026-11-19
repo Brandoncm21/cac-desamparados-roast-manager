@@ -40,7 +40,7 @@ export const TITULO_ETAPA: Record<EtapaNombre, string> = {
   bodegaje: "Bodegaje",
   trilla: "Trilla",
   catacion: "Catación",
-  calificacion: "Calificación de café arábiga",
+  calificacion: "Hoja de calificación de café arábiga verde y tostado",
 };
 
 export const DESCRIPCION_ETAPA: Record<EtapaNombre, string> = {
@@ -51,7 +51,7 @@ export const DESCRIPCION_ETAPA: Record<EtapaNombre, string> = {
   trilla: "Rendimientos, peso en verde y clasificación de la exportación.",
   catacion: "Resultado de taza del lote (catado sí/no y notas).",
   calificacion:
-    "Evaluación final: análisis físico del café verde y puntaje sensorial del tostado.",
+    "Hoja SCA: defectos del café verde (muestra 350 g), quakers del tostado (100 g) y grado.",
 };
 
 const S = {
@@ -242,33 +242,29 @@ export const CAMPOS_ETAPA: Record<EtapaNombre, CampoEtapa[]> = {
   ],
 
   calificacion: [
-    // Bloque verde (análisis físico)
-    numero("humedad", "Humedad", "Café verde", {
+    { key: "nombre", label: "Nombre", tipo: "texto", seccion: "Datos generales" },
+    { key: "codigo", label: "Código", tipo: "texto", seccion: "Datos generales" },
+    { key: "fecha", label: "Fecha", tipo: "fecha", seccion: "Datos generales" },
+    { key: "grado", label: "Grado", tipo: "texto", seccion: "Datos generales" },
+    numero("humedad", "Humedad", "Datos generales", {
       unidad: "%",
       step: "0.01",
       min: 0,
       max: 100,
     }),
-    numero("densidad", "Densidad", "Café verde", {
-      unidad: "g/ml",
-      step: "0.001",
+    numero("total_equivalencia", "Total equivalencia", "Datos generales", {
+      step: "0.01",
       min: 0,
     }),
-    numero("defectos_primarios", "Defectos primarios", "Café verde", { step: "1", min: 0 }),
-    numero("defectos_secundarios", "Defectos secundarios", "Café verde", { step: "1", min: 0 }),
-    porcentaje("porcentaje_verde", "% Café verde", "Café verde"),    // Bloque tostado (físico + sensorial)
-    numero("puntaje_sca", "Puntaje SCA", "Café tostado", {
-      step: "0.1",
+    numero("total_defectos_verde", "Total defectos verdes", "Datos generales", {
+      step: "1",
       min: 0,
-      max: 100,
-      ayuda: "Escala 0–100. Al guardarlo, el lote pasa a Calificado.",
     }),
-    numero("fragancia", "Fragancia", "Café tostado", { step: "1", min: 1, max: 10 }),
-    numero("acidez", "Acidez", "Café tostado", { step: "1", min: 1, max: 10 }),
-    numero("cuerpo", "Cuerpo", "Café tostado", { step: "1", min: 1, max: 10 }),
-    numero("dulzor", "Dulzor", "Café tostado", { step: "1", min: 1, max: 10 }),
-    numero("balance", "Balance", "Café tostado", { step: "1", min: 1, max: 10 }),
-    { key: "notas", label: "Notas de calificación", tipo: "textarea", seccion: "Café tostado" },
+    { key: "color", label: "Color", tipo: "texto", seccion: "Café verde" },
+    { key: "olor", label: "Olor", tipo: "texto", seccion: "Café verde" },
+    { key: "codigo_muestra_tostado", label: "Código de muestra", tipo: "texto", seccion: "Café tostado" },
+    numero("quakers", "Quakers", "Café tostado", { step: "1", min: 0 }),
+    { key: "grado_tostado", label: "Grado tostado", tipo: "texto", seccion: "Café tostado" },
   ],
 };
 
