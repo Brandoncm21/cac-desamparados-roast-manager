@@ -178,11 +178,11 @@ Dominio nuevo tras las migraciones `0050`–`0053`: el lote nace en **Recibido d
 
 **`GET /api/productores`** — paginado; `search` sobre `nombre_completo`; `deleted_at IS NULL`; orden por nombre.
 
-**`GET /api/recibido`** — paginado; filtros Zod `enproceso`, `productor_id`, `finca_id`, `desde`/`hasta` (`YYYY-MM-DD`); `search` sobre `numero_lote`/`numero_recibo`; embebe `productores(nombre_completo)` y `fincas(nombre, altura, zonas_finca(nombre))`; orden `fecha_recibido DESC`.
+**`GET /api/recibido`** — paginado; filtros Zod `enproceso`, `estado_lote`, `productor_id`, `finca_id`, `desde`/`hasta` (`YYYY-MM-DD`); `search` sobre `numero_lote`/`numero_recibo`; embebe `productores(nombre_completo)` y `fincas(nombre, altura, zonas_finca(nombre))`; orden `fecha_recibido DESC`.
 
-**`POST /api/recibido`** — `crearRecibidoSchema` ([`lib/schemas/beneficio.ts`](../../lib/schemas/beneficio.ts)); exige `productor_id` + `finca_id` coherentes (la finca debe pertenecer al productor → **400**); `numero_lote` UNIQUE → **409** (`23505`); `puro_impuro`/`limpio_sucio` por defecto `true`. Crea el lote en `Recibido`.
+**`POST /api/recibido`** — `crearRecibidoSchema` ([`lib/schemas/beneficio.ts`](../../lib/schemas/beneficio.ts)); exige `productor_id`, `finca_id`, `varietal`, `cajuelas` y `cuartillos`; la finca debe pertenecer al productor y tener zona/altura (si no → **422**). `numero_lote`, `numero_recibo` y `factura` se autogeneran (`L-`, `R-`, `FC-`); `zona_finca`/`altura_finca` se derivan en servidor. `numero_lote` UNIQUE → **409** (`23505`).
 
-**`GET /api/recibido/[id]`** — lote + `etapas` (`caracterizacion`, `secado`, `bodegaje`, `trilla`, `catacion`, `calificacion`), consultadas en paralelo. **`PUT`** actualiza la cabecera (parcial, sin defaults para no pisar columnas). **`DELETE`** hace soft delete.
+**`GET /api/recibido/[id]`** — lote + `etapas` (`caracterizacion`, `secado`, `bodegaje`, `trilla`, `catacion`, `calificacion`), consultadas en paralelo. **`PUT`** actualiza la cabecera (parcial; incluye `estado_lote` y pruebas opcionales; si cambia `finca_id` re-deriva zona/altura). **`DELETE`** hace soft delete.
 
 **Etapas** (`GET` devuelve la fila 1:1; `PUT` llama a la RPC y responde `{data: {<etapa>: row, enproceso}}`):
 
@@ -196,6 +196,7 @@ Dominio nuevo tras las migraciones `0050`–`0053`: el lote nace en **Recibido d
 | `PUT /api/recibido/[id]/calificacion` | `guardarCalificacionSchema` (verde + tostado; tostado exige humedad) | `guardar_calificacion(p_id_lote, p_calificacion)` |
 
 - Escritura de etapas: `Admin`/`Recepción`; catación y calificación: `Tostador`/`Admin`. `GET`: `Admin`/`Recepción`/`Tostador`.
+- **Caracterización (0057)**: `caracterizacionSchema` acepta `fecha_hora`, `proceso` (catálogo compartido), `proceso_otro`, conteos de cerezas, lecturas/promedios °Bx, `densidad_g_ml`, `g_vanos`/`g_secos`/`g_broca` y observaciones. Ya no acepta `escala_maduracion`, `rango_optimo_madurez`, `muestreo_tabla` ni `pct_*`.
 - Trilla sin `peso_verde_final` > 0 → **422**. `guardar_catacion` es `SECURITY DEFINER` con chequeo de rol; desmarcar `catado` revierte a `En Trilla`. `guardar_calificacion` es `SECURITY INVOKER` y avanza el lote a `Calificado`.
 - Mapeo de errores RPC: `P0002`→**404**, `42501`→**403**, `55000`→**409**, `22023`→**422**.
 

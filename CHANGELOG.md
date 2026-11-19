@@ -4,6 +4,18 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Changed — Caracterización de materia prima (0057)
+- **DB `0057`**: se eliminan `escala_maduracion`, `rango_optimo_madurez`, `muestreo_tabla` y los 5 `pct_*`; se agrega `proceso_otro` y CHECK del catálogo compartido; `guardar_caracterizacion` actualizada.
+- **UI**: formulario dedicado en 4 bloques (datos generales, cerezas, densidad/flotación y refractómetro) con fecha/hora actual editable, lote de solo lectura, proceso heredado del recibo y promedios °Bx en vivo.
+- **Cerezas**: se conservan los 5 estados existentes (`semimaduras` se muestra como “Inmaduras o semimaduras”) y los porcentajes se calculan en vivo sin persistirse.
+- **Reutilización**: combo de proceso compartido con Recibido (`ProcesoSelect`) y `InputConUnidad` para `g`, `g/ml` y `°Bx`.
+
+### Added — Recibido de Café: estado, PDF, requeridos y limpieza (0055–0056)
+- **DB `0055`**: `lotes_cafe.estado_lote` (`proceso/disponible/vendido`) con sincronización de `disponible`/`vendido`; `proceso_otro`; `% segundas/daños mecánicos/pulpa pergamino/pergamino en pulpa`; densidades de fruta/pergamino húmedo; `proceso` ampliado (`Miel`, `Semilavado`, `Anaeróbico`); se eliminan `ph_miel` y rangos de maduración; triggers de numeración `L-00001`/`R-00001`.
+- **DB `0056`**: snapshot `zona_finca`/`altura_finca`; limpieza numérica `% puro/impuro/limpio/sucio`; factura automática `FC-00001` (distinta de `F-0001` de órdenes); CHECK de varietal no vacío; se retiran `puro_impuro`/`limpio_sucio`.
+- **UI**: formulario con factura/zona/altura automáticas, obligatorios marcados, sección **Limpieza** y recuadro central rojo-anaranjado con campos faltantes; detalle con tarjeta de limpieza, edición de pruebas y PDF con encabezado CACD estilo perfil.
+- **API**: `POST /api/recibido` deriva zona/altura y bloquea fincas incompletas; `PUT` acepta `estado_lote` y pruebas; `PGRST204/PGRST205` se mapean a 422/404.
+
 ### Changed — Pivote Beneficiado / Acopio (005, fases F0–F6)
 - **DB `0050`**: nueva tabla `productores` (6 filas migradas desde `clientes` conservando `public_id` como conector K2) y `fincas.productor_id`; `fincas.cliente_id` queda deprecada.
 - **DB `0051`**: se elimina el dominio legacy de lotes (`v_lotes_catacion`, 8 funciones y `DROP TABLE lotes_cafe CASCADE`). Nota: `CASCADE` no borra tablas hijas; las 10 huérfanas se borran explícitamente.

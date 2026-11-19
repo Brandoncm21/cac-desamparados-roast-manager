@@ -106,17 +106,19 @@ describe("porcentajeDe", () => {
 
 describe("crearRecibidoSchema", () => {
   const base = {
-    numero_lote: "L-2026-001",
-    numero_recibo: "R-100",
     productor_id: 1,
     finca_id: 2,
+    varietal: "Catuaí",
+    cajuelas: 10,
+    cuartillos: 5,
   };
 
-  it("acepta lo mínimo y aplica defaults", () => {
+  it("acepta lo mínimo y deja opcionales en null", () => {
     const parsed = crearRecibidoSchema.parse(base);
-    expect(parsed.puro_impuro).toBe(true);
-    expect(parsed.limpio_sucio).toBe(true);
     expect(parsed.proceso).toBeUndefined();
+    expect(parsed.estado_lote).toBeUndefined();
+    expect(parsed.porcentaje_flote ?? null).toBeNull();
+    expect(parsed.porcentaje_puro ?? null).toBeNull();
   });
 
   it("normaliza porcentajes vacíos a null", () => {
@@ -124,16 +126,25 @@ describe("crearRecibidoSchema", () => {
     expect(parsed.porcentaje_flote).toBeNull();
   });
 
-  it("rechaza pH fuera de 0–14 y porcentajes fuera de 0–100", () => {
-    expect(crearRecibidoSchema.safeParse({ ...base, ph_miel: 15 }).success).toBe(false);
-    expect(
-      crearRecibidoSchema.safeParse({ ...base, porcentaje_broca: 101 }).success
-    ).toBe(false);
+  it("rechaza porcentajes fuera de 0–100", () => {
+    expect(crearRecibidoSchema.safeParse({ ...base, porcentaje_broca: 101 }).success).toBe(false);
+    expect(crearRecibidoSchema.safeParse({ ...base, porcentaje_sucio: -1 }).success).toBe(false);
   });
 
-  it("exige lote, recibo, productor y finca", () => {
+  it("exige varietal, cajuelas y cuartillos", () => {
+    expect(crearRecibidoSchema.safeParse({ ...base, varietal: "" }).success).toBe(false);
+    expect(crearRecibidoSchema.safeParse({ ...base, cajuelas: "" }).success).toBe(false);
+    expect(crearRecibidoSchema.safeParse({ ...base, cuartillos: "abc" }).success).toBe(false);
+    expect(crearRecibidoSchema.safeParse({ ...base, cajuelas: 0, cuartillos: 0 }).success).toBe(true);
+  });
+
+  it("requiere proceso_otro si proceso es Otro", () => {
+    expect(crearRecibidoSchema.safeParse({ ...base, proceso: "Otro" }).success).toBe(false);
+    expect(crearRecibidoSchema.safeParse({ ...base, proceso: "Otro", proceso_otro: "Honey fermentado" }).success).toBe(true);
+  });
+
+  it("exige productor y finca", () => {
     expect(crearRecibidoSchema.safeParse({}).success).toBe(false);
-    expect(crearRecibidoSchema.safeParse({ ...base, numero_lote: "" }).success).toBe(false);
     expect(crearRecibidoSchema.safeParse({ ...base, productor_id: 0 }).success).toBe(false);
   });
 });
@@ -177,12 +188,28 @@ describe("catacionSchema", () => {
 });
 
 describe("caracterizacionSchema", () => {
-  it("acepta conteos y promedios opcionales", () => {
+  it("acepta conteos, flotación, densidad y promedios opcionales", () => {
     const r = caracterizacionSchema.safeParse({
       cerezas_en_objetivo: 40,
+      densidad_g_ml: 1.02,
+      g_vanos: 5,
+      semimadura_bx_promedio: 18.4,
       madura_bx_promedio: 21.3,
     });
     expect(r.success).toBe(true);
+  });
+
+  it("acepta el proceso compartido y rechaza uno fuera del catálogo", () => {
+    expect(caracterizacionSchema.safeParse({ proceso: "Miel" }).success).toBe(true);
+    expect(caracterizacionSchema.safeParse({ proceso: "Honey" }).success).toBe(true);
+    expect(caracterizacionSchema.safeParse({ proceso: "Inventado" }).success).toBe(false);
+  });
+
+  it("exige proceso_otro cuando el proceso es Otro", () => {
+    expect(caracterizacionSchema.safeParse({ proceso: "Otro" }).success).toBe(false);
+    expect(
+      caracterizacionSchema.safeParse({ proceso: "Otro", proceso_otro: "Fermentación láctica" }).success
+    ).toBe(true);
   });
 });
 

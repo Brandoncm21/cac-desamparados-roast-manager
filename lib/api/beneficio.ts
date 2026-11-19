@@ -53,13 +53,21 @@ export interface RecibidoLote {
   porcentaje_vano: number | null;
   porcentaje_verde: number | null;
   porcentaje_secos: number | null;
-  ph_miel: number | null;
-  puro_impuro: boolean;
-  limpio_sucio: boolean;
-  rango_objetivo: number | null;
-  rango_sobre_objetivo: number | null;
-  rango: number | null;
+  porcentaje_segundas: number | null;
+  porcentaje_danos_mecanicos: number | null;
+  porcentaje_pulpa_pergamino: number | null;
+  porcentaje_pergamino_pulpa: number | null;
+  densidad_fruta: number | null;
+  densidad_pergamino_humedo: number | null;
+  porcentaje_puro: number | null;
+  porcentaje_impuro: number | null;
+  porcentaje_limpio: number | null;
+  porcentaje_sucio: number | null;
+  zona_finca: string | null;
+  altura_finca: number | null;
   proceso: string | null;
+  proceso_otro: string | null;
+  estado_lote: "proceso" | "disponible" | "vendido";
   enproceso: string;
   disponible: boolean;
   vendido: boolean;
@@ -84,6 +92,7 @@ export interface ListarRecibidosParams {
   page?: number;
   pageSize?: number;
   enproceso?: string;
+  estado_lote?: string;
   search?: string;
   productor_id?: number;
   finca_id?: number;
@@ -120,6 +129,7 @@ export async function listarRecibidos(params: ListarRecibidosParams = {}) {
     pageSize: String(params.pageSize ?? 25),
   });
   if (params.enproceso) query.set("enproceso", params.enproceso);
+  if (params.estado_lote) query.set("estado_lote", params.estado_lote);
   if (params.search?.trim()) query.set("search", params.search.trim());
   if (params.productor_id) query.set("productor_id", String(params.productor_id));
   if (params.finca_id) query.set("finca_id", String(params.finca_id));
@@ -156,6 +166,13 @@ export async function actualizarRecibido(
     body: JSON.stringify(input),
   });
   return leerJson<RecibidoLote>(res);
+}
+
+export async function actualizarEstadoRecibido(
+  id: number,
+  estado_lote: "proceso" | "disponible" | "vendido"
+): Promise<RecibidoLote> {
+  return actualizarRecibido(id, { estado_lote });
 }
 
 export async function desactivarRecibido(id: number): Promise<void> {
