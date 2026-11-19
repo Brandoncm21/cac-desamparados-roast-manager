@@ -7,9 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
-import { SelectOrdenDialog } from "@/components/forms/select-orden-dialog";
+import { CrearPerfilDialog } from "@/components/forms/crear-perfil-dialog";
 import { Plus, Thermometer, Search, AlertCircle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+
+interface LotePerfil {
+  numero_lote: string;
+  enproceso: string;
+}
 
 interface Perfil {
   id_perfil: number;
@@ -17,6 +22,7 @@ interface Perfil {
   nombre_cafe: string | null;
   fecha_tueste: string;
   estado: string;
+  lotes?: LotePerfil[];
   ordenes_trabajo: {
     numero_factura: string;
     clientes: { nombre_completo: string } | null;
@@ -66,6 +72,9 @@ export default function TuesteListPage() {
            ordenes_trabajo (
             numero_factura,
             clientes (nombre_completo)
+          ),
+          perfil_tueste_lotes (
+            lotes_cafe (numero_lote, enproceso)
           )
         `,
           { count: "exact" }
@@ -83,7 +92,17 @@ export default function TuesteListPage() {
 
       const { data, count } = await query;
       if (data) {
-        setPerfiles(data as unknown as Perfil[]);
+        const normalizados = (data as unknown as Array<
+          Perfil & {
+            perfil_tueste_lotes?: Array<{ lotes_cafe: LotePerfil | null }>;
+          }
+        >).map(({ perfil_tueste_lotes, ...perfil }) => ({
+          ...perfil,
+          lotes: (perfil_tueste_lotes ?? [])
+            .map((fila) => fila.lotes_cafe)
+            .filter((lote): lote is LotePerfil => Boolean(lote)),
+        }));
+        setPerfiles(normalizados);
       }
       setTotalItems(count || 0);
     };
@@ -98,10 +117,13 @@ export default function TuesteListPage() {
       const factura = p.ordenes_trabajo?.numero_factura || "";
       const cliente = p.ordenes_trabajo?.clientes?.nombre_completo || "";
       const nombre = p.nombre_cafe || "";
+      const lotes =
+        p.lotes?.map((lote) => lote.numero_lote).join(" ") || p.numero_lote || "";
       return (
         factura.toLowerCase().includes(term) ||
         cliente.toLowerCase().includes(term) ||
-        nombre.toLowerCase().includes(term)
+        nombre.toLowerCase().includes(term) ||
+        lotes.toLowerCase().includes(term)
       );
     });
   }, [perfiles, debouncedSearch]);
@@ -111,7 +133,7 @@ export default function TuesteListPage() {
 
   const totalPages = Math.ceil(totalItems / pageSize);
 
-  const crearPerfil = async (ordenId?: number) => {
+  const crearPerfil = async (ordenId: number | null, loteIds: number[] = []) => {
     if (creating) return;
     setCreating(true);
     try {
@@ -119,8 +141,9 @@ export default function TuesteListPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nombre_cafe: "Nuevo lote",
-          id_orden: ordenId || null,
+          nombre_cafe: "Nuevo perfil",
+          id_orden: ordenId,
+          lote_ids: loteIds,
         }),
       });
       const result = await res.json();
@@ -132,8 +155,8 @@ export default function TuesteListPage() {
         return;
       }
 
-      if (result.data?.id_perfil) {
-        router.push(`/tueste/${result.data.id_perfil}`);
+      if (result.data?.perfil?.id_perfil) {
+        router.push(`/tueste/${result.data.perfil.id_perfil}`);
       }
     } finally {
       setCreating(false);
@@ -229,14 +252,16 @@ export default function TuesteListPage() {
         onPageSizeChange={setPageSize}
       />
 
-      <SelectOrdenDialog
-        open={selectOrdenOpen}
-        onOpenChange={setSelectOrdenOpen}
-        onSelect={(ordenId) => {
-          setSelectOrdenOpen(false);
-          crearPerfil(ordenId);
-        }}
-      />
+      {selectOrdenOpen && (
+        <CrearPerfilDialog
+          open={selectOrdenOpen}
+          onOpenChange={setSelectOrdenOpen}
+          onConfirm={(ordenId, loteIds) => {
+            setSelectOrdenOpen(false);
+            crearPerfil(ordenId, loteIds);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -250,6 +275,9 @@ function PerfilCard({
 }) {
   const router = useRouter();
   const isPending = variant === "pending";
+  const lotesTexto = perfil.lotes?.length
+    ? perfil.lotes.map((lote) => lote.numero_lote).join(", ")
+    : perfil.numero_lote;
 
   return (
     <Card
@@ -263,7 +291,7 @@ function PerfilCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Thermometer className={`h-5 w-5 ${isPending ? "text-amber-500" : "text-green-500"}`} />
-          {perfil.numero_lote || `Perfil #${perfil.id_perfil}`}
+          {lotesTexto || `Perfil #${perfil.id_perfil}`}
         </CardTitle>
       </CardHeader>
       <CardContent className="text-sm text-muted-foreground">

@@ -86,11 +86,10 @@ export function usePDF({
       y
     );
     y += 4;
-    pdf.text(
-      `Café: ${ctxNombreCafe || "-"}    Lote: ${perfil?.numero_lote || "-"}`,
-      M,
-      y
-    );
+    const lotesTexto = perfil?.lotes?.length
+      ? perfil.lotes.map((lote) => lote.numero_lote).join(", ")
+      : perfil?.numero_lote || "-";
+    pdf.text(`Café: ${ctxNombreCafe || "-"}    Lotes: ${lotesTexto}`, M, y);
     y += 4;
     pdf.text(
       `Tostador: ${nombreTostador || "-"}    Temp. Sala: ${ctxTempSala || "-"}°C    Humedad: ${ctxHumSala || "-"}%`,
