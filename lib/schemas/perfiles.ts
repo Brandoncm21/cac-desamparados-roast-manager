@@ -8,6 +8,7 @@ export const crearPerfilSchema = z.object({
   nombre_cafe: z.string().max(150).optional().or(z.literal("")),
   temperatura_sala: z.number().optional().nullable(),
   humedad_sala: z.number().optional().nullable(),
+  lote_ids: z.array(z.number().int().positive()).optional().default([]),
 });
 
 export const bulkTemperaturasSchema = z.object({
@@ -33,7 +34,7 @@ export const upsertHitoSchema = z.object({
   temperatura: z.number().optional().nullable(),
 });
 
-export const actualizarPerfilSchema = crearPerfilSchema.partial().extend({
+export const actualizarPerfilSchema = crearPerfilSchema.omit({ lote_ids: true }).partial().extend({
   estado: z.enum(["Pendiente", "Completado"]).optional(),
 });
 

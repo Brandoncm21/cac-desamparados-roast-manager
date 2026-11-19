@@ -91,6 +91,16 @@ export function OrdenImprimible({ orden, total }: OrdenImprimibleProps) {
             Producto:{" "}
             <span className="font-medium">{orden.descripcion_producto || "Sin especificar"}</span>
           </p>
+          <p>
+            Lotes:{" "}
+            <span className="font-medium">
+              {orden.lotes?.length
+                ? orden.lotes
+                    .map((lote) => `${lote.numero_lote} (${lote.enproceso})`)
+                    .join(", ")
+                : "Sin especificar"}
+            </span>
+          </p>
         </CardContent>
       </Card>
 
@@ -114,6 +124,11 @@ export function OrdenImprimible({ orden, total }: OrdenImprimibleProps) {
                 <TableRow key={servicio.id_servicio}>
                   <TableCell className="font-medium">
                     {servicio.tipo_servicio}
+                    {servicio.empaques?.nombre && (
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        {servicio.empaques.nombre}
+                      </span>
+                    )}
                     {servicio.override_precio && (
                       <Badge variant="outline" className="ml-2 text-xs">
                         Modificado

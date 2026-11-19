@@ -8,6 +8,7 @@ export interface ServicioOrden {
   tipo_servicio: string;
   servicio_id: number | null;
   empaque_id: number | null;
+  empaques?: { nombre: string } | null;
   peso_inicial: number | null;
   peso_kg: number | null;
   precio: number | null;
@@ -16,6 +17,11 @@ export interface ServicioOrden {
   linea_total: number | null;
   override_precio: boolean;
   override_motivo: string | null;
+}
+
+export interface LoteOrden {
+  numero_lote: string;
+  enproceso: string;
 }
 
 export interface EspecificacionesOrden {
@@ -37,6 +43,7 @@ export interface OrdenDetalle {
   descripcion_producto: string | null;
   clientes: ClienteOrden | null;
   fincas?: { nombre: string; altura: number | null } | null;
+  lotes?: LoteOrden[];
   servicios_ejecutados: ServicioOrden[];
   orden_pasos: { servicios_maestro: { tipo: string } }[];
   especificaciones_orden: EspecificacionesOrden | null;

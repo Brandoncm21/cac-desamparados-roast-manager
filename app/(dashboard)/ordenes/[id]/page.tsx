@@ -49,7 +49,11 @@ export default function OrdenDetallePage() {
 
       {detalle.perfil && <ResumenTueste perfil={detalle.perfil} metricas={detalle.metricas} />}
 
-      <PasosPanel idOrden={orden.id_orden} />
+      <PasosPanel
+        idOrden={orden.id_orden}
+        onImprimirFactura={detalle.imprimir}
+        onDescargarFacturaPDF={detalle.descargarFacturaPDF}
+      />
     </div>
   );
 }
