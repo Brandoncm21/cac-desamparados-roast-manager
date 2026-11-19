@@ -7,34 +7,62 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import {
-  LayoutDashboard, Users, FileText, Flame, BarChart3, LogOut, Coffee, Menu, X, Plus,
-  Package, Box, Boxes, CupSoda, MapPin, FlaskConical, Sun, Warehouse, ChevronDown, Award,
+  LayoutDashboard,
+  Users,
+  FileText,
+  Flame,
+  BarChart3,
+  LogOut,
+  Coffee,
+  Menu,
+  X,
+  Plus,
+  Package,
+  Box,
+  Boxes,
+  CupSoda,
+  MapPin,
+  FlaskConical,
+  Sun,
+  Warehouse,
+  Award,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { getCurrentUserRole, type UserRole } from "@/lib/auth-helpers";
+import {
+  SidebarGrupo,
+  esRutaActiva,
+  type SidebarNavItem,
+} from "@/components/layout/sidebar-grupo";
 
-const navItems = [
+const generalNavItems: SidebarNavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/ordenes", label: "Órdenes", icon: FileText },
+  { href: "/tueste", label: "Tueste", icon: Flame },
+  { href: "/reportes", label: "Reportes", icon: BarChart3 },
 ];
 
-const beneficioNavItems = [
+const acopioNavItems: SidebarNavItem[] = [
   { href: "/beneficio/recibido", label: "Recibido de Café", icon: Package },
   { href: "/beneficio/caracterizacion", label: "Caracterización", icon: FlaskConical },
   { href: "/beneficio/secado", label: "Secado", icon: Sun },
   { href: "/beneficio/bodegaje", label: "Bodegaje", icon: Warehouse },
   { href: "/beneficio/trilla", label: "Trilla", icon: Boxes },
   { href: "/beneficio/catacion", label: "Catación", icon: CupSoda },
-  { href: "/beneficio/calificacion", label: "Calificación", icon: Award },
+  {
+    href: "/beneficio/calificacion",
+    label: "Calificación",
+    title: "Calificación de Café Arábiga Verde y Tostado",
+    icon: Award,
+  },
   { href: "/fincas", label: "Fincas", icon: MapPin },
 ];
 
-const navItemsFinales = [
-  { href: "/tueste", label: "Tueste", icon: Flame },
+const serviciosBaseItems: SidebarNavItem[] = [
+  { href: "/ordenes", label: "Órdenes", icon: FileText },
   { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/reportes", label: "Reportes", icon: BarChart3 },
 ];
 
-const adminNavItems = [
+const serviciosAdminItems: SidebarNavItem[] = [
   { href: "/admin/servicios", label: "Servicios", icon: Package },
   { href: "/admin/empaques", label: "Empaques", icon: Box },
 ];
@@ -45,7 +73,8 @@ export function Sidebar() {
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [beneficioAbierto, setBeneficioAbierto] = useState(true);
+  const [acopioAbierto, setAcopioAbierto] = useState<boolean | null>(null);
+  const [serviciosAbierto, setServiciosAbierto] = useState<boolean | null>(null);
 
   useEffect(() => {
     getCurrentUserRole().then(setUserRole);
@@ -63,25 +92,28 @@ export function Sidebar() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  const serviciosItems = useMemo(
+    () =>
+      userRole === "Admin"
+        ? [...serviciosBaseItems, ...serviciosAdminItems]
+        : serviciosBaseItems,
+    [userRole]
+  );
+
+  const acopioActivo = acopioNavItems.some((item) =>
+    esRutaActiva(pathname, item.href)
+  );
+  const serviciosActivo = serviciosItems.some((item) =>
+    esRutaActiva(pathname, item.href)
+  );
+  const acopioVisible = acopioAbierto ?? acopioActivo;
+  const serviciosVisible = serviciosAbierto ?? serviciosActivo;
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
   };
-
-  const esActivo = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
-
-  const claseEnlace = (activo: boolean) =>
-    cn(
-      "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all min-h-[48px] active:scale-95",
-      activo
-        ? "bg-secondary-container text-on-secondary-container"
-        : "text-muted-foreground hover:bg-surface-container-high hover:text-on-surface"
-    );
-
-  const beneficioActivo = beneficioNavItems.some((item) => esActivo(item.href));
-  const beneficioVisible = beneficioAbierto || beneficioActivo;
 
   return (
     <>
@@ -117,96 +149,69 @@ export function Sidebar() {
             <Coffee className="h-6 w-6 text-on-primary" />
           </div>
           <div>
-            <span className="font-heading font-bold text-lg whitespace-nowrap leading-tight block">SCACR</span>
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">CAC Desamparados</span>
+            <span className="font-heading font-bold text-lg whitespace-nowrap leading-tight block">
+              SCACR
+            </span>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              CAC Desamparados
+            </span>
           </div>
         </div>
 
         {/* Navegación */}
-        <nav className="flex-1 space-y-1 px-4 py-4 overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link key={item.href} href={item.href} className={claseEnlace(esActivo(item.href))}>
-                <Icon className="h-5 w-5 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </Link>
-            );
-          })}
+        <nav
+          aria-label="Principal"
+          className="flex-1 space-y-3 px-3 py-4 overflow-y-auto"
+        >
+          <div className="space-y-0.5">
+            {generalNavItems.map((item) => {
+              const Icon = item.icon;
+              const activo = esRutaActiva(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors min-h-[42px]",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary/40",
+                    activo
+                      ? "bg-surface-container-highest text-on-surface font-semibold"
+                      : "text-muted-foreground hover:bg-surface-container-high hover:text-on-surface"
+                  )}
+                >
+                  <Icon className="h-4.5 w-4.5 h-[18px] w-[18px] shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
 
-          {/* Grupo Beneficiado / Acopio */}
-          <button
-            type="button"
-            onClick={() => setBeneficioAbierto((prev) => !prev)}
-            aria-expanded={beneficioVisible}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all min-h-[48px] active:scale-95",
-              beneficioActivo && !beneficioAbierto
-                ? "bg-secondary-container text-on-secondary-container"
-                : "text-muted-foreground hover:bg-surface-container-high hover:text-on-surface"
-            )}
-          >
-            <Coffee className="h-5 w-5 shrink-0" />
-            <span className="truncate">Beneficiado / Acopio</span>
-            <ChevronDown
-              className={cn(
-                "ml-auto h-4 w-4 shrink-0 transition-transform",
-                beneficioVisible ? "rotate-0" : "-rotate-90"
-              )}
+          <div className="border-t border-outline-variant/60" />
+
+          <div className="space-y-2">
+            <SidebarGrupo
+              id="grupo-acopio"
+              titulo="Acopio"
+              eyebrow="Planta"
+              icono={Coffee}
+              tone="acopio"
+              items={acopioNavItems}
+              pathname={pathname}
+              abierto={acopioVisible}
+              onToggle={() => setAcopioAbierto(!acopioVisible)}
             />
-          </button>
-
-          {beneficioVisible && (
-            <div className="space-y-1 pl-3">
-              {beneficioNavItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      claseEnlace(esActivo(item.href)),
-                      "py-2.5 min-h-[42px] text-[13px]"
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-
-          {navItemsFinales.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link key={item.href} href={item.href} className={claseEnlace(esActivo(item.href))}>
-                <Icon className="h-5 w-5 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </Link>
-            );
-          })}
-
-          {userRole === "Admin" && (
-            <>
-              <div className="pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Administración
-              </div>
-              {adminNavItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={claseEnlace(esActivo(item.href))}
-                  >
-                    <Icon className="h-5 w-5 shrink-0" />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </>
-          )}
+            <SidebarGrupo
+              id="grupo-servicios"
+              titulo="Servicios"
+              eyebrow="Comercial"
+              icono={BriefcaseBusiness}
+              tone="servicios"
+              items={serviciosItems}
+              pathname={pathname}
+              abierto={serviciosVisible}
+              onToggle={() => setServiciosAbierto(!serviciosVisible)}
+            />
+          </div>
         </nav>
 
         {/* CTA + Cerrar sesión */}
