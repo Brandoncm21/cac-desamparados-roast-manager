@@ -63,13 +63,15 @@ Helpers: [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desampa
 | 51 | PUT | `/api/recibido/[id]/trilla` | `Recepción, Admin` | Upsert → `guardar_trilla` (`peso_verde_final` > 0) |
 | 52 | GET | `/api/recibido/[id]/catacion` | `Recepción, Tostador, Admin` | Fila de catación/tueste |
 | 53 | PUT | `/api/recibido/[id]/catacion` | `Tostador, Admin` | Upsert → `guardar_catacion` |
-| 54 | GET | `/api/fincas` | `Recepción, Tostador, Admin` | Listar fincas (`productor_id`, `search`, paginado) |
-| 55 | POST | `/api/fincas` | `Recepción, Admin` | Crear finca (`crearFincaSchema`) |
-| 56 | GET | `/api/fincas/[id]` | `Recepción, Tostador, Admin` | Detalle de finca |
-| 57 | PUT | `/api/fincas/[id]` | `Recepción, Admin` | Actualizar finca |
-| 58 | DELETE | `/api/fincas/[id]` | `Recepción, Admin` | Soft delete (`deleted_at`) |
+| 54 | GET | `/api/recibido/[id]/calificacion` | `Recepción, Tostador, Admin` | Fila de calificación (verde + tostado) |
+| 55 | PUT | `/api/recibido/[id]/calificacion` | `Tostador, Admin` | Upsert → `guardar_calificacion` |
+| 56 | GET | `/api/fincas` | `Recepción, Tostador, Admin` | Listar fincas (`productor_id`, `search`, paginado) |
+| 57 | POST | `/api/fincas` | `Recepción, Admin` | Crear finca (`crearFincaSchema`) |
+| 58 | GET | `/api/fincas/[id]` | `Recepción, Tostador, Admin` | Detalle de finca |
+| 59 | PUT | `/api/fincas/[id]` | `Recepción, Admin` | Actualizar finca |
+| 60 | DELETE | `/api/fincas/[id]` | `Recepción, Admin` | Soft delete (`deleted_at`) |
 
-> **Beneficiado / Acopio (spec 005):** las rutas 38–53 se detallan en §2.6 y usan el mismo contrato `{ data, pagination }` / `{ error: { code, message, issues } }`. Las rutas 54–58 (`fincas`) siguen el mismo contrato.
+> **Beneficiado / Acopio (spec 005/006):** las rutas 38–55 se detallan en §2.6 y usan el mismo contrato `{ data, pagination }` / `{ error: { code, message, issues } }`. Las rutas 56–60 (`fincas`) siguen el mismo contrato.
 
 > **Admin-only:** rutas 33-37 usan `createAdminClientWithRoleCheck(["Admin"])` que bypassa RLS con `service_role` ([`lib/supabase/admin.ts:19`](https://github.com/Brandoncm21/cac-desamparados-roast-manager/blob/80b1dd5/lib/supabase/admin.ts#L19)).
 
@@ -172,7 +174,7 @@ GET /api/ordenes?page=2&pageSize=10&estado=Pendiente&search=juan
 
 Dominio nuevo tras las migraciones `0050`–`0053`: el lote nace en **Recibido de Café**, el productor es una entidad propia (`productores`) y las fincas cuelgan del productor. Se retiraron `/api/lotes/**` y `/api/cataciones/**` (F2/F5); `/lotes/**` redirige a `/beneficio/recibido`.
 
-**Estados (`enproceso`):** `Recibido → En Caracterización → En Secado → En Bodega → En Trilla → Catado → Vendido`. Las RPCs sólo avanzan hacia adelante (desmarcar catación devuelve el lote a `En Trilla`). `disponible` y `vendido` son flags; `CHECK NOT (vendido AND disponible)`.
+**Estados (`enproceso`):** `Recibido → En Caracterización → En Secado → En Bodega → En Trilla → Catado → Calificado → Vendido`. Las RPCs sólo avanzan hacia adelante (desmarcar catación devuelve el lote a `En Trilla`). `disponible` y `vendido` son flags; `CHECK NOT (vendido AND disponible)`.
 
 **`GET /api/productores`** — paginado; `search` sobre `nombre_completo`; `deleted_at IS NULL`; orden por nombre.
 
@@ -180,7 +182,7 @@ Dominio nuevo tras las migraciones `0050`–`0053`: el lote nace en **Recibido d
 
 **`POST /api/recibido`** — `crearRecibidoSchema` ([`lib/schemas/beneficio.ts`](../../lib/schemas/beneficio.ts)); exige `productor_id` + `finca_id` coherentes (la finca debe pertenecer al productor → **400**); `numero_lote` UNIQUE → **409** (`23505`); `puro_impuro`/`limpio_sucio` por defecto `true`. Crea el lote en `Recibido`.
 
-**`GET /api/recibido/[id]`** — lote + `etapas` (`caracterizacion`, `secado`, `bodegaje`, `trilla`, `catacion`), consultadas en paralelo. **`PUT`** actualiza la cabecera (parcial, sin defaults para no pisar columnas). **`DELETE`** hace soft delete.
+**`GET /api/recibido/[id]`** — lote + `etapas` (`caracterizacion`, `secado`, `bodegaje`, `trilla`, `catacion`, `calificacion`), consultadas en paralelo. **`PUT`** actualiza la cabecera (parcial, sin defaults para no pisar columnas). **`DELETE`** hace soft delete.
 
 **Etapas** (`GET` devuelve la fila 1:1; `PUT` llama a la RPC y responde `{data: {<etapa>: row, enproceso}}`):
 
@@ -191,9 +193,10 @@ Dominio nuevo tras las migraciones `0050`–`0053`: el lote nace en **Recibido d
 | `PUT /api/recibido/[id]/bodegaje` | `bodegajeSchema` | `guardar_bodega(p_id_lote, p_bodega)` |
 | `PUT /api/recibido/[id]/trilla` | `trillaSchema` (`peso_verde_final` > 0) | `guardar_trilla(p_id_lote, p_trilla)` |
 | `PUT /api/recibido/[id]/catacion` | `guardarCatacionSchema` (`catado`, `notas_catacion`) | `guardar_catacion(p_catacion)` |
+| `PUT /api/recibido/[id]/calificacion` | `guardarCalificacionSchema` (verde + tostado; tostado exige humedad) | `guardar_calificacion(p_id_lote, p_calificacion)` |
 
-- Escritura de etapas: `Admin`/`Recepción`; catación: `Tostador`/`Admin`. `GET`: `Admin`/`Recepción`/`Tostador`.
-- Trilla sin `peso_verde_final` > 0 → **422**. `guardar_catacion` es `SECURITY DEFINER` con chequeo de rol; desmarcar `catado` revierte a `En Trilla`.
+- Escritura de etapas: `Admin`/`Recepción`; catación y calificación: `Tostador`/`Admin`. `GET`: `Admin`/`Recepción`/`Tostador`.
+- Trilla sin `peso_verde_final` > 0 → **422**. `guardar_catacion` es `SECURITY DEFINER` con chequeo de rol; desmarcar `catado` revierte a `En Trilla`. `guardar_calificacion` es `SECURITY INVOKER` y avanza el lote a `Calificado`.
 - Mapeo de errores RPC: `P0002`→**404**, `42501`→**403**, `55000`→**409**, `22023`→**422**.
 
 **`/api/fincas`** — fincas del productor: `GET` paginado con `productor_id` + `search` (`ilike nombre`), embebe `productores(nombre_completo)` y `zonas_finca(nombre)`; `POST` (`crearFincaSchema`: `productor_id`, `nombre`, `zona_id?`, `ubicacion?`, `altura?`; `23505`→**409**, `23503`→**400**) y `[id]` `GET` (incluye `lotes[]` del nuevo dominio, `ordenes_count` y `tiene_dependencias`), `PUT` y `DELETE` soft. `PUT` que cambie `productor_id` y `DELETE` con lotes/órdenes asociados → **409**. `fincas.cliente_id` fue eliminada en `0053`.

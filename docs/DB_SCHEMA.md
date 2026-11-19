@@ -130,7 +130,7 @@ Objetivo (spec [`004-refactor-flujo-lotes`](../specs/004-refactor-flujo-lotes/sp
 > `ordenes_trabajo.zona_finca`, `clientes.zona_procedencia` y la tabla `orden_lotes_externos`.
 > El esquema queda **solo por `id`**; la altura vive únicamente en `fincas.altura` (D8).
 
-## 3quinquies. Beneficiado / Acopio (0050–0053, rama `feat/005-beneficiado-acopio`)
+## 3quinquies. Beneficiado / Acopio (0050–0054, ramas `feat/005-beneficiado-acopio`, `feat/006-calificacion-cafe`)
 
 Pivote del dominio: el lote nace en **Recibido de Café**, los productores dejan de ser clientes y las fincas cuelgan del productor. `0051` eliminó las vistas/funciones legacy y `DROP TABLE lotes_cafe`; `0053` eliminó `fincas.cliente_id`.
 
@@ -138,9 +138,10 @@ Pivote del dominio: el lote nace en **Recibido de Café**, los productores dejan
 |---|---|---|
 | `productores` | Tabla propia (`id_productor`, `nombre_completo`, `telefono`, `public_id`, `external_ref`, `deleted_at`); 6 filas migradas desde `clientes` conservando `public_id` (conector K2) | 0050 |
 | `fincas.productor_id` | FK `RESTRICT`; 8 fincas backfilled; `cliente_id` eliminada | 0050 / 0053 |
-| `lotes_cafe` | **Rediseñada**: `public_id uuid UNIQUE`, `numero_lote` UNIQUE, `numero_recibo`, `factura`, `productor_id`/`finca_id` FK `RESTRICT`, `varietal`, `cajuelas`/`cuartillos`, `% flote/broca/vano/verde/secos`, `ph_miel numeric(4,2)`, `puro_impuro`/`limpio_sucio`, `rango_objetivo`/`rango_sobre_objetivo`/`rango`, `proceso` CHECK `Lavado/Honey/Natural/Otro`, `enproceso` CHECK `Recibido/En Caracterización/En Secado/En Bodega/En Trilla/Catado/Vendido`, `disponible`/`vendido`, `fecha_recibido timestamptz NOT NULL DEFAULT now()`, `deleted_at`; `CHECK NOT (vendido AND disponible)` | 0052 |
+| `lotes_cafe` | **Rediseñada**: `public_id uuid UNIQUE`, `numero_lote` UNIQUE, `numero_recibo`, `factura`, `productor_id`/`finca_id` FK `RESTRICT`, `varietal`, `cajuelas`/`cuartillos`, `% flote/broca/vano/verde/secos`, `ph_miel numeric(4,2)`, `puro_impuro`/`limpio_sucio`, `rango_objetivo`/`rango_sobre_objetivo`/`rango`, `proceso` CHECK `Lavado/Honey/Natural/Otro`, `enproceso` CHECK `Recibido/En Caracterización/En Secado/En Bodega/En Trilla/Catado/Calificado/Vendido`, `disponible`/`vendido`, `fecha_recibido timestamptz NOT NULL DEFAULT now()`, `deleted_at`; `CHECK NOT (vendido AND disponible)` | 0052 / 0054 |
 | `caracterizacion_lote`, `secado_lote`, `bodega_lote`, `trilla_lote` | 1:1 con el lote (`id_lote` FK `RESTRICT`); UNIQUE parcial `(id_lote) WHERE deleted_at IS NULL`; RLS 3 políticas + trigger `update_updated_at()` | 0052 |
 | `catacion_tueste` | 1:1 con el lote; `catado bool`, `notas_catacion text` | 0052 |
+| `calificacion_lote` | 1:1 con el lote; verde (humedad, densidad, defectos primarios/secundarios, `% verde`) y tostado (puntaje SCA, fragancia, acidez, cuerpo, dulzor, balance, notas); RPC `guardar_calificacion` (`SECURITY INVOKER`) avanza a `Calificado`; RLS 3 políticas + trigger `update_updated_at()` | 0054 |
 | `orden_lotes` | Recreada **sin `peso_kg`**: `(id_orden_lote, id_orden, id_lote, created_at, deleted_at)` | 0052 |
 | RPCs | `guardar_caracterizacion`, `guardar_secado`, `guardar_bodega`, `guardar_trilla` (`SECURITY INVOKER`), `guardar_catacion` (`SECURITY DEFINER` + chequeo de rol); helpers `_ben_text/_num/_int/_date/_ts/_bool/_avanzar/_lote_editable`; sólo avanzan el estado hacia adelante | 0052b |
 | Hardening | `SET search_path`, `REVOKE` a `anon`, RLS en las 7 tablas | 0052c |

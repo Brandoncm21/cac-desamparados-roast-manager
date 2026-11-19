@@ -36,6 +36,7 @@ export const ESTADOS_LOTE: MapaEstados = {
   "En Trilla": { label: "En Trilla", className: "bg-blue-100 text-blue-800" },
   "En Bodega": { label: "En Bodega", className: "bg-purple-100 text-purple-800" },
   Catado: { label: "Catado", className: "bg-orange-100 text-orange-800" },
+  Calificado: { label: "Calificado", className: "bg-teal-100 text-teal-800" },
   Vendido: { label: "Vendido", className: "bg-green-100 text-green-800" },
 };
 

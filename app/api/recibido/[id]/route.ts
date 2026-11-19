@@ -23,7 +23,7 @@ async function get(
   const { id } = await params;
   const idLote = validateIdParam(id);
 
-  const [lote, caracterizacion, secado, bodegaje, trilla, catacion] =
+  const [lote, caracterizacion, secado, bodegaje, trilla, catacion, calificacion] =
     await Promise.all([
       supabase
         .from("lotes_cafe")
@@ -61,6 +61,12 @@ async function get(
         .eq("id_lote", idLote)
         .is("deleted_at", null)
         .maybeSingle(),
+      supabase
+        .from("calificacion_lote")
+        .select("*")
+        .eq("id_lote", idLote)
+        .is("deleted_at", null)
+        .maybeSingle(),
     ]);
 
   if (lote.error) {
@@ -76,6 +82,7 @@ async function get(
       bodegaje: bodegaje.data ?? null,
       trilla: trilla.data ?? null,
       catacion: catacion.data ?? null,
+      calificacion: calificacion.data ?? null,
     },
   });
 }
