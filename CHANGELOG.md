@@ -4,6 +4,22 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Changed — Trilla compacta en 6 cajitas (0060)
+- **UI**: formulario dedicado con Trilla, Peso teórico, Peso verde sin selección, Mediciones de humedad, Porcentaje en calidades y Peso en verde exportación.
+- **DB `0060`**: se agregan `pruebas_fisicas_trilla` y `peso_en_verde_final_inferior`; `guardar_trilla` las persiste.
+- **Validación**: `peso_verde_final` pasa a opcional; `peso_verde_final` y `peso_en_verde_final` se mantienen como columnas distintas.
+- **Etiquetas**: “Cataduras” conserva la propiedad `porcentaje_cataduras`.
+
+### Changed — Bodegaje compacto en 3 cajitas (0059)
+- **UI**: formulario dedicado con las cajitas Bodegaje, Peso y Mediciones de humedad; unidades `kg` y `%` visibles.
+- **Eliminado del formulario, Zod y payload**: densidades de pergamino/bellota y las condiciones ambientales (humedad relativa, temperatura interna/externa). Se conserva la etiqueta correcta “Peso bellota”.
+- **DB `0059`**: `guardar_bodega` deja de escribir esas columnas; se mantienen en `bodega_lote` como legado nullable, sin migración destructiva.
+
+### Changed — Secado: formulario por bloques y tiempo automático (0058)
+- **DB `0058`**: se eliminan `humedad_6`/`tem_6`; se quita el CHECK de orden de fechas; `guardar_secado` calcula `dias_secado` y `tiempo_secado` desde las fechas y los persiste.
+- **UI**: formulario dedicado en 4 bloques (datos de secado, tipo de secado, mediciones y pesos), lote de solo lectura, tiempo calculado en vivo, advertencia si la fecha final es anterior y hasta 5 pares humedad/temperatura.
+- **Validación**: `secadoSchema` queda totalmente opcional y ya no bloquea fechas invertidas; el tiempo calculado queda vacío en ese caso.
+
 ### Changed — Caracterización de materia prima (0057)
 - **DB `0057`**: se eliminan `escala_maduracion`, `rango_optimo_madurez`, `muestreo_tabla` y los 5 `pct_*`; se agrega `proceso_otro` y CHECK del catálogo compartido; `guardar_caracterizacion` actualizada.
 - **UI**: formulario dedicado en 4 bloques (datos generales, cerezas, densidad/flotación y refractómetro) con fecha/hora actual editable, lote de solo lectura, proceso heredado del recibo y promedios °Bx en vivo.

@@ -26,6 +26,9 @@ import {
 import { EstadoBadge } from "@/components/ui/estado-badge";
 import { FormularioEtapa } from "@/components/beneficio/formulario-etapa";
 import { FormularioCaracterizacion } from "@/components/beneficio/formulario-caracterizacion";
+import { FormularioSecado } from "@/components/beneficio/formulario-secado";
+import { FormularioBodegaje } from "@/components/beneficio/formulario-bodegaje";
+import { FormularioTrilla } from "@/components/beneficio/formulario-trilla";
 import {
   listarRecibidos,
   obtenerEtapa,
@@ -255,6 +258,30 @@ export function EtapaPage({ etapa }: EtapaPageProps) {
           ) : dialogo ? (
             etapa === "caracterizacion" ? (
               <FormularioCaracterizacion
+                key={dialogo.lote.id_lote}
+                lote={dialogo.lote}
+                initial={dialogo.fila}
+                onSaved={alGuardar}
+                onCancel={cerrar}
+              />
+            ) : etapa === "secado" ? (
+              <FormularioSecado
+                key={dialogo.lote.id_lote}
+                lote={dialogo.lote}
+                initial={dialogo.fila}
+                onSaved={alGuardar}
+                onCancel={cerrar}
+              />
+            ) : etapa === "bodegaje" ? (
+              <FormularioBodegaje
+                key={dialogo.lote.id_lote}
+                lote={dialogo.lote}
+                initial={dialogo.fila}
+                onSaved={alGuardar}
+                onCancel={cerrar}
+              />
+            ) : etapa === "trilla" ? (
+              <FormularioTrilla
                 key={dialogo.lote.id_lote}
                 lote={dialogo.lote}
                 initial={dialogo.fila}

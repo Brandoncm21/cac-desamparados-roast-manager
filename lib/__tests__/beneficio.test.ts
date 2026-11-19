@@ -1,12 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
   calcularPorcentajesMaduracion,
+  calcularTiempoSecado,
   esEtapaEditable,
   porcentajeDe,
   promedioBx,
   siguienteEstado,
 } from "../services/beneficio";
 import {
+  bodegajeSchema,
   caracterizacionSchema,
   catacionSchema,
   crearRecibidoSchema,
@@ -149,34 +151,128 @@ describe("crearRecibidoSchema", () => {
   });
 });
 
+describe("calcularTiempoSecado", () => {
+  it("calcula días entre fechas válidas", () => {
+    expect(calcularTiempoSecado("2026-01-05", "2026-01-10")).toEqual({
+      dias: 5,
+      texto: "5 días",
+    });
+    expect(calcularTiempoSecado("2026-01-05", "2026-01-06")).toEqual({
+      dias: 1,
+      texto: "1 día",
+    });
+    expect(calcularTiempoSecado("2026-01-05", "2026-01-05")).toEqual({
+      dias: 0,
+      texto: "0 días",
+    });
+  });
+
+  it("devuelve null si falta una fecha o están invertidas", () => {
+    expect(calcularTiempoSecado(null, "2026-01-10")).toEqual({ dias: null, texto: null });
+    expect(calcularTiempoSecado("2026-01-10", "")).toEqual({ dias: null, texto: null });
+    expect(calcularTiempoSecado("2026-01-10", "2026-01-05")).toEqual({
+      dias: null,
+      texto: null,
+    });
+  });
+
+  it("rechaza fechas con formato inválido", () => {
+    expect(calcularTiempoSecado("2026-13-40", "2026-01-10")).toEqual({
+      dias: null,
+      texto: null,
+    });
+  });
+});
+
 describe("secadoSchema", () => {
-  it("rechaza finalización anterior al inicio", () => {
+  it("acepta un registro vacío: todos los campos son opcionales", () => {
+    expect(secadoSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("acepta fechas invertidas sin bloquear el guardado", () => {
     const r = secadoSchema.safeParse({
       fecha_inicio_secado: "2026-01-10",
       fecha_finalizacion_secado: "2026-01-05",
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
   });
 
-  it("acepta un rango de fechas coherente", () => {
-    const r = secadoSchema.safeParse({
-      fecha_inicio_secado: "2026-01-05",
-      fecha_finalizacion_secado: "2026-01-10",
+  it("acepta hasta 5 mediciones y descarta el sexto par", () => {
+    const parsed = secadoSchema.parse({
+      humedad_1: 20.1,
+      humedad_5: 18.3,
+      tem_5: 32.1,
+      humedad_6: 17.9,
+      tem_6: 31.5,
     });
-    expect(r.success).toBe(true);
+    expect(parsed.humedad_5).toBe(18.3);
+    expect(parsed.tem_5).toBe(32.1);
+    expect(parsed).not.toHaveProperty("humedad_6");
+    expect(parsed).not.toHaveProperty("tem_6");
+  });
+});
+
+describe("bodegajeSchema", () => {
+  it("acepta un registro vacío: todos los campos son opcionales", () => {
+    expect(bodegajeSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("acepta los seis campos finales", () => {
+    const parsed = bodegajeSchema.parse({
+      inicio_reposo: "2026-02-01",
+      cantidad_sacos: 12,
+      peso_pergamino: 150.5,
+      peso_bellota: 40.2,
+      humedad_inicial: 22.1,
+      humedad_final: 12.4,
+    });
+    expect(parsed.cantidad_sacos).toBe(12);
+    expect(parsed.humedad_final).toBe(12.4);
+  });
+
+  it("descarta densidades y condiciones ambientales", () => {
+    const parsed = bodegajeSchema.parse({
+      densidad_pergamino: 0.8,
+      densidad_bellota: 0.7,
+      lectura_humedad_relativa: 60,
+      lectura_temperatura_interna: 25,
+      lectura_temperatura_externa: 30,
+    });
+    expect(parsed).not.toHaveProperty("densidad_pergamino");
+    expect(parsed).not.toHaveProperty("densidad_bellota");
+    expect(parsed).not.toHaveProperty("lectura_humedad_relativa");
+    expect(parsed).not.toHaveProperty("lectura_temperatura_interna");
+    expect(parsed).not.toHaveProperty("lectura_temperatura_externa");
   });
 });
 
 describe("trillaSchema", () => {
-  it("exige el peso en verde final", () => {
-    expect(trillaSchema.safeParse({}).success).toBe(false);
-    expect(trillaSchema.safeParse({ peso_verde_final: "" }).success).toBe(false);
-    expect(trillaSchema.safeParse({ peso_verde_final: 0 }).success).toBe(false);
+  it("acepta un registro vacío: todos los campos son opcionales", () => {
+    expect(trillaSchema.safeParse({}).success).toBe(true);
+    expect(trillaSchema.safeParse({ peso_verde_final: "" }).success).toBe(true);
+    expect(trillaSchema.safeParse({ peso_verde_final: 0 }).success).toBe(true);
   });
 
-  it("acepta un peso en verde positivo", () => {
-    const r = trillaSchema.safeParse({ peso_verde_final: 120.5 });
-    expect(r.success).toBe(true);
+  it("acepta las pruebas físicas y el peso final inferior", () => {
+    const parsed = trillaSchema.parse({
+      pruebas_fisicas_trilla: "Sin defectos visibles",
+      peso_en_verde_final_inferior: 12.4,
+    });
+    expect(parsed.pruebas_fisicas_trilla).toBe("Sin defectos visibles");
+    expect(parsed.peso_en_verde_final_inferior).toBe(12.4);
+  });
+
+  it("conserva separados peso_verde_final y peso_en_verde_final", () => {
+    const parsed = trillaSchema.parse({
+      peso_verde_final: 120.5,
+      peso_en_verde_final: 98.2,
+    });
+    expect(parsed.peso_verde_final).toBe(120.5);
+    expect(parsed.peso_en_verde_final).toBe(98.2);
+  });
+
+  it("rechaza porcentajes fuera de 0–100", () => {
+    expect(trillaSchema.safeParse({ porcentaje_primera: 101 }).success).toBe(false);
   });
 });
 
