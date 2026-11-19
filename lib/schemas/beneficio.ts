@@ -183,40 +183,25 @@ export const caracterizacionSchema = z
   });
 
 // ── Secado ──────────────────────────────────────────────────────────────────
-export const secadoSchema = z
-  .object({
-    tiempo_secado: textoOpcional(50),
-    fecha_inicio_secado: fechaOpcional,
-    fecha_finalizacion_secado: fechaOpcional,
-    dias_secado: enteroOpcional,
-    numero_cama: textoOpcional(50),
-    porcentaje_solar: porcentaje,
-    porcentaje_mecanico: porcentaje,
-    humedad_1: numeroOpcional,
-    humedad_2: numeroOpcional,
-    humedad_3: numeroOpcional,
-    humedad_4: numeroOpcional,
-    humedad_5: numeroOpcional,
-    humedad_6: numeroOpcional,
-    tem_1: numeroOpcional,
-    tem_2: numeroOpcional,
-    tem_3: numeroOpcional,
-    tem_4: numeroOpcional,
-    tem_5: numeroOpcional,
-    tem_6: numeroOpcional,
-    peso_inicial: numeroOpcional,
-    peso_final: numeroOpcional,
-  })
-  .refine(
-    (v) =>
-      !v.fecha_inicio_secado ||
-      !v.fecha_finalizacion_secado ||
-      v.fecha_finalizacion_secado >= v.fecha_inicio_secado,
-    {
-      message: "La fecha de finalización no puede ser anterior a la de inicio",
-      path: ["fecha_finalizacion_secado"],
-    }
-  );
+export const secadoSchema = z.object({
+  fecha_inicio_secado: fechaOpcional,
+  fecha_finalizacion_secado: fechaOpcional,
+  numero_cama: textoOpcional(50),
+  porcentaje_solar: porcentaje,
+  porcentaje_mecanico: porcentaje,
+  humedad_1: numeroOpcional,
+  humedad_2: numeroOpcional,
+  humedad_3: numeroOpcional,
+  humedad_4: numeroOpcional,
+  humedad_5: numeroOpcional,
+  tem_1: numeroOpcional,
+  tem_2: numeroOpcional,
+  tem_3: numeroOpcional,
+  tem_4: numeroOpcional,
+  tem_5: numeroOpcional,
+  peso_inicial: numeroOpcional,
+  peso_final: numeroOpcional,
+});
 
 // ── Bodegaje ────────────────────────────────────────────────────────────────
 export const bodegajeSchema = z.object({
@@ -226,27 +211,18 @@ export const bodegajeSchema = z.object({
   peso_bellota: numeroOpcional,
   humedad_inicial: numeroOpcional,
   humedad_final: numeroOpcional,
-  densidad_pergamino: numeroOpcional,
-  densidad_bellota: numeroOpcional,
-  lectura_humedad_relativa: porcentaje,
-  lectura_temperatura_interna: numeroOpcional,
-  lectura_temperatura_externa: numeroOpcional,
 });
 
 // ── Trilla ──────────────────────────────────────────────────────────────────
 export const trillaSchema = z.object({
   fecha_final_reposo: fechaOpcional,
+  pruebas_fisicas_trilla: textoOpcional(2000),
   rendimiento_teorico_pelado: porcentaje,
   rendimiento_teorico_seleccion: porcentaje,
   rendimiento_final_pelado: porcentaje,
   rendimiento_final_seleccion: porcentaje,
   peso_en_verde_teorico: numeroOpcional,
-  peso_verde_final: z.preprocess(
-    (v) => ((typeof v === "number" && Number.isNaN(v)) || v === "" ? null : v),
-    z
-      .number()
-      .positive("El peso en verde final (kg) es obligatorio para cerrar la trilla")
-  ),
+  peso_verde_final: numeroOpcional,
   humedad_inicial_pergamino_bellota: numeroOpcional,
   humedad_final_verde: numeroOpcional,
   porcentaje_primera: porcentaje,
@@ -260,6 +236,7 @@ export const trillaSchema = z.object({
   porcentaje_otras_inferiores: porcentaje,
   peso_en_verde_final: numeroOpcional,
   peso_verde_inferiores: numeroOpcional,
+  peso_en_verde_final_inferior: numeroOpcional,
 });
 
 // ── Catación (simplificada) ─────────────────────────────────────────────────

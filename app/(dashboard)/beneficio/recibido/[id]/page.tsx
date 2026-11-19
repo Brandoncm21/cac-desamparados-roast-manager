@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { EstadoBadge } from "@/components/ui/estado-badge";
 import { FormularioEtapa } from "@/components/beneficio/formulario-etapa";
 import { FormularioCaracterizacion } from "@/components/beneficio/formulario-caracterizacion";
+import { FormularioSecado } from "@/components/beneficio/formulario-secado";
+import { FormularioBodegaje } from "@/components/beneficio/formulario-bodegaje";
+import { FormularioTrilla } from "@/components/beneficio/formulario-trilla";
 import { EstadoLoteControl } from "@/components/beneficio/estado-lote-control";
 import { EditarReciboDialog } from "@/components/beneficio/editar-recibo-dialog";
 import { obtenerRecibido, type EtapaBeneficioNombre, type EtapaFila, type RecibidoDetalle } from "@/lib/api/beneficio";
@@ -200,6 +203,30 @@ export default function RecibidoDetallePage() {
             dialogo.etapa === "caracterizacion" ? (
               <FormularioCaracterizacion
                 key={`caracterizacion-${lote.id_lote}`}
+                lote={lote}
+                initial={dialogo.fila}
+                onSaved={() => { setDialogo(null); cargar(); }}
+                onCancel={() => setDialogo(null)}
+              />
+            ) : dialogo.etapa === "secado" ? (
+              <FormularioSecado
+                key={`secado-${lote.id_lote}`}
+                lote={lote}
+                initial={dialogo.fila}
+                onSaved={() => { setDialogo(null); cargar(); }}
+                onCancel={() => setDialogo(null)}
+              />
+            ) : dialogo.etapa === "bodegaje" ? (
+              <FormularioBodegaje
+                key={`bodegaje-${lote.id_lote}`}
+                lote={lote}
+                initial={dialogo.fila}
+                onSaved={() => { setDialogo(null); cargar(); }}
+                onCancel={() => setDialogo(null)}
+              />
+            ) : dialogo.etapa === "trilla" ? (
+              <FormularioTrilla
+                key={`trilla-${lote.id_lote}`}
                 lote={lote}
                 initial={dialogo.fila}
                 onSaved={() => { setDialogo(null); cargar(); }}

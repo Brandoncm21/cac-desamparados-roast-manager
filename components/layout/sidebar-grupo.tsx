@@ -32,9 +32,9 @@ const toneStyles: Record<
     headerOpen: "bg-tertiary-fixed/30",
     headerIcon: "bg-tertiary-fixed text-on-tertiary-fixed",
     eyebrow: "text-on-tertiary-fixed-variant",
-    itemHover: "hover:bg-tertiary-fixed/35 hover:text-on-tertiary-fixed-variant",
+    itemHover: "hover:bg-green-100 hover:text-green-800",
     itemActive:
-      "bg-tertiary-fixed text-on-tertiary-fixed font-semibold shadow-[inset_3px_0_0_var(--tertiary)]",
+      "bg-green-100 text-green-800 font-semibold shadow-[inset_3px_0_0_currentColor]",
     focus: "focus-visible:ring-tertiary/50",
   },
   servicios: {
@@ -43,9 +43,9 @@ const toneStyles: Record<
     headerOpen: "bg-secondary-fixed/35",
     headerIcon: "bg-secondary-fixed text-on-secondary-fixed",
     eyebrow: "text-on-secondary-fixed-variant",
-    itemHover: "hover:bg-secondary-fixed/45 hover:text-on-secondary-fixed-variant",
+    itemHover: "hover:bg-orange-100 hover:text-orange-800",
     itemActive:
-      "bg-secondary-fixed text-on-secondary-fixed font-semibold shadow-[inset_3px_0_0_var(--secondary)]",
+      "bg-orange-100 text-orange-800 font-semibold shadow-[inset_3px_0_0_currentColor]",
     focus: "focus-visible:ring-secondary/50",
   },
 };

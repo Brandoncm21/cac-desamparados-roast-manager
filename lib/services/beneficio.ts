@@ -75,6 +75,44 @@ export function esEtapaEditable(enproceso: string | null | undefined): boolean {
   return enproceso !== "Vendido";
 }
 
+export interface TiempoSecado {
+  dias: number | null;
+  texto: string | null;
+}
+
+const DIAS_MS = 24 * 60 * 60 * 1000;
+
+function parsearFecha(valor: string | null | undefined): Date | null {
+  if (!valor) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(valor);
+  if (!match) return null;
+  const [, anio, mes, dia] = match;
+  const fecha = new Date(Date.UTC(Number(anio), Number(mes) - 1, Number(dia)));
+  if (
+    fecha.getUTCFullYear() !== Number(anio) ||
+    fecha.getUTCMonth() !== Number(mes) - 1 ||
+    fecha.getUTCDate() !== Number(dia)
+  ) {
+    return null;
+  }
+  return fecha;
+}
+
+/** Días entre dos fechas de secado; null si falta alguna o la final es anterior. */
+export function calcularTiempoSecado(
+  inicio: string | null | undefined,
+  fin: string | null | undefined
+): TiempoSecado {
+  const desde = parsearFecha(inicio);
+  const hasta = parsearFecha(fin);
+  if (!desde || !hasta) return { dias: null, texto: null };
+
+  const dias = Math.round((hasta.getTime() - desde.getTime()) / DIAS_MS);
+  if (dias < 0) return { dias: null, texto: null };
+
+  return { dias, texto: dias === 1 ? "1 día" : `${dias} días` };
+}
+
 /** Porcentaje de una parte sobre un total, o null si el total no es válido. */
 export function porcentajeDe(
   parte: number | null | undefined,

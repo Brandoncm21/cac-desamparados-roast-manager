@@ -175,8 +175,8 @@ export function Sidebar() {
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors min-h-[42px]",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary/40",
                     activo
-                      ? "bg-surface-container-highest text-on-surface font-semibold"
-                      : "text-muted-foreground hover:bg-surface-container-high hover:text-on-surface"
+                      ? "bg-blue-100 text-blue-800 font-semibold"
+                      : "text-muted-foreground hover:bg-blue-100 hover:text-blue-800"
                   )}
                 >
                   <Icon className="h-4.5 w-4.5 h-[18px] w-[18px] shrink-0" />
