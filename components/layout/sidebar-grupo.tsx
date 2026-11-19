@@ -9,6 +9,7 @@ export type SidebarNavItem = {
   label: string;
   icon: LucideIcon;
   title?: string;
+  multiline?: boolean;
 };
 
 type Tone = "acopio" | "servicios";
@@ -151,7 +152,9 @@ export function SidebarGrupo({
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
+                <span className={item.multiline ? "whitespace-normal leading-tight" : "truncate"}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}

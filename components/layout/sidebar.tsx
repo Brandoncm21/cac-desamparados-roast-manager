@@ -47,13 +47,14 @@ const acopioNavItems: SidebarNavItem[] = [
   { href: "/beneficio/secado", label: "Secado", icon: Sun },
   { href: "/beneficio/bodegaje", label: "Bodegaje", icon: Warehouse },
   { href: "/beneficio/trilla", label: "Trilla", icon: Boxes },
-  { href: "/beneficio/catacion", label: "Catación", icon: CupSoda },
   {
     href: "/beneficio/calificacion",
-    label: "Calificación",
-    title: "Calificación de Café Arábiga Verde y Tostado",
+    label: "Calificación de café arábiga verde y tostado",
+    title: "Hoja de calificación de café arábiga verde y tostado",
     icon: Award,
+    multiline: true,
   },
+  { href: "/beneficio/catacion", label: "Catación", icon: CupSoda },
   { href: "/fincas", label: "Fincas", icon: MapPin },
 ];
 

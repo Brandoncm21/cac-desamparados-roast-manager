@@ -193,14 +193,15 @@ Dominio nuevo tras las migraciones `0050`–`0053`: el lote nace en **Recibido d
 | `PUT /api/recibido/[id]/bodegaje` | `bodegajeSchema` | `guardar_bodega(p_id_lote, p_bodega)` |
 | `PUT /api/recibido/[id]/trilla` | `trillaSchema` (todos opcionales; incluye `pruebas_fisicas_trilla` y `peso_en_verde_final_inferior`) | `guardar_trilla(p_id_lote, p_trilla)` |
 | `PUT /api/recibido/[id]/catacion` | `guardarCatacionSchema` (`catado`, `notas_catacion`) | `guardar_catacion(p_catacion)` |
-| `PUT /api/recibido/[id]/calificacion` | `guardarCalificacionSchema` (verde + tostado; tostado exige humedad) | `guardar_calificacion(p_id_lote, p_calificacion)` |
+| `PUT /api/recibido/[id]/calificacion` | `guardarCalificacionSchema` (hoja SCA verde + tostado) | `guardar_hoja_calificacion(p_id_lote, p_datos)` |
 
 - Escritura de etapas: `Admin`/`Recepción`; catación y calificación: `Tostador`/`Admin`. `GET`: `Admin`/`Recepción`/`Tostador`.
 - **Caracterización (0057)**: `caracterizacionSchema` acepta `fecha_hora`, `proceso` (catálogo compartido), `proceso_otro`, conteos de cerezas, lecturas/promedios °Bx, `densidad_g_ml`, `g_vanos`/`g_secos`/`g_broca` y observaciones. Ya no acepta `escala_maduracion`, `rango_optimo_madurez`, `muestreo_tabla` ni `pct_*`.
 - **Secado (0058)**: `secadoSchema` acepta fechas opcionales, `numero_cama`, `% solar/mecánico`, 5 pares `humedad_*`/`tem_*` y pesos. No acepta `tiempo_secado`/`dias_secado` (los calcula la RPC); ya no existe `humedad_6`/`tem_6`.
 - **Bodegaje (0059)**: `bodegajeSchema` acepta `inicio_reposo`, `cantidad_sacos`, `peso_pergamino`, `peso_bellota`, `humedad_inicial` y `humedad_final`. Ya no acepta densidades ni condiciones ambientales; la RPC tampoco las escribe.
 - **Trilla (0060)**: `trillaSchema` acepta `pruebas_fisicas_trilla` y `peso_en_verde_final_inferior`; `peso_verde_final` ya no es obligatorio. `peso_verde_final` y `peso_en_verde_final` son columnas distintas.
-- `guardar_catacion` es `SECURITY DEFINER` con chequeo de rol; desmarcar `catado` revierte a `En Trilla`. `guardar_calificacion` es `SECURITY INVOKER` y avanza el lote a `Calificado`.
+- **Calificación (0061)**: `GET/PUT /api/recibido/[id]/calificacion` leen/guardan la hoja SCA con `defectos` (16 tipos verdes), color, olor, quakers y grados. `GET /api/calificacion/catalogos` expone catálogo/opciones y `GET /api/calificacion` lista hojas.
+- `guardar_catacion` es `SECURITY DEFINER` con chequeo de rol; desmarcar `catado` revierte a `En Trilla`. `guardar_hoja_calificacion` avanza el lote a `Calificado` cuando ambos grados están definidos.
 - Mapeo de errores RPC: `P0002`→**404**, `42501`→**403**, `55000`→**409**, `22023`→**422**.
 
 **`/api/fincas`** — fincas del productor: `GET` paginado con `productor_id` + `search` (`ilike nombre`), embebe `productores(nombre_completo)` y `zonas_finca(nombre)`; `POST` (`crearFincaSchema`: `productor_id`, `nombre`, `zona_id?`, `ubicacion?`, `altura?`; `23505`→**409**, `23503`→**400**) y `[id]` `GET` (incluye `lotes[]` del nuevo dominio, `ordenes_count` y `tiene_dependencias`), `PUT` y `DELETE` soft. `PUT` que cambie `productor_id` y `DELETE` con lotes/órdenes asociados → **409**. `fincas.cliente_id` fue eliminada en `0053`.

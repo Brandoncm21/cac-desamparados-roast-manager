@@ -58,6 +58,26 @@ export const PROCESOS_BENEFICIO = ["Lavado", "Honey", "Natural", "Miel", "Semila
 
 export const ESTADOS_LOTE_COMERCIAL = ["proceso", "disponible", "vendido"] as const;
 
+export const GRADOS_CALIFICACION = [
+  "Specialty",
+  "Premium",
+  "Exchange",
+  "Below Standard",
+] as const;
+
+export const COLORES_CAFE_VERDE = [
+  "Azul-Verde",
+  "Azulado-Verde",
+  "Verde",
+  "Verdoso",
+  "Amarillo-Verde",
+  "Amarillo pálido",
+  "Amarillo",
+  "Cafezoso",
+] as const;
+
+export const OLORES_CAFE_VERDE = ["Olor extraño", "Limpio"] as const;
+
 export const ETAPAS_BENEFICIO = [
   "caracterizacion",
   "secado",
@@ -249,62 +269,37 @@ export const guardarCatacionSchema = catacionSchema.extend({
   id_lote: z.number().int().positive("La catación debe estar vinculada a un lote"),
 });
 
-// ── Calificación (verde + tostado) ──────────────────────────────────────────
-/** Atributos sensoriales: enteros de 1 a 10. */
-const atributo = z.preprocess(
-  (v) => ((typeof v === "number" && Number.isNaN(v)) || v === "" ? null : v),
-  z
-    .number()
-    .int("El atributo debe ser un entero de 1 a 10")
-    .min(1, "El atributo mínimo es 1")
-    .max(10, "El atributo máximo es 10")
-    .optional()
-    .nullable()
+// ── Calificación (hoja SCA verde + tostado) ────────────────────────────────
+const conteoDefecto = z.preprocess(
+  (v) => (v === "" || v == null ? 0 : v),
+  z.number().int("El conteo debe ser un entero").min(0, "No puede ser negativo")
 );
 
+const defectoCalificacionSchema = z.object({
+  id_defecto: z.number().int().positive(),
+  numero_defectos: conteoDefecto,
+});
+
 const calificacionCampos = {
-  // Bloque verde: análisis físico del café verde.
+  nombre: textoOpcional(150),
+  codigo: textoOpcional(100),
+  fecha: fechaOpcional,
+  grado: z.enum(GRADOS_CALIFICACION).optional().nullable(),
   humedad: porcentaje,
-  densidad: z.preprocess(
-    (v) => ((typeof v === "number" && Number.isNaN(v)) || v === "" ? null : v),
-    z
-      .number()
-      .positive("La densidad debe ser mayor que 0")
-      .optional()
-      .nullable()
-  ),
-  defectos_primarios: enteroOpcional,
-  defectos_secundarios: enteroOpcional,
-  porcentaje_verde: porcentaje,
-  // Bloque tostado: puntaje y atributos sensoriales.
-  puntaje_sca: porcentaje,
-  fragancia: atributo,
-  acidez: atributo,
-  cuerpo: atributo,
-  dulzor: atributo,
-  balance: atributo,
-  notas: textoOpcional(2000),
+  color: z.enum(COLORES_CAFE_VERDE).optional().nullable(),
+  olor: z.enum(OLORES_CAFE_VERDE).optional().nullable(),
+  codigo_muestra_tostado: textoOpcional(100),
+  quakers: enteroOpcional,
+  grado_tostado: z.enum(GRADOS_CALIFICACION).optional().nullable(),
+  defectos: z.array(defectoCalificacionSchema).max(30).default([]),
 };
 
-/** El tostado solo se califica si el verde ya está cargado (FR-003). */
-const verdeAntesQueTostado = {
-  message: "Registre primero el análisis del café verde (humedad)",
-  path: ["puntaje_sca"] as string[],
-};
+export const calificacionSchema = z.object(calificacionCampos);
 
-const exigeVerde = (v: { puntaje_sca?: number | null; humedad?: number | null }) =>
-  v.puntaje_sca == null || v.humedad != null;
-
-export const calificacionSchema = z
-  .object(calificacionCampos)
-  .refine(exigeVerde, verdeAntesQueTostado);
-
-export const guardarCalificacionSchema = z
-  .object({
-    ...calificacionCampos,
-    id_lote: z.number().int().positive("La calificación debe estar vinculada a un lote"),
-  })
-  .refine(exigeVerde, verdeAntesQueTostado);
+export const guardarCalificacionSchema = z.object({
+  ...calificacionCampos,
+  id_lote: z.number().int().positive("La calificación debe estar vinculada a un lote"),
+});
 
 export const ETAPA_SCHEMAS = {
   caracterizacion: caracterizacionSchema,
