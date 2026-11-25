@@ -15,6 +15,7 @@ import type {
   SecadoInput,
   TrillaInput,
 } from "@/lib/schemas/beneficio";
+import type { CrearProductorInput } from "@/lib/schemas/productores";
 import { leerJson, leerJsonPaginado } from "./http";
 
 export interface ZonaFinca {
@@ -107,6 +108,21 @@ export async function listarProductores(search?: string): Promise<ProductorResum
   const res = await fetch(`/api/productores?${params}`);
   const { items } = await leerJsonPaginado<ProductorResumen>(res);
   return items;
+}
+
+/**
+ * Crea un productor. Solo viajan las columnas editables (`nombre_completo`,
+ * `telefono`); fechas, `public_id` y `id_productor` los asigna la BD.
+ */
+export async function crearProductor(
+  input: CrearProductorInput
+): Promise<ProductorResumen> {
+  const res = await fetch("/api/productores", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return leerJson<ProductorResumen>(res);
 }
 
 export async function listarFincasDeProductor(

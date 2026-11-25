@@ -15,6 +15,7 @@ import {
   actualizarFinca, crearFinca, listarZonas, opcionesProductor, type FincaOpcion, type ZonaOpcion,
 } from "@/lib/fincas";
 import { listarProductores, type ProductorResumen } from "@/lib/api/beneficio";
+import { NuevoProductorDialog } from "./nuevo-productor-dialog";
 
 const SIN_ZONA = "__sin_zona__";
 
@@ -46,6 +47,7 @@ export function FincaForm({ finca, productorBloqueado = false }: FincaFormProps)
   const [zonas, setZonas] = useState<ZonaOpcion[]>([]);
   const [nuevaZonaOpen, setNuevaZonaOpen] = useState(false);
   const [nuevaZonaNombre, setNuevaZonaNombre] = useState("");
+  const [nuevoProductorOpen, setNuevoProductorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const {
@@ -84,6 +86,13 @@ export function FincaForm({ finca, productorBloqueado = false }: FincaFormProps)
       activo = false;
     };
   }, []);
+
+  const onProductorCreado = (productor: ProductorResumen) => {
+    setProductores((prev) =>
+      [...prev, productor].sort((a, b) => a.nombre_completo.localeCompare(b.nombre_completo))
+    );
+    setValue("productor_id", productor.id_productor, { shouldValidate: true });
+  };
 
   const crearZona = async () => {
     const nombre = nuevaZonaNombre.trim();
@@ -146,7 +155,19 @@ export function FincaForm({ finca, productorBloqueado = false }: FincaFormProps)
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2 md:col-span-2">
-            <Label>Productor *</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label>Productor *</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => setNuevoProductorOpen(true)}
+                disabled={productorBloqueado}
+              >
+                + Nuevo productor
+              </Button>
+            </div>
             <Select
               items={opcionesProductor(productores)}
               value={productorId ? String(productorId) : null}
@@ -250,6 +271,12 @@ export function FincaForm({ finca, productorBloqueado = false }: FincaFormProps)
           </div>
         </CardContent>
       </Card>
+
+      <NuevoProductorDialog
+        open={nuevoProductorOpen}
+        onOpenChange={setNuevoProductorOpen}
+        onCreado={onProductorCreado}
+      />
 
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={() => router.push("/fincas")}>

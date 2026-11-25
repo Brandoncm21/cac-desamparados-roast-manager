@@ -33,8 +33,8 @@ Helpers: [`lib/api-helpers.ts:57-87`](https://github.com/Brandoncm21/cac-desampa
 | 21 | GET | `/api/servicios-activos` | `Recepción, Tostador, Admin` | Servicios activos con intervalos + empaques con precio vigente |
 | 22 | PUT | `/api/servicios/[idServicio]` | `Recepción, Admin` | Editar servicio ejecutado |
 | 23 | DELETE | `/api/servicios/[idServicio]` | `Recepción, Admin` | Eliminar servicio (solo Pendiente) |
-| 24 | POST | `/api/perfiles-tueste` | `Tostador, Admin` | Crear perfil |
-| 25 | GET | `/api/perfiles-tueste/[id]` | `Recepción, Tostador, Admin` | Obtener perfil con temperaturas/hitos/métricas/ajustes |
+| 24 | POST | `/api/perfiles-tueste` | `Tostador, Admin` | Crear perfil (factura Tueste opcional + `lote_ids` opcionales) |
+| 25 | GET | `/api/perfiles-tueste/[id]` | `Recepción, Tostador, Admin` | Obtener perfil con lotes, temperaturas, hitos, métricas y ajustes |
 | 26 | PUT/DELETE | `/api/perfiles-tueste/[id]` | `Tostador, Admin` | Actualizar / soft delete |
 | 27 | GET/POST | `/api/perfiles-tueste/[id]/temperaturas` | `Tostador, Admin` | Listar / bulk upsert temperaturas |
 | 28 | PUT | `/api/perfiles-tueste/[id]/hitos/[tipoHito]` | `Tostador, Admin` | Upsert hito |

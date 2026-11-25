@@ -57,12 +57,34 @@ export function useTuesteData(perfilId: number, timeStep: number): TuesteData {
         const { data: perfilData } = await supabase
           .from("perfiles_tueste")
           .select(
-            "*, empleados!perfiles_tueste_id_tostador_fkey(nombre), ordenes_trabajo(numero_factura, porcentaje_humedad_entrada)"
+            "*, empleados!perfiles_tueste_id_tostador_fkey(nombre), ordenes_trabajo(numero_factura, porcentaje_humedad_entrada), perfil_tueste_lotes(lotes_cafe(id_lote, numero_lote, enproceso, estado_lote, productores(nombre_completo), fincas(nombre)))"
           )
           .eq("id_perfil", perfilId)
           .is("deleted_at", null)
           .single();
-        if (perfilData) setPerfil(perfilData);
+        if (perfilData) {
+          const fila = perfilData as unknown as Record<string, unknown> & {
+            perfil_tueste_lotes?: Array<{
+              lotes_cafe: {
+                id_lote: number;
+                numero_lote: string;
+                enproceso: string;
+                estado_lote: string | null;
+                productores: { nombre_completo: string } | null;
+                fincas: { nombre: string } | null;
+              } | null;
+            }>;
+          };
+          const { perfil_tueste_lotes, ...base } = fila;
+          setPerfil({
+            ...(base as unknown as PerfilTueste),
+            lotes: (perfil_tueste_lotes ?? [])
+              .map((item) => item.lotes_cafe)
+              .filter(
+                (lote): lote is NonNullable<typeof lote> => Boolean(lote)
+              ),
+          });
+        }
 
         const { data: metricasData } = await supabase
           .from("metricas_tueste")

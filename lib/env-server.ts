@@ -42,4 +42,13 @@ export const envServer = {
   get APP_URL() {
     return process.env["NEXT_PUBLIC_APP_URL"] || "http://localhost:3016";
   },
+  get OPENROUTER_API_KEY() {
+    const value = process.env["OPENROUTER_API_KEY"];
+    if (!value) {
+      throw new Error(
+        "❌ Variable de entorno faltante: OPENROUTER_API_KEY. Crea una clave en https://openrouter.ai/keys y agrégala a .env.local (nunca la comitees)."
+      );
+    }
+    return value;
+  },
 } as const;

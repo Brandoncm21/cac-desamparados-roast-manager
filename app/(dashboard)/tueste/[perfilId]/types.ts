@@ -28,10 +28,20 @@ export interface EmpleadoRelacionado {
   nombre: string;
 }
 
+export interface LotePerfilTueste {
+  id_lote: number;
+  numero_lote: string;
+  enproceso: string;
+  estado_lote?: string | null;
+  productores?: { nombre_completo: string } | null;
+  fincas?: { nombre: string } | null;
+}
+
 export interface PerfilTueste {
   id_perfil: number;
   id_orden?: number | null;
   numero_lote?: string | null;
+  lotes?: LotePerfilTueste[];
   fecha_tueste?: string | null;
   id_tostador?: number | null;
   nombre_cafe?: string | null;

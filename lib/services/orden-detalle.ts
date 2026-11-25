@@ -5,6 +5,8 @@
  * rendimiento y el total sin montar el componente.
  */
 
+import { calcularTotalAcumulado, type PasoFlujo } from "./pasos-orden";
+
 export interface MetricaTueste {
   tipo_metrica: string;
   valor_antes: number | null;
@@ -40,4 +42,28 @@ export function totalServicios(servicios: readonly ServicioFacturado[]): number 
     (suma, s) => suma + (Number(s.linea_total) || Number(s.precio) || 0),
     0
   );
+}
+
+/**
+ * Total facturable de la orden.
+ *
+ * Fuente de verdad: los pasos del flujo ya COMPLETADOS en `orden_pasos`
+ * (suma de `costo_total_paso`, que ya incluye subtotal + empaques).
+ * Fallback: si no hay pasos completados (órdenes legacy), suma los
+ * `linea_total ?? precio` de `servicios_ejecutados`.
+ *
+ * Nunca devuelve `NaN`: valores nulos/inválidos se tratan como 0.
+ */
+export interface OrdenConFacturacion {
+  servicios_ejecutados: readonly ServicioFacturado[];
+  orden_pasos: readonly PasoFlujo[] | null | undefined;
+}
+
+export function totalFacturaOrden(orden: OrdenConFacturacion): number {
+  const pasos = orden.orden_pasos ?? [];
+  const completados = pasos.filter((p) => p.estado === "COMPLETADO");
+  if (completados.length > 0) {
+    return calcularTotalAcumulado(completados);
+  }
+  return totalServicios(orden.servicios_ejecutados);
 }

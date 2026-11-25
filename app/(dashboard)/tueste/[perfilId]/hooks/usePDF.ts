@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import { dibujarEncabezadoInstitucional } from "@/lib/pdf/header";
 import type {
   AjusteLocal,
   HitoRecord,
@@ -60,18 +61,11 @@ export function usePDF({
       reader.readAsDataURL(logoBlob);
     });
 
-    let y = 5;
-
-    pdf.addImage(logoB64, "JPEG", M, y, 22, 22);
-    pdf.setFontSize(13);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Centro Agrícola Cantonal de Desamparados (CACD)", M + 25, y + 10);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    pdf.text("SCACR - Registro de Torrefacción", M + 25, y + 17);
-    pdf.setDrawColor(0);
-    pdf.line(M, y + 24, W - M, y + 24);
-    y += 30;
+    let y = dibujarEncabezadoInstitucional({
+      pdf,
+      titulo: "SCACR - Registro de Torrefacción",
+      logoB64,
+    });
 
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
@@ -86,11 +80,10 @@ export function usePDF({
       y
     );
     y += 4;
-    pdf.text(
-      `Café: ${ctxNombreCafe || "-"}    Lote: ${perfil?.numero_lote || "-"}`,
-      M,
-      y
-    );
+    const lotesTexto = perfil?.lotes?.length
+      ? perfil.lotes.map((lote) => lote.numero_lote).join(", ")
+      : perfil?.numero_lote || "-";
+    pdf.text(`Café: ${ctxNombreCafe || "-"}    Lotes: ${lotesTexto}`, M, y);
     y += 4;
     pdf.text(
       `Tostador: ${nombreTostador || "-"}    Temp. Sala: ${ctxTempSala || "-"}°C    Humedad: ${ctxHumSala || "-"}%`,

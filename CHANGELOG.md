@@ -4,6 +4,17 @@ Todas las notas de versión de SCACR.
 
 ## [Unreleased]
 
+### Added — Imprimir/Descargar factura al cerrar el flujo de órdenes
+- **Flujo de pasos**: al quedar todos los pasos completados aparecen “Imprimir Factura” y “Descargar PDF” junto al total acumulado.
+- **PDF**: nueva factura jsPDF con encabezado CACD y el mismo lenguaje visual de perfiles/recibido; incluye cliente, finca, lotes, servicios/empaques y total.
+- **Impresión**: plantilla HTML de orden corregida a A4, con filas de tabla sin cortes y sin sidebar/botones.
+- **Datos**: el detalle de la orden incorpora `empaques(nombre)` y los lotes asociados vía `orden_lotes`.
+
+### Added — Perfiles de tueste con lotes selectivos (0062)
+- **DB `0062`**: tabla `perfil_tueste_lotes` (N:M, 0..N lotes por perfil) y RPC `crear_perfil_tueste` que inserta perfil + lotes de forma transaccional.
+- **Modal Crear Nuevo Perfil**: factura opcional (solo órdenes con servicio Tueste) y lotes como selección independiente múltiple, con proceso visible. Se puede crear el perfil solo con lotes.
+- **Compatibilidad**: se conserva `perfiles_tueste.numero_lote` como fallback del primer lote; encabezado, PDF, listado y detalle priorizan la relación nueva.
+
 ### Changed — Trilla compacta en 6 cajitas (0060)
 - **UI**: formulario dedicado con Trilla, Peso teórico, Peso verde sin selección, Mediciones de humedad, Porcentaje en calidades y Peso en verde exportación.
 - **DB `0060`**: se agregan `pruebas_fisicas_trilla` y `peso_en_verde_final_inferior`; `guardar_trilla` las persiste.

@@ -19,6 +19,10 @@ export function TuesteHeader({
   isOnline,
   onDescargarPDF,
 }: TuesteHeaderProps) {
+  const lotesTexto = perfil?.lotes?.length
+    ? perfil.lotes.map((lote) => lote.numero_lote).join(", ")
+    : perfil?.numero_lote || "-";
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-12 lg:pt-0">
       <div>
@@ -26,7 +30,7 @@ export function TuesteHeader({
           {perfil?.nombre_cafe || `Perfil #${perfilId}`}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Lote: {perfil?.numero_lote || "-"} | Minuto: {currentMinute}
+          Lotes: {lotesTexto} | Minuto: {currentMinute}
         </p>
       </div>
       <div className="flex items-center gap-2">

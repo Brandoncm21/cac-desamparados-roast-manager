@@ -9,8 +9,9 @@ import { getCurrentUserRole, type UserRole } from "@/lib/auth-helpers";
 import { detalleDeError } from "@/lib/api/http";
 import { cambiarEstadoOrden, eliminarOrden } from "@/lib/api/ordenes";
 import { crearPerfilTueste } from "@/lib/api/perfiles-tueste";
-import { totalServicios, type MetricaTueste } from "@/lib/services/orden-detalle";
-import type { OrdenDetalle, PerfilConResumen } from "../types";
+import { totalFacturaOrden, type MetricaTueste } from "@/lib/services/orden-detalle";
+import { generarPDFFactura, imprimirFactura } from "@/lib/pdf/orden";
+import type { LoteOrden, OrdenDetalle, PerfilConResumen } from "../types";
 
 export type { OrdenDetalle, PerfilConResumen } from "../types";
 
@@ -42,8 +43,9 @@ export function useOrdenDetalle(idOrden: number) {
           *,
           clientes(*),
           fincas(nombre, altura),
-          servicios_ejecutados(*),
-          orden_pasos(servicios_maestro(tipo)),
+          servicios_ejecutados(*, empaques(nombre)),
+          orden_lotes(lotes_cafe(numero_lote, enproceso)),
+          orden_pasos(*, servicios_maestro(id_servicio_maestro, tipo, nombre)),
           especificaciones_orden(*),
           empleado_recibe:empleados!id_empleado_recibe(nombre),
           empleado_entrega:empleados!id_empleado_entrega(nombre)
@@ -53,7 +55,18 @@ export function useOrdenDetalle(idOrden: number) {
         .is("deleted_at", null)
         .single();
 
-      if (vigente && data) setOrden(data as unknown as OrdenDetalle);
+      if (vigente && data) {
+        const fila = data as unknown as OrdenDetalle & {
+          orden_lotes?: Array<{ lotes_cafe: LoteOrden | null }>;
+        };
+        const { orden_lotes, ...base } = fila;
+        setOrden({
+          ...(base as OrdenDetalle),
+          lotes: (orden_lotes ?? [])
+            .map((item) => item.lotes_cafe)
+            .filter((lote): lote is LoteOrden => Boolean(lote)),
+        });
+      }
     };
 
     cargar();
@@ -159,6 +172,11 @@ export function useOrdenDetalle(idOrden: number) {
     }
   };
 
+  const descargarFacturaPDF = async () => {
+    if (!orden) return;
+    await generarPDFFactura(orden, totalFacturaOrden(orden));
+  };
+
   return {
     orden,
     perfil,
@@ -168,10 +186,17 @@ export function useOrdenDetalle(idOrden: number) {
     userRole,
     creandoPerfil,
     tieneTueste,
-    total: totalServicios(orden?.servicios_ejecutados ?? []),
+    total: totalFacturaOrden({
+      servicios_ejecutados: orden?.servicios_ejecutados ?? [],
+      orden_pasos: orden?.orden_pasos ?? [],
+    }),
     cambiarEstado,
     eliminar,
     iniciarTueste,
-    imprimir: () => window.print(),
+    imprimir: async () => {
+      if (!orden) return;
+      await imprimirFactura(orden, totalFacturaOrden(orden));
+    },
+    descargarFacturaPDF,
   };
 }

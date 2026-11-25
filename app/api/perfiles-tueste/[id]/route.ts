@@ -12,14 +12,23 @@ async function get(
   const { id } = await params;
   const perfilId = validateIdParam(id);
 
-  const { data: perfil, error } = await supabase
+  const { data: perfilData, error } = await supabase
     .from("perfiles_tueste")
-    .select("*, empleados!perfiles_tueste_id_tostador_fkey(nombre), ordenes_trabajo(numero_factura)")
+    .select(
+      "*, empleados!perfiles_tueste_id_tostador_fkey(nombre), ordenes_trabajo(numero_factura), perfil_tueste_lotes(lotes_cafe(id_lote, numero_lote, enproceso, estado_lote, productores(nombre_completo), fincas(nombre)))"
+    )
     .eq("id_perfil", perfilId)
     .is("deleted_at", null)
     .single();
 
   if (error) return apiError("Perfil no encontrado", 404);
+
+  const { perfil_tueste_lotes, ...perfil } = perfilData as Record<string, unknown> & {
+    perfil_tueste_lotes?: Array<{ lotes_cafe: Record<string, unknown> | null }>;
+  };
+  const lotes = (perfil_tueste_lotes ?? [])
+    .map((fila) => fila.lotes_cafe)
+    .filter((lote): lote is Record<string, unknown> => Boolean(lote));
 
   const { data: temperaturas } = await supabase
     .from("trazabilidad_temperatura")
@@ -45,6 +54,7 @@ async function get(
 
   return apiOk({
     ...perfil,
+    lotes,
     temperaturas: temperaturas || [],
     hitos: hitos || [],
     metricas: metricas || [],

@@ -1,7 +1,7 @@
 @media print {
   @page {
-    size: A2;
-    margin: 20mm;
+    size: A4;
+    margin: 12mm;
   }
 
   body * {
@@ -18,9 +18,22 @@
     left: 0;
     top: 0;
     width: 100%;
-    padding: 20mm;
+    padding: 0;
     background: white;
     color: black;
+  }
+
+  .printArea table {
+    break-inside: auto;
+  }
+
+  .printArea tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .printArea thead {
+    display: table-header-group;
   }
 
   .noPrint {
