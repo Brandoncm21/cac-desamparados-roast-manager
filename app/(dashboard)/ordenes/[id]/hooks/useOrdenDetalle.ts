@@ -9,8 +9,8 @@ import { getCurrentUserRole, type UserRole } from "@/lib/auth-helpers";
 import { detalleDeError } from "@/lib/api/http";
 import { cambiarEstadoOrden, eliminarOrden } from "@/lib/api/ordenes";
 import { crearPerfilTueste } from "@/lib/api/perfiles-tueste";
-import { totalServicios, type MetricaTueste } from "@/lib/services/orden-detalle";
-import { generarPDFFactura } from "@/lib/pdf/orden";
+import { totalFacturaOrden, type MetricaTueste } from "@/lib/services/orden-detalle";
+import { generarPDFFactura, imprimirFactura } from "@/lib/pdf/orden";
 import type { LoteOrden, OrdenDetalle, PerfilConResumen } from "../types";
 
 export type { OrdenDetalle, PerfilConResumen } from "../types";
@@ -45,7 +45,7 @@ export function useOrdenDetalle(idOrden: number) {
           fincas(nombre, altura),
           servicios_ejecutados(*, empaques(nombre)),
           orden_lotes(lotes_cafe(numero_lote, enproceso)),
-          orden_pasos(servicios_maestro(tipo)),
+          orden_pasos(*, servicios_maestro(id_servicio_maestro, tipo, nombre)),
           especificaciones_orden(*),
           empleado_recibe:empleados!id_empleado_recibe(nombre),
           empleado_entrega:empleados!id_empleado_entrega(nombre)
@@ -174,10 +174,7 @@ export function useOrdenDetalle(idOrden: number) {
 
   const descargarFacturaPDF = async () => {
     if (!orden) return;
-    await generarPDFFactura(
-      orden,
-      totalServicios(orden.servicios_ejecutados)
-    );
+    await generarPDFFactura(orden, totalFacturaOrden(orden));
   };
 
   return {
@@ -189,11 +186,17 @@ export function useOrdenDetalle(idOrden: number) {
     userRole,
     creandoPerfil,
     tieneTueste,
-    total: totalServicios(orden?.servicios_ejecutados ?? []),
+    total: totalFacturaOrden({
+      servicios_ejecutados: orden?.servicios_ejecutados ?? [],
+      orden_pasos: orden?.orden_pasos ?? [],
+    }),
     cambiarEstado,
     eliminar,
     iniciarTueste,
-    imprimir: () => window.print(),
+    imprimir: async () => {
+      if (!orden) return;
+      await imprimirFactura(orden, totalFacturaOrden(orden));
+    },
     descargarFacturaPDF,
   };
 }

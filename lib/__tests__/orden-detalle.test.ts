@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { calcularRendimiento, totalServicios } from "../services/orden-detalle";
+import {
+  calcularRendimiento,
+  totalFacturaOrden,
+  totalServicios,
+} from "../services/orden-detalle";
+import type { PasoFlujo } from "../services/pasos-orden";
 
 describe("lib/services/orden-detalle", () => {
   describe("calcularRendimiento", () => {
@@ -71,6 +76,74 @@ describe("lib/services/orden-detalle", () => {
 
     it("debería ignorar importes nulos", () => {
       expect(totalServicios([{ linea_total: null, precio: null }])).toBe(0);
+    });
+  });
+
+  describe("totalFacturaOrden", () => {
+    const paso = (
+      overrides: Partial<Pick<PasoFlujo, "estado" | "costo_total_paso">> = {}
+    ): PasoFlujo => ({
+      id_paso: 1,
+      prioridad: 1,
+      estado: "PENDIENTE",
+      costo_total_paso: null,
+      ...overrides,
+    });
+
+    it("debería sumar solo los pasos completados (fuente de verdad)", () => {
+      expect(
+        totalFacturaOrden({
+          servicios_ejecutados: [],
+          orden_pasos: [
+            paso({ estado: "COMPLETADO", costo_total_paso: 1000 }),
+            paso({ estado: "EN_PROCESO", costo_total_paso: 5000 }),
+            paso({ estado: "COMPLETADO", costo_total_paso: "250.50" }),
+          ],
+        })
+      ).toBe(1250.5);
+    });
+
+    it("debería devolver 0 cuando ningún paso está completado", () => {
+      expect(
+        totalFacturaOrden({
+          servicios_ejecutados: [],
+          orden_pasos: [paso({ estado: "PENDIENTE" }), paso({ estado: "OMITIDO" })],
+        })
+      ).toBe(0);
+    });
+
+    it("debería hacer fallback a servicios_ejecutados sin pasos completados", () => {
+      expect(
+        totalFacturaOrden({
+          servicios_ejecutados: [
+            { linea_total: 300, precio: 10 },
+            { linea_total: null, precio: 200 },
+          ],
+          orden_pasos: [],
+        })
+      ).toBe(500);
+    });
+
+    it("debería devolver 0 sin pasos ni servicios", () => {
+      expect(totalFacturaOrden({ servicios_ejecutados: [], orden_pasos: [] })).toBe(
+        0
+      );
+    });
+
+    it("debería tratar importes nulos y strings sin romper la suma", () => {
+      expect(
+        totalFacturaOrden({
+          servicios_ejecutados: [{ linea_total: null, precio: null }],
+          orden_pasos: [paso({ estado: "COMPLETADO", costo_total_paso: null })],
+        })
+      ).toBe(0);
+
+      expect(
+        totalFacturaOrden({
+          servicios_ejecutados: [{ linea_total: "100.50", precio: null }],
+          orden_pasos: [],
+        })
+      ).toBe(100.5);
     });
   });
 });

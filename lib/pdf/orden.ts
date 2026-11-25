@@ -1,29 +1,74 @@
 "use client";
 
+import type { jsPDF } from "jspdf";
 import type { OrdenDetalle } from "@/app/(dashboard)/ordenes/[id]/types";
+import { formatearColones, formatearPeso } from "@/lib/format";
+import { dibujarEncabezadoInstitucional } from "./header";
 
-const dinero = (valor: number | string | null | undefined) =>
-  `CRC ${(Number(valor) || 0).toFixed(2)}`;
+const W = 210;
+const M = 10;
+const PAGE_BOTTOM = 282;
 
 const texto = (valor: string | number | null | undefined) =>
   valor == null || valor === "" ? "—" : String(valor);
 
-const peso = (valor: number | string | null | undefined) =>
-  valor == null || valor === "" ? "—" : `${Number(valor).toFixed(2)} kg`;
+interface FilaFactura {
+  descripcion: string;
+  peso: number | null;
+  precioKg: number | null;
+  empaque: number | null;
+  total: number;
+}
 
-/**
- * Factura/orden en PDF con el mismo encabezado institucional y estructura
- * tipográfica de los comprobantes de perfiles y recibido.
- */
+/** Descarga la factura de la orden en PDF (diseño unificado CACD). */
 export async function generarPDFFactura(
   orden: OrdenDetalle,
   total: number
 ): Promise<void> {
+  const pdf = await buildFacturaPDF(orden, total);
+  pdf.save(`factura-${orden.numero_factura || orden.id_orden}.pdf`);
+}
+
+/** Imprime la factura de la orden usando el mismo documento PDF (diseño unificado CACD). */
+export async function imprimirFactura(
+  orden: OrdenDetalle,
+  total: number
+): Promise<void> {
+  const pdf = await buildFacturaPDF(orden, total);
+  const blob = pdf.output("blob");
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+  if (!win) {
+    URL.revokeObjectURL(url);
+    throw new Error("No se pudo abrir el documento para imprimir");
+  }
+
+  // El visor de PDF necesita cargar antes de invocar print(); se dispara al
+  // terminar la carga o, como respaldo, tras un breve margen. Solo una vez.
+  let impreso = false;
+  const imprimir = () => {
+    if (impreso) return;
+    impreso = true;
+    try {
+      win.focus();
+      win.print();
+    } catch {
+      // Si el navegador bloquea la impresión automática, el usuario aún puede
+      // imprimir manualmente desde la pestaña abierta.
+    }
+  };
+
+  win.onload = imprimir;
+  setTimeout(imprimir, 1000);
+}
+
+/** Construye el documento PDF de la factura (compartido por descargar e imprimir). */
+async function buildFacturaPDF(
+  orden: OrdenDetalle,
+  total: number
+): Promise<jsPDF> {
   const { jsPDF } = await import("jspdf");
   const pdf = new jsPDF("p", "mm", "a4");
-  const W = 210;
-  const M = 10;
-  const PAGE_BOTTOM = 282;
 
   let logoB64 = "";
   try {
@@ -39,26 +84,11 @@ export async function generarPDFFactura(
     logoB64 = "";
   }
 
-  let y = 5;
-
-  if (logoB64) {
-    try {
-      pdf.addImage(logoB64, "JPEG", M, y, 22, 22);
-    } catch {
-      // La factura sigue siendo válida sin logo.
-    }
-  }
-
-  const offset = logoB64 ? 25 : 0;
-  pdf.setFontSize(13);
-  pdf.setFont("helvetica", "bold");
-  pdf.text("Centro Agrícola Cantonal de Desamparados (CACD)", M + offset, y + 10);
-  pdf.setFontSize(10);
-  pdf.setFont("helvetica", "normal");
-  pdf.text("SCACR - Factura de Orden de Trabajo", M + offset, y + 17);
-  pdf.setDrawColor(0);
-  pdf.line(M, y + 24, W - M, y + 24);
-  y += 32;
+  let y = dibujarEncabezadoInstitucional({
+    pdf,
+    titulo: "SCACR - Factura de Orden de Trabajo",
+    logoB64,
+  });
 
   const seccion = (titulo: string) => {
     pdf.setFontSize(10);
@@ -76,6 +106,7 @@ export async function generarPDFFactura(
     }
   };
 
+  // ---- DATOS DE LA ORDEN ----
   seccion("DATOS DE LA ORDEN");
   pdf.text(
     `Orden #: ${texto(orden.numero_factura)}    Fecha: ${texto(orden.fecha_orden)}    Estado: ${texto(orden.estado_orden)}`,
@@ -84,18 +115,22 @@ export async function generarPDFFactura(
   );
   y += 4;
   pdf.text(
-    `Hora de cierre: ${texto(orden.hora_cierre)}    Responsable: ${texto(orden.empleado_recibe?.nombre)}`,
+    `Hora de cierre: ${texto(orden.hora_cierre)}    Responsable: ${texto(
+      orden.empleado_recibe?.nombre
+    )}`,
     M,
     y
   );
   y += 7;
 
+  // ---- CLIENTE ----
   seccion("CLIENTE");
   pdf.text(`Nombre: ${texto(orden.clientes?.nombre_completo)}`, M, y);
   y += 4;
   pdf.text(`Teléfono: ${texto(orden.clientes?.telefono)}`, M, y);
   y += 7;
 
+  // ---- FINCA Y PRODUCTO ----
   seccion("FINCA Y PRODUCTO");
   const finca = orden.fincas?.nombre
     ? `${orden.fincas.nombre}${orden.fincas.altura != null ? ` (${orden.fincas.altura} msnm)` : ""}`
@@ -108,7 +143,9 @@ export async function generarPDFFactura(
   pdf.text(`Finca: ${finca}`, M, y);
   y += 4;
   pdf.text(
-    `Producto: ${texto(orden.descripcion_producto)}    Proceso: ${texto(orden.proceso_cafe)}`,
+    `Producto: ${texto(orden.descripcion_producto)}    Proceso: ${texto(
+      orden.proceso_cafe
+    )}`,
     M,
     y
   );
@@ -123,6 +160,7 @@ export async function generarPDFFactura(
   pdf.text(lotesLineas, M, y);
   y += lotesLineas.length * 3.5 + 4;
 
+  // ---- DETALLE DE SERVICIOS ----
   seccion("DETALLE DE SERVICIOS");
   const columnas = {
     descripcion: M,
@@ -135,7 +173,7 @@ export async function generarPDFFactura(
   const encabezadoTabla = () => {
     pdf.setFontSize(7);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Servicio / Empaque", columnas.descripcion, y);
+    pdf.text("Servicio / Etapa", columnas.descripcion, y);
     pdf.text("Peso", columnas.peso, y, { align: "right" });
     pdf.text("Precio/kg", columnas.precioKg, y, { align: "right" });
     pdf.text("Empaque", columnas.empaque, y, { align: "right" });
@@ -144,54 +182,49 @@ export async function generarPDFFactura(
     pdf.setFont("helvetica", "normal");
   };
 
-  encabezadoTabla();
+  const filas = construirFilas(orden);
 
-  if (orden.servicios_ejecutados.length === 0) {
+  if (filas.length === 0) {
     pdf.setFontSize(8);
     pdf.text("Sin servicios registrados.", M, y);
     y += 6;
-  }
+  } else {
+    encabezadoTabla();
+    for (const fila of filas) {
+      const descripcionLineas = pdf.splitTextToSize(fila.descripcion, 80);
+      const alto = Math.max(4, descripcionLineas.length * 3.6) + 1;
 
-  for (const servicio of orden.servicios_ejecutados) {
-    const descripcion = servicio.empaques?.nombre
-      ? `${servicio.tipo_servicio} · ${servicio.empaques.nombre}`
-      : servicio.tipo_servicio;
-    const lineas = pdf.splitTextToSize(descripcion, 80);
-    const alto = Math.max(4, lineas.length * 3.6) + 1;
+      if (y + alto > PAGE_BOTTOM) {
+        pdf.addPage();
+        y = 15;
+        encabezadoTabla();
+      }
 
-    if (y + alto > PAGE_BOTTOM) {
-      pdf.addPage();
-      y = 15;
-      encabezadoTabla();
+      pdf.setFontSize(8);
+      pdf.text(descripcionLineas, columnas.descripcion, y);
+      pdf.text(formatearPeso(fila.peso), columnas.peso, y, { align: "right" });
+      pdf.text(formatearColones(fila.precioKg), columnas.precioKg, y, {
+        align: "right",
+      });
+      pdf.text(formatearColones(fila.empaque), columnas.empaque, y, {
+        align: "right",
+      });
+      pdf.text(formatearColones(fila.total), columnas.total, y, {
+        align: "right",
+      });
+      y += alto;
     }
-
-    pdf.setFontSize(8);
-    pdf.text(lineas, columnas.descripcion, y);
-    pdf.text(peso(servicio.peso_kg ?? servicio.peso_inicial), columnas.peso, y, {
-      align: "right",
-    });
-    pdf.text(dinero(servicio.snapshot_precio_por_kg), columnas.precioKg, y, {
-      align: "right",
-    });
-    pdf.text(dinero(servicio.snapshot_precio_empaque), columnas.empaque, y, {
-      align: "right",
-    });
-    pdf.text(
-      dinero(servicio.linea_total ?? servicio.precio),
-      columnas.total,
-      y,
-      { align: "right" }
-    );
-    y += alto;
   }
 
+  // ---- TOTAL ACUMULADO ----
   asegurarEspacio(14);
   pdf.setFontSize(9);
   pdf.setFont("helvetica", "bold");
   pdf.text("TOTAL ACUMULADO", M, y + 4);
-  pdf.text(dinero(total), columnas.total, y + 4, { align: "right" });
+  pdf.text(formatearColones(total), columnas.total, y + 4, { align: "right" });
   y += 12;
 
+  // ---- ESPECIFICACIONES ----
   const especificaciones = orden.especificaciones_orden;
   if (
     especificaciones &&
@@ -217,6 +250,7 @@ export async function generarPDFFactura(
     y += obs.length * 3.6 + 4;
   }
 
+  // ---- FOOTER ----
   pdf.setFontSize(7);
   pdf.setFont("helvetica", "normal");
   pdf.setDrawColor(0);
@@ -228,5 +262,44 @@ export async function generarPDFFactura(
     { align: "center" }
   );
 
-  pdf.save(`factura-${orden.numero_factura || orden.id_orden}.pdf`);
+  return pdf;
+}
+
+/**
+ * Construye las filas de la factura desde los pasos COMPLETADOS (fuente de
+ * verdad) con fallback a `servicios_ejecutados` (legacy) cuando no haya
+ * pasos completados.
+ */
+function construirFilas(orden: OrdenDetalle): FilaFactura[] {
+  const filas: FilaFactura[] = [];
+  const completados = orden.orden_pasos.filter((p) => p.estado === "COMPLETADO");
+
+  if (completados.length > 0) {
+    for (const paso of completados) {
+      filas.push({
+        descripcion: paso.servicios_maestro?.nombre
+          ? paso.servicios_maestro.nombre
+          : texto(paso.servicios_maestro?.tipo),
+        peso: paso.peso_facturable_kg ?? paso.peso_inicial_kg,
+        precioKg: paso.snapshot_precio_kg,
+        empaque: paso.snapshot_precio_empaque,
+        total: Number(paso.costo_total_paso) || 0,
+      });
+    }
+    return filas;
+  }
+
+  // Fallback legacy: servicios_ejecutados.
+  for (const servicio of orden.servicios_ejecutados) {
+    filas.push({
+      descripcion: servicio.empaques?.nombre
+        ? `${servicio.tipo_servicio} · ${servicio.empaques.nombre}`
+        : servicio.tipo_servicio,
+      peso: servicio.peso_kg ?? servicio.peso_inicial,
+      precioKg: servicio.snapshot_precio_por_kg,
+      empaque: servicio.snapshot_precio_empaque,
+      total: Number(servicio.linea_total) || Number(servicio.precio) || 0,
+    });
+  }
+  return filas;
 }

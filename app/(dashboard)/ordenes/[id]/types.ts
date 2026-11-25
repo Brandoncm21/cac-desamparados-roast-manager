@@ -24,6 +24,27 @@ export interface LoteOrden {
   enproceso: string;
 }
 
+/** Paso de orden con los campos usados para la facturación. */
+export interface PasoOrdenResumen {
+  id_paso: number;
+  id_orden: number;
+  servicio_id: number;
+  prioridad: number;
+  estado: "PENDIENTE" | "EN_PROCESO" | "COMPLETADO" | "OMITIDO";
+  peso_inicial_kg: number | null;
+  peso_facturable_kg: number | null;
+  peso_final_kg: number | null;
+  merma_kg: number | null;
+  snapshot_precio_kg: number | null;
+  snapshot_precio_empaque: number | null;
+  subtotal_servicio: number | null;
+  costo_total_paso: number | null;
+  cantidad_empaques: number | null;
+  empaque_id: number | null;
+  observaciones: string | null;
+  servicios_maestro: { id_servicio_maestro: number; tipo: string; nombre: string };
+}
+
 export interface EspecificacionesOrden {
   tipo_tueste: string | null;
   tipo_molienda: string | null;
@@ -45,7 +66,7 @@ export interface OrdenDetalle {
   fincas?: { nombre: string; altura: number | null } | null;
   lotes?: LoteOrden[];
   servicios_ejecutados: ServicioOrden[];
-  orden_pasos: { servicios_maestro: { tipo: string } }[];
+  orden_pasos: PasoOrdenResumen[];
   especificaciones_orden: EspecificacionesOrden | null;
   empleado_recibe: { nombre: string } | null;
   empleado_entrega: { nombre: string } | null;
